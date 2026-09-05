@@ -488,6 +488,33 @@ export const CHARACTERS: Record<
   },
 };
 
+export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
+  renike: {
+    s1: "L1 Serpenyő — közepes hatótávú ütés, blokkolható.",
+    s2: "R1 Büdi — fingós gázfelhő, területi támadás.",
+  },
+  ricsi: {
+    s1: "L1 Üveges — borosüveges ütés, blokkolható.",
+    s2: "R1 Hányósugár — előre lövő sugaras támadás.",
+  },
+  cica: {
+    s1: "L1 Tigrisugrás — nagy hatótávú vetődés az ellenfélnek.",
+    s2: "R1 Földrengető — három földütés, területi támadás. Guggolva-blokkolva védhető.",
+  },
+  agi: {
+    s1: "L1 Köpés — projectile, leköpi az ellenfelet.",
+    s2: "R1 Vérszívás — sebez és gyógyít.",
+  },
+  cricsi: {
+    s1: "L1 Superman Punch — hosszú hatótávú kiütő ütés, blokkolható.",
+    s2: "R1 KI Robbanás — AOE gömb, nem blokkolható.",
+  },
+  jezus: {
+    s1: "L1 Fényoszlop — 5 mp-ig az ellenfél pozícióján sebez, Jézust gyógyítja.",
+    s2: "R1 Szent Aura — 5 mp védőgömb: elnyeli a sebzést, nem támadhat, átmegy az ellenfélen (pl. sarokból a másik térfélre).",
+  },
+};
+
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
   kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=30" },
   sintertanya: { id: "sintertanya", name: "SINTERTANYA", nameHu: "Sintertanya", art: "/stages/sintertanya.jpg?v=30" },
@@ -1116,6 +1143,10 @@ export class KitchenKombat {
     this.round = 1;
     this.winner = null;
     this.fatality = null;
+    this.paused = false;
+    this.cpuPlan = [];
+    this.cpuAirOffense = false;
+    this.cpuGuard = false;
     this.f1 = this.makeFighter(this.p1id, 340, 1);
     this.f2 = this.makeFighter(this.p2id, 940, -1);
     this.screen = "vs";
@@ -1731,6 +1762,7 @@ export class KitchenKombat {
   }
 
   separate() {
+    if (this.f1.shieldT > 0 || this.f2.shieldT > 0) return;
     const hb1 = this.hurtbox(this.f1);
     const hb2 = this.hurtbox(this.f2);
     const vOverlap = hb1.y < hb2.y + hb2.h && hb2.y < hb1.y + hb1.h;

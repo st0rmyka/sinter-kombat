@@ -1,9 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio } from "./audio";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
+
+const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.13",
+    items: [
+      "Új max CPU: SZOPNI FOGSZ",
+      "Könnyű / Normál / Hard finomhangolva",
+      "Köridő szürke kör HUD-dal",
+      "Verziószám a bal alsó sarokban",
+    ],
+  },
+  {
+    v: "v0.12",
+    items: ["CPU agresszió csökkentve Könnyűn és Normálon"],
+  },
+  {
+    v: "v0.11",
+    items: ["CPU blokk, kombó, jump-in, anti-air javítva"],
+  },
+  {
+    v: "Korábbi",
+    items: [
+      "Jézus: Fényoszlop + Szent Aura",
+      "Cigányricsi, Vámpír Ági, Cica",
+      "Magyar announcer, menüzene, loading",
+      "Sinter Kombat menü + Sintertanya pálya",
+      "Visszavágó, mobil landscape, 45 mp-es kör",
+    ],
+  },
+];
 
 const emptyHud = (): Hud => ({
   screen: "title",
@@ -41,6 +71,8 @@ export function GameView() {
   const [hud, setHud] = useState<Hud>(emptyHud);
   const [muted, setMutedUi] = useState(false);
   const [help, setHelp] = useState(false);
+  const [updates, setUpdates] = useState(false);
+  const [patchIdx, setPatchIdx] = useState(0);
   const [diff, setDiff] = useState<Difficulty>("normal");
   const [menu, setMenu] = useState<"root" | "diff">("root");
   const [titleIdx, setTitleIdx] = useState(0);
@@ -63,6 +95,10 @@ export function GameView() {
   hudRef.current = hud;
   const helpRef = useRef(help);
   helpRef.current = help;
+  const updatesRef = useRef(updates);
+  updatesRef.current = updates;
+  const patchIdxRef = useRef(patchIdx);
+  patchIdxRef.current = patchIdx;
   const diffRef = useRef(diff);
   diffRef.current = diff;
   const menuRef = useRef(menu);
@@ -119,6 +155,14 @@ export function GameView() {
     const g = gameRef.current;
     if (!g) return;
     setConfirm(null);
+    g.beginMatch();
+  };
+
+  const goRestart = () => {
+    const g = gameRef.current;
+    if (!g) return;
+    setConfirm(null);
+    setHelp(false);
     g.beginMatch();
   };
 
@@ -219,11 +263,16 @@ export function GameView() {
         raf = requestAnimationFrame(tick);
         return;
       }
-      if (helpRef.current) {
+      if (helpRef.current || updatesRef.current) {
         const m = sampleMenu();
-        if (!gated() && (m.kickLP || m.kickRP || m.punchLP || m.punchRP || m.startP)) {
+        if (updatesRef.current) {
+          if (m.upP) setPatchIdx((i) => Math.max(0, i - 1));
+          if (m.downP) setPatchIdx((i) => Math.min(PATCH_NOTES.length - 1, i + 1));
+        }
+        if (!gated() && (m.kickLP || m.kickRP || m.startP)) {
           armGate();
           setHelp(false);
+          setUpdates(false);
         }
         raf = requestAnimationFrame(tick);
         return;
@@ -233,19 +282,25 @@ export function GameView() {
         const diffs: Difficulty[] = DIFFICULTIES;
         const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
         if (menuRef.current === "root") {
-          if (m.upP) setTitleIdx((i) => (i + 2) % 3);
-          if (m.downP) setTitleIdx((i) => (i + 1) % 3);
+          if (m.upP) setTitleIdx((i) => (i + 3) % 4);
+          if (m.downP) setTitleIdx((i) => (i + 1) % 4);
           if (ok) {
-            boot();
             armGate();
             const i = titleIdxRef.current;
-            if (i === 0) setMenu("diff");
-            else if (i === 1) {
+            if (i === 0) {
+              boot();
+              setMenu("diff");
+            } else if (i === 1) {
+              boot();
               resetSelect(false);
               g.chooseMode(false, diffRef.current);
-            } else {
+            } else if (i === 2) {
+              boot();
               setNetErr(null);
               g.openOnline();
+            } else {
+              setPatchIdx(0);
+              setUpdates(true);
             }
           }
         } else {
@@ -362,16 +417,16 @@ export function GameView() {
         } else if (h.screen === "pause") {
           if (helpRef.current) {
             /* help overlay handles close */
-          } else if (m.upP) setPauseIdx((i) => (i + 2) % 3);
-          else if (m.downP) setPauseIdx((i) => (i + 1) % 3);
+          } else if (m.upP) setPauseIdx((i) => (i + 3) % 4);
+          else if (m.downP) setPauseIdx((i) => (i + 1) % 4);
           else if (ok) {
             const i = pauseIdxRef.current;
             if (i === 0) g.pauseToggle();
-            else if (i === 1) {
+            else if (i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+            else if (i === 2) {
               armGate();
               setHelp(true);
-            }
-            else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            } else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
           }
         } else if (h.screen === "result") {
           if (m.upP) setResultIdx((i) => (i + 2) % 3);
@@ -479,6 +534,21 @@ export function GameView() {
                   </button>
                 ))}
           </div>
+          {menu === "root" && (
+            <button
+              type="button"
+              onClick={() => {
+                setTitleIdx(3);
+                setPatchIdx(0);
+                setUpdates(true);
+              }}
+              className={`font-display absolute bottom-4 right-4 z-10 min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
+                titleIdx === 3 ? "text-gold" : "text-fg/70 hover:text-fg"
+              }`}
+            >
+              {titleIdx === 3 ? "▸ Frissítések" : "Frissítések"}
+            </button>
+          )}
         </div>
       )}
 
@@ -680,8 +750,9 @@ export function GameView() {
               {(
                 [
                   { label: "Folytatás", i: 0 },
-                  { label: "Irányítás", i: 1 },
-                  { label: "Főmenü", i: 2 },
+                  { label: "Újraindítás", i: 1 },
+                  { label: "Irányítás", i: 2 },
+                  { label: "Főmenü", i: 3 },
                 ] as const
               ).map((item) => (
                 <MenuBtn
@@ -690,7 +761,8 @@ export function GameView() {
                   onClick={() => {
                     setPauseIdx(item.i);
                     if (item.i === 0) gameRef.current?.pauseToggle();
-                    else if (item.i === 1) setHelp(true);
+                    else if (item.i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+                    else if (item.i === 2) setHelp(true);
                     else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
                   }}
                 >
@@ -738,7 +810,14 @@ export function GameView() {
         </Overlay>
       )}
 
-      {help && <Help onClose={() => setHelp(false)} />}
+      {help && <Help p1={hud.p1} p2={hud.p2} onClose={() => setHelp(false)} />}
+      {updates && (
+        <Updates
+          sel={patchIdx}
+          onClose={() => setUpdates(false)}
+          onPick={setPatchIdx}
+        />
+      )}
 
       {hud.screen === "fight" && hud.netWait && (
         <div className="pointer-events-none absolute inset-x-0 top-20 z-20 text-center">
@@ -1025,31 +1104,78 @@ function ConfirmBox({
   );
 }
 
-function Help({ onClose }: { onClose: () => void }) {
+function Help({ p1, p2, onClose }: { p1: CharId; p2: CharId; onClose: () => void }) {
+  const a = CHARACTERS[p1];
+  const b = CHARACTERS[p2];
+  const sa = CHAR_SKILLS[p1];
+  const sb = CHAR_SKILLS[p2];
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/90 px-4">
       <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
         <h3 className="font-display text-2xl">Irányítás</h3>
         <p className="text-muted mt-2 text-sm">PS5 DualSense / DualShock</p>
         <ul className="mt-3 space-y-1 text-sm">
-          <li>D-pad / bot — mozgás (A/D billentyű)</li>
-          <li>Dupla előre / dupla hátra — szökkenés (quickstep)</li>
-          <li>□ Square — jobb ütés (K)</li>
-          <li>△ Triangle — bal ütés (J)</li>
-          <li>○ Circle — jobb rúgás (M)</li>
-          <li>✕ Cross — bal rúgás (N)</li>
-          <li>L1 — special 1 — L billentyű. Renike: serpenyő, Ricsi: borosüveg, Cica: Tigrisugrás, Ági: Köpés, Cigányricsi: Superman Punch, Jézus: Fényoszlop</li>
-          <li>R1 — special 2 — ; billentyű. Renike Büdi, Ricsi Hányósugár, Cica Földrengető, Ági Vérszívás, Cigányricsi KI Robbanás, Jézus Szent Aura</li>
-          <li>R2 — védekezés (Shift). Guggolva + blokk = low védés</li>
-          <li>Special meter a HP alatt: csak bevitt vagy leblokkolt ütéssel töltődik, magától nem</li>
+          <li>D-pad / bot — mozgás</li>
+          <li>Dupla előre / dupla hátra — dash</li>
+          <li>△ Triangle — bal ütés · □ Square — jobb ütés</li>
+          <li>✕ Cross — bal rúgás · ○ Circle — jobb rúgás</li>
+          <li>R2 — védekezés. Guggolva + blokk = low védés</li>
           <li>Options — szünet</li>
         </ul>
-        <p className="text-muted mt-3 text-sm">
-          Előre séta gyorsabb, mint hátra. Dupla-tap: szökkenés. Ugrással át lehet menni a másik térfélre — utána
-          a karakterek egymás felé fordulnak. Levegőben a négy támadó gomb jump attack. Guggolva a négy támadó gomb
-          low attack — csak guggoló blokkal védhető. Online: Host/Join IP, mindkét gép a saját 1P gombjait használja.
-        </p>
-        <MenuBtn onClick={onClose}>Bezár</MenuBtn>
+        <div className="mt-4 space-y-3 text-sm">
+          <div>
+            <p className="font-display text-gold text-lg">{a.name}</p>
+            <p>L1 {a.special} — {sa.s1.replace(/^L1 [^—]+ — /, "")}</p>
+            <p>R1 {a.special2} — {sa.s2.replace(/^R1 [^—]+ — /, "")}</p>
+          </div>
+          <div>
+            <p className="font-display text-gold text-lg">{b.name}</p>
+            <p>L1 {b.special} — {sb.s1.replace(/^L1 [^—]+ — /, "")}</p>
+            <p>R1 {b.special2} — {sb.s2.replace(/^R1 [^—]+ — /, "")}</p>
+          </div>
+        </div>
+        <MenuBtn onClick={onClose}>Vissza</MenuBtn>
+      </div>
+    </div>
+  );
+}
+
+function Updates({
+  sel,
+  onClose,
+  onPick,
+}: {
+  sel: number;
+  onClose: () => void;
+  onPick: (i: number) => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/85 px-4">
+      <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
+        <h3 className="font-display text-2xl">Frissítések</h3>
+        <p className="text-muted mt-1 text-sm">Aktuális verzió: {GAME_VERSION}</p>
+        <div className="mt-4 space-y-4">
+          {PATCH_NOTES.map((p, i) => (
+            <button
+              key={p.v}
+              type="button"
+              onClick={() => onPick(i)}
+              className={`block w-full rounded-md border px-3 py-2 text-left ${
+                i === sel ? "border-gold bg-gold/10" : "border-border"
+              }`}
+            >
+              <p className="font-display text-gold text-lg">{p.v}</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm">
+                {p.items.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4">
+          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
+        </div>
       </div>
     </div>
   );
