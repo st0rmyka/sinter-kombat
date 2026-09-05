@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId } from "./engine";
+import { CHARACTERS, CHAR_IDS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio } from "./audio";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
@@ -230,7 +230,7 @@ export function GameView() {
       }
       if (h.screen === "title") {
         const m = sampleMenu();
-        const diffs: Difficulty[] = ["easy", "normal", "hard"];
+        const diffs: Difficulty[] = DIFFICULTIES;
         const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
         if (menuRef.current === "root") {
           if (m.upP) setTitleIdx((i) => (i + 2) % 3);
@@ -249,8 +249,8 @@ export function GameView() {
             }
           }
         } else {
-          if (m.upP || m.leftP) setDiff((d) => diffs[(diffs.indexOf(d) + 2) % 3]);
-          if (m.downP || m.rightP) setDiff((d) => diffs[(diffs.indexOf(d) + 1) % 3]);
+          if (m.upP || m.leftP) setDiff((d) => diffs[(diffs.indexOf(d) + diffs.length - 1) % diffs.length]);
+          if (m.downP || m.rightP) setDiff((d) => diffs[(diffs.indexOf(d) + 1) % diffs.length]);
           if (!gated() && m.kickRP) setMenu("root");
           if (ok) {
             boot();
@@ -460,7 +460,7 @@ export function GameView() {
                     {titleIdx === item.i ? `▸ ${item.label}` : item.label}
                   </button>
                 ))
-              : (["easy", "normal", "hard"] as Difficulty[]).map((d) => (
+              : DIFFICULTIES.map((d) => (
                   <button
                     key={d}
                     type="button"
@@ -470,12 +470,12 @@ export function GameView() {
                       resetSelect(true);
                       gameRef.current?.chooseMode(true, d);
                     }}
-                    className={`font-display min-h-11 min-w-64 px-6 text-center text-2xl tracking-wide transition-colors sm:text-3xl ${
-                      diff === d ? "text-gold" : "text-fg/70 hover:text-fg"
-                    }`}
+                    className={`font-display min-h-11 min-w-64 px-6 text-center tracking-wide transition-colors ${
+                      d === "szopni" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
+                    } ${diff === d ? "text-gold" : "text-fg/70 hover:text-fg"}`}
                   >
                     {diff === d ? "▸ " : ""}
-                    {d === "easy" ? "Könnyű" : d === "hard" ? "Nehéz" : "Normál"}
+                    {difficultyLabel(d)}
                   </button>
                 ))}
           </div>
@@ -752,6 +752,13 @@ export function GameView() {
       </div>
 
       {touchUi && !landscape && <RotateHint />}
+
+      <div
+        className="pointer-events-none absolute bottom-2 left-3 z-30 font-display text-[11px] tracking-[0.18em] text-white/75"
+        style={{ textShadow: "0 1px 2px #000" }}
+      >
+        {GAME_VERSION}
+      </div>
 
       <button
         type="button"

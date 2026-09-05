@@ -1,10 +1,14 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-05-2216.zip`  
-**Időpont:** 2026-09-05 22:16 CEST  
-**Állapot:** Jézus (idle + hangok: announcer, attack/damage/defeat, Fényoszlop, Védőgömb) + Cigányricsi, Vámpír Ági, Cica, Renike, Ricsi. Menü, mobile landscape, 45s kör, HP+70%.
+**Fájl:** `Sinter-Kombat-backup-2026-09-06-0001.zip`  
+**Időpont:** 2026-09-06 00:01 CEST  
+**Verzió:** v0.13  
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-05-2214.zip` (Jézus, hangok előtt / részben).
+**Állapot:** Jézus + hangok, Cigányricsi, Vámpír Ági, Cica, Renike, Ricsi. CPU: Könnyű/Normál/Hard finomhangolva, **SZOPNI FOGSZ** max nehézség. Timer HUD kör, verziószám a bal alsó sarokban. Menü, mobile landscape, 45s kör, HP+70%.
+
+Előző snapshot: `Sinter-Kombat-backup-2026-09-05-2216.zip`
+
+GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
 ## Mi van benne
 
