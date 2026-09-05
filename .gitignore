@@ -1,0 +1,16 @@
+node_modules/
+desktop/node_modules/
+desktop/dist/
+dist/
+.vite/
+artifacts/
+screenshots/
+*.zip
+.grok/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+attachments/23GEPBs*
+attachments/*grok-workspace.zip

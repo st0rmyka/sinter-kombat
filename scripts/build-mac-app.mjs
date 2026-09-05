@@ -1,0 +1,178 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  lstatSync,
+  readlinkSync,
+  readdirSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ELECTRON_VER = "37.3.1";
+const OUT_DIR = path.join(tmpdir(), "Kitchen-Kombat-macOS");
+const ZIP_PATH = path.join(root, "Kitchen-Kombat-macOS.zip");
+const CACHE = path.join(tmpdir(), "kk-electron");
+
+function run(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: "inherit", ...opts });
+    p.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(" ")} -> ${code}`))));
+  });
+}
+
+async function download(url, dest) {
+  if (existsSync(dest)) return;
+  mkdirSync(path.dirname(dest), { recursive: true });
+  const res = await fetch(url, { redirect: "follow" });
+  if (!res.ok) throw new Error(`download ${url} ${res.status}`);
+  await pipeline(res.body, createWriteStream(dest));
+}
+
+function writeIcns() {}
+
+async function zipDir(srcDir, zipPath, topName) {
+  await run("python3", [
+    "-c",
+    r"""
+import os, stat, sys, zipfile
+from pathlib import Path
+src, dest, top = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+if dest.exists(): dest.unlink()
+
+def add(zf, path, arc):
+    if path.is_symlink():
+        zi = zipfile.ZipInfo(arc)
+        zi.create_system = 3
+        zi.external_attr = (stat.S_IFLNK | 0o755) << 16
+        zf.writestr(zi, os.readlink(path))
+        return
+    if path.is_dir():
+        for child in sorted(path.iterdir(), key=lambda p: p.name):
+            add(zf, child, f"{arc}/{child.name}")
+        return
+    mode = path.stat().st_mode
+    zi = zipfile.ZipInfo.from_file(path, arc)
+    zi.create_system = 3
+    zi.external_attr = (mode & 0xFFFF) << 16
+    with path.open("rb") as f:
+        zf.writestr(zi, f.read(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=6)
+
+with zipfile.ZipFile(dest, "w", allowZip64=True) as zf:
+    add(zf, src, top)
+print("zip", dest, dest.stat().st_size)
+""",
+    srcDir,
+    zipPath,
+    topName,
+  ]);
+}
+
+function patchPlist(plistPath, { name, ident }) {
+  let xml = readFileSync(plistPath, "utf8");
+  const setStr = (key, value) => {
+    const re = new RegExp(`(<key>${key}<\\/key>\\s*<string>)[^<]*(<\\/string>)`);
+    if (re.test(xml)) xml = xml.replace(re, `$1${value}$2`);
+    else xml = xml.replace("</dict>\n</plist>", `	<key>${key}</key>\n	<string>${value}</string>\n</dict>\n</plist>`);
+  };
+  setStr("CFBundleDisplayName", name);
+  setStr("CFBundleName", name);
+  setStr("CFBundleIdentifier", ident);
+  setStr("CFBundleIconFile", "electron.icns");
+  setStr("LSApplicationCategoryType", "public.app-category.games");
+  xml = xml.replace(
+    /<key>ElectronAsarIntegrity<\/key>\s*<dict>[\s\S]*?<\/dict>/,
+    "",
+  );
+  writeFileSync(plistPath, xml);
+}
+
+async function assemble(arch, label, icnsPath) {
+  const zipName = `electron-v${ELECTRON_VER}-darwin-${arch}.zip`;
+  const zipPath = path.join(CACHE, zipName);
+  const url = `https://github.com/electron/electron/releases/download/v${ELECTRON_VER}/${zipName}`;
+  console.log(`downloading ${zipName}...`);
+  await download(url, zipPath);
+  const unpack = path.join(CACHE, `unpack-${arch}`);
+  const srcApp = path.join(unpack, "Electron.app");
+  if (!existsSync(srcApp)) {
+    mkdirSync(unpack, { recursive: true });
+    await run("unzip", ["-q", zipPath, "-d", unpack]);
+  }
+  if (!existsSync(srcApp)) throw new Error(`Electron.app missing in ${unpack}`);
+  const destFolder = path.join(OUT_DIR, label);
+  const destApp = path.join(destFolder, "Kitchen Kombat.app");
+  rmSync(destFolder, { recursive: true, force: true });
+  mkdirSync(destFolder, { recursive: true });
+  await run("cp", ["-a", srcApp, destApp]);
+  const res = path.join(destApp, "Contents", "Resources");
+  const appDir = path.join(res, "app");
+  mkdirSync(appDir, { recursive: true });
+  copyFileSync(path.join(root, "desktop", "package.json"), path.join(appDir, "package.json"));
+  copyFileSync(path.join(root, "desktop", "main.mjs"), path.join(appDir, "main.mjs"));
+  cpSync(path.join(root, "desktop", "dist"), path.join(appDir, "dist"), { recursive: true });
+  copyFileSync(icnsPath, path.join(res, "electron.icns"));
+  patchPlist(path.join(destApp, "Contents", "Info.plist"), {
+    name: "Kitchen Kombat",
+    ident: "hu.kitchenkombat.app",
+  });
+  rmSync(path.join(res, "default_app.asar"), { force: true });
+  console.log(`built ${destApp}`);
+}
+
+const README = `Kitchen Kombat — macOS
+========================
+
+Apple Silicon (M1, M2, M3, M4):
+  nyisd meg:  Apple Silicon / Kitchen Kombat.app
+
+Intel-es Mac:
+  nyisd meg:  Intel / Kitchen Kombat.app
+
+Ha a macOS azt írja, hogy a fejlesztőt nem lehet ellenőrizni:
+  1. jobb klikk a Kitchen Kombat.app-on
+  2. Megnyitás
+  3. erősítsd meg újra a Megnyitást
+
+Irányítás
+  Billentyű: A/D séta, W ugrás, J/K ütés, N/M rúgás, L special, Shift block
+  Dupla előre / dupla hátra: szökkenés
+  DualSense: USB vagy Bluetooth, □ jobb ütés, △ bal ütés, ○ jobb rúgás, ✕ bal rúgás, R2 block
+
+Teljes képernyő: Control + Command + F  (vagy F11)
+Kilépés: Command + Q
+`;
+
+async function main() {
+  mkdirSync(CACHE, { recursive: true });
+  rmSync(OUT_DIR, { recursive: true, force: true });
+  mkdirSync(OUT_DIR, { recursive: true });
+  console.log("vite desktop build...");
+  await run("npx", ["vite", "build", "--config", "vite.desktop.config.ts"], { cwd: root });
+  const icnsPath = path.join(CACHE, "kitchen.icns");
+  if (!existsSync(icnsPath)) {
+    await run("python3", [path.join(root, "scripts", "make-mac-icon.py"), icnsPath]);
+  }
+  await assemble("arm64", "Apple Silicon", icnsPath);
+  await assemble("x64", "Intel", icnsPath);
+  writeFileSync(path.join(OUT_DIR, "OLVASSEL.txt"), README);
+  rmSync(ZIP_PATH, { force: true });
+  console.log("zipping...");
+  await zipDir(OUT_DIR, ZIP_PATH, "Kitchen-Kombat-macOS");
+  console.log(`done ${ZIP_PATH}`);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

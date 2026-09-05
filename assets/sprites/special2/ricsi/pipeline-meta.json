@@ -1,0 +1,249 @@
+{
+  "target": "player",
+  "mode": "sheet",
+  "prompt": "",
+  "role": "",
+  "input": "/workspace/assets/sprites/special2/ricsi-raw.jpg",
+  "threshold": 100,
+  "edge_threshold": 150,
+  "duration": 200,
+  "rows": 2,
+  "cols": 3,
+  "cell_size": 128,
+  "fit_scale": 0.85,
+  "trim_border": 8,
+  "edge_clean_depth": 3,
+  "align": "feet",
+  "shared_scale": true,
+  "component_mode": "largest",
+  "component_padding": 0,
+  "min_component_area": 1,
+  "edge_touch_margin": 0,
+  "frame_labels": [
+    "frame-1",
+    "frame-2",
+    "frame-3",
+    "frame-4",
+    "frame-5",
+    "frame-6"
+  ],
+  "frames": [
+    {
+      "grid": [
+        0,
+        0
+      ],
+      "source_box": [
+        0,
+        0,
+        469,
+        704
+      ],
+      "component_mode": "largest",
+      "component_count": 2,
+      "selected_component_area": 75590,
+      "selected_component_bbox": [
+        116,
+        54,
+        372,
+        643
+      ],
+      "crop_bbox": [
+        116,
+        54,
+        372,
+        643
+      ],
+      "edge_touch": false,
+      "output_size": [
+        45,
+        103
+      ],
+      "paste_position": [
+        41,
+        16
+      ]
+    },
+    {
+      "grid": [
+        0,
+        1
+      ],
+      "source_box": [
+        469,
+        0,
+        938,
+        704
+      ],
+      "component_mode": "largest",
+      "component_count": 2,
+      "selected_component_area": 79068,
+      "selected_component_bbox": [
+        53,
+        56,
+        361,
+        642
+      ],
+      "crop_bbox": [
+        53,
+        56,
+        361,
+        642
+      ],
+      "edge_touch": false,
+      "output_size": [
+        54,
+        103
+      ],
+      "paste_position": [
+        37,
+        16
+      ]
+    },
+    {
+      "grid": [
+        0,
+        2
+      ],
+      "source_box": [
+        938,
+        0,
+        1407,
+        704
+      ],
+      "component_mode": "largest",
+      "component_count": 1,
+      "selected_component_area": 80440,
+      "selected_component_bbox": [
+        22,
+        59,
+        364,
+        642
+      ],
+      "crop_bbox": [
+        22,
+        59,
+        364,
+        642
+      ],
+      "edge_touch": false,
+      "output_size": [
+        60,
+        102
+      ],
+      "paste_position": [
+        34,
+        17
+      ]
+    },
+    {
+      "grid": [
+        1,
+        0
+      ],
+      "source_box": [
+        0,
+        704,
+        469,
+        1408
+      ],
+      "component_mode": "largest",
+      "component_count": 1,
+      "selected_component_area": 81981,
+      "selected_component_bbox": [
+        76,
+        24,
+        394,
+        628
+      ],
+      "crop_bbox": [
+        76,
+        24,
+        394,
+        628
+      ],
+      "edge_touch": false,
+      "output_size": [
+        56,
+        106
+      ],
+      "paste_position": [
+        36,
+        13
+      ]
+    },
+    {
+      "grid": [
+        1,
+        1
+      ],
+      "source_box": [
+        469,
+        704,
+        938,
+        1408
+      ],
+      "component_mode": "largest",
+      "component_count": 1,
+      "selected_component_area": 81441,
+      "selected_component_bbox": [
+        39,
+        30,
+        371,
+        630
+      ],
+      "crop_bbox": [
+        39,
+        30,
+        371,
+        630
+      ],
+      "edge_touch": false,
+      "output_size": [
+        58,
+        105
+      ],
+      "paste_position": [
+        35,
+        14
+      ]
+    },
+    {
+      "grid": [
+        1,
+        2
+      ],
+      "source_box": [
+        938,
+        704,
+        1407,
+        1408
+      ],
+      "component_mode": "largest",
+      "component_count": 1,
+      "selected_component_area": 79150,
+      "selected_component_bbox": [
+        64,
+        15,
+        302,
+        632
+      ],
+      "crop_bbox": [
+        64,
+        15,
+        302,
+        632
+      ],
+      "edge_touch": false,
+      "output_size": [
+        41,
+        108
+      ],
+      "paste_position": [
+        43,
+        11
+      ]
+    }
+  ],
+  "edge_touch_frames": []
+}
