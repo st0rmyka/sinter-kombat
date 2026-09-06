@@ -3,7 +3,7 @@ import { Volume2, VolumeX } from "lucide-react";
 import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix } from "./audio";
-import { getSettings, patchSettings, subscribeSettings, type GameSettings } from "./settings";
+import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
@@ -124,6 +124,8 @@ export function GameView() {
   const [help, setHelp] = useState(false);
   const [updates, setUpdates] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [padEdit, setPadEdit] = useState(false);
+  const [padSel, setPadSel] = useState<PadBtnId>("l2");
   const [setIdx, setSetIdx] = useState(0);
   const [opt, setOpt] = useState<GameSettings>(getSettings);
   const [exited, setExited] = useState(false);
@@ -154,6 +156,10 @@ export function GameView() {
   updatesRef.current = updates;
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const padEditRef = useRef(padEdit);
+  padEditRef.current = padEdit;
+  const padSelRef = useRef(padSel);
+  padSelRef.current = padSel;
   const setIdxRef = useRef(setIdx);
   setIdxRef.current = setIdx;
   const patchIdxRef = useRef(patchIdx);
@@ -356,6 +362,29 @@ export function GameView() {
         raf = requestAnimationFrame(tick);
         return;
       }
+      if (padEditRef.current) {
+        const m = sampleMenu();
+        const ids = PAD_BTNS.map((b) => b.id);
+        if (m.specialP) {
+          const i = ids.indexOf(padSelRef.current);
+          setPadSel(ids[(i + ids.length - 1) % ids.length]!);
+        }
+        if (m.special2P) {
+          const i = ids.indexOf(padSelRef.current);
+          setPadSel(ids[(i + 1) % ids.length]!);
+        }
+        const step = 1;
+        if (m.leftP) patchPadBtn(padSelRef.current, { x: getSettings().pad[padSelRef.current].x - step });
+        if (m.rightP) patchPadBtn(padSelRef.current, { x: getSettings().pad[padSelRef.current].x + step });
+        if (m.upP) patchPadBtn(padSelRef.current, { y: getSettings().pad[padSelRef.current].y - step });
+        if (m.downP) patchPadBtn(padSelRef.current, { y: getSettings().pad[padSelRef.current].y + step });
+        if (!gated() && m.kickRP) {
+          armGate();
+          setPadEdit(false);
+        }
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       if (helpRef.current || updatesRef.current || settingsRef.current) {
         const m = sampleMenu();
         if (updatesRef.current) {
@@ -363,12 +392,17 @@ export function GameView() {
           if (m.downP) setPatchIdx((i) => Math.min(PATCH_NOTES.length - 1, i + 1));
         }
         if (settingsRef.current) {
-          const rows = 7;
+          const rows = 8;
           if (m.upP) setSetIdx((i) => (i + rows - 1) % rows);
           if (m.downP) setSetIdx((i) => (i + 1) % rows);
           if (m.leftP || m.rightP) {
             const dir = m.leftP ? -1 : 1;
             nudgeSetting(setIdxRef.current, dir);
+          }
+          if (!gated() && (m.kickLP || m.punchLP || m.startP) && setIdxRef.current === 7) {
+            armGate();
+            setPadSel("l2");
+            setPadEdit(true);
           }
         }
         if (!gated() && (m.kickRP || (settingsRef.current ? false : m.kickLP) || m.startP)) {
@@ -930,8 +964,8 @@ export function GameView() {
       )}
 
       {hud.screen === "pause" && (
-        <Overlay>
-          <h2 className="font-display text-4xl">SZÜNET</h2>
+        <Overlay dense={touchUi}>
+          <h2 className={`font-display ${touchUi ? "text-xl" : "text-4xl"}`}>SZÜNET</h2>
           {confirm ? (
             <ConfirmBox
               q={confirm.q}
@@ -973,6 +1007,7 @@ export function GameView() {
               ).map((item) => (
                 <MenuBtn
                   key={item.i}
+                  dense={touchUi}
                   active={pauseIdx === item.i}
                   onClick={() => {
                     setPauseIdx(item.i);
@@ -1005,7 +1040,7 @@ export function GameView() {
                 </MenuBtn>
               ))}
               {hud.training && (
-                <p className="text-muted mt-2 text-center text-xs">
+                <p className={`text-muted text-center ${touchUi ? "mt-0.5 text-[10px]" : "mt-2 text-xs"}`}>
                   Ellenfél / nehézség / energia: bal-jobb. Kör: vissza.
                 </p>
               )}
@@ -1064,6 +1099,18 @@ export function GameView() {
           opt={opt}
           onClose={() => setSettings(false)}
           onPick={setSetIdx}
+          onCustomize={() => {
+            setPadSel("l2");
+            setPadEdit(true);
+          }}
+        />
+      )}
+      {padEdit && (
+        <PadCustomizer
+          opt={opt}
+          sel={padSel}
+          onSel={setPadSel}
+          onClose={() => setPadEdit(false)}
         />
       )}
 
@@ -1082,7 +1129,9 @@ export function GameView() {
         </div>
       )}
 
-      {hud.screen === "fight" && touchUi && <TouchPad scale={opt.touch} alpha={opt.touchAlpha} />}
+      {hud.screen === "fight" && touchUi && (
+        <TouchPad scale={opt.touch} alpha={opt.touchAlpha} layout={opt.pad} />
+      )}
       </div>
 
       {exited && (
@@ -1302,26 +1351,36 @@ function RotateHint() {
   );
 }
 
-function Overlay({ children, dim }: { children: React.ReactNode; dim?: boolean }) {
+function Overlay({ children, dim, dense }: { children: React.ReactNode; dim?: boolean; dense?: boolean }) {
   return (
     <div
-      className={`absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-4 ${
-        dim ? "bg-bg/40" : "bg-bg/75"
-      }`}
+      className={`absolute inset-0 z-10 flex flex-col items-center justify-center overflow-y-auto px-4 ${
+        dense ? "gap-1 py-1" : "gap-3"
+      } ${dim ? "bg-bg/40" : "bg-bg/75"}`}
     >
       {children}
     </div>
   );
 }
 
-function MenuBtn({ children, onClick, active }: { children: React.ReactNode; onClick: () => void; active?: boolean }) {
+function MenuBtn({
+  children,
+  onClick,
+  active,
+  dense,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+  dense?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-md border px-6 py-2 font-semibold uppercase tracking-wide ${
-        active ? "border-gold bg-gold text-bg" : "border-gold bg-surface text-fg hover:bg-gold hover:text-bg"
-      }`}
+      className={`rounded-md border font-semibold uppercase tracking-wide ${
+        dense ? "min-h-7 px-4 py-0.5 text-sm" : "min-h-11 px-6 py-2"
+      } ${active ? "border-gold bg-gold text-bg" : "border-gold bg-surface text-fg hover:bg-gold hover:text-bg"}`}
     >
       {active ? `▸ ${children}` : children}
     </button>
@@ -1420,11 +1479,13 @@ function SettingsPanel({
   opt,
   onClose,
   onPick,
+  onCustomize,
 }: {
   sel: number;
   opt: GameSettings;
   onClose: () => void;
   onPick: (i: number) => void;
+  onCustomize: () => void;
 }) {
   const row = (i: number, label: string, value: string, extra?: React.ReactNode) => (
     <button
@@ -1433,6 +1494,7 @@ function SettingsPanel({
       onClick={() => {
         onPick(i);
         if (i === 0) nudgeSetting(0, 1);
+        if (i === 7) onCustomize();
       }}
       className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm ${
         sel === i ? "border-gold bg-gold/10" : "border-border"
@@ -1529,6 +1591,7 @@ function SettingsPanel({
             }}
             className="w-full"
           />
+          {row(7, "Virtuális kontroller testreszabása", "▶")}
         </div>
         <div className="mt-4">
           <MenuBtn onClick={onClose}>Vissza</MenuBtn>
@@ -1579,80 +1642,188 @@ function Updates({
   );
 }
 
-function TouchPad({ scale, alpha }: { scale: number; alpha: number }) {
+function TouchPad({ scale, alpha, layout }: { scale: number; alpha: number; layout: GameSettings["pad"] }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {PAD_BTNS.map((b) => (
+        <PadKey
+          key={b.id}
+          def={b}
+          layout={layout[b.id]}
+          masterScale={scale}
+          masterAlpha={alpha}
+          play
+        />
+      ))}
+    </div>
+  );
+}
+
+function PadKey({
+  def,
+  layout,
+  masterScale,
+  masterAlpha,
+  play,
+  selected,
+  onPick,
+}: {
+  def: (typeof PAD_BTNS)[number];
+  layout: { x: number; y: number; scale: number; alpha: number };
+  masterScale: number;
+  masterAlpha: number;
+  play?: boolean;
+  selected?: boolean;
+  onPick?: (id: PadBtnId, e: React.PointerEvent) => void;
+}) {
   const hold = (code: string) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
-      pressVirtual(code);
+      if (play) pressVirtual(code);
+      else onPick?.(def.id, e);
     },
     onPointerUp: (e: React.PointerEvent) => {
       e.preventDefault();
-      releaseVirtual(code);
+      if (play) releaseVirtual(code);
     },
-    onPointerCancel: () => releaseVirtual(code),
+    onPointerCancel: () => {
+      if (play) releaseVirtual(code);
+    },
   });
-  const btn =
-    "flex size-14 items-center justify-center rounded-full border border-gold/70 bg-surface/80 text-base font-bold text-fg active:bg-gold active:text-bg";
-  const mini =
-    "flex h-11 min-w-14 items-center justify-center rounded-md border border-gold/70 bg-surface/80 px-2 text-xs font-bold uppercase text-fg active:bg-gold active:text-bg";
+  const round = def.kind === "round";
+  const cls = round
+    ? "flex size-14 items-center justify-center rounded-full border text-base font-bold text-fg active:bg-gold active:text-bg"
+    : "flex h-11 min-w-14 items-center justify-center rounded-md border px-2 text-xs font-bold uppercase text-fg active:bg-gold active:text-bg";
   return (
-    <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-      style={{ transform: `scale(${scale})`, transformOrigin: "bottom center", opacity: alpha }}
+    <button
+      type="button"
+      className={`pointer-events-auto absolute ${cls} ${
+        selected ? "border-gold bg-gold/40" : "border-gold/70 bg-surface/80"
+      }`}
+      style={{
+        left: `${layout.x}%`,
+        top: `${layout.y}%`,
+        transform: `translate(-50%, -50%) scale(${masterScale * layout.scale})`,
+        opacity: masterAlpha * layout.alpha,
+        touchAction: "none",
+      }}
+      {...hold(def.code)}
     >
-      <div className="pointer-events-auto flex flex-col items-center gap-2">
-        <div className="flex gap-2">
-          <button type="button" className={mini} {...hold("ControlLeft")}>
-            L2
-          </button>
-          <button type="button" className={mini} {...hold("ShiftLeft")}>
-            R2
-          </button>
-        </div>
-        <button type="button" className={btn} {...hold("ArrowUp")}>
-          ↑
-        </button>
-        <div className="flex gap-2">
-          <button type="button" className={btn} {...hold("ArrowLeft")}>
-            ←
-          </button>
-          <button type="button" className={btn} {...hold("ArrowDown")}>
-            ↓
-          </button>
-          <button type="button" className={btn} {...hold("ArrowRight")}>
-            →
-          </button>
-        </div>
+      {def.label}
+    </button>
+  );
+}
+
+function PadCustomizer({
+  opt,
+  sel,
+  onSel,
+  onClose,
+}: {
+  opt: GameSettings;
+  sel: PadBtnId;
+  onSel: (id: PadBtnId) => void;
+  onClose: () => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ id: PadBtnId; dx: number; dy: number } | null>(null);
+  const cur = opt.pad[sel];
+  const onPick = (id: PadBtnId, e: React.PointerEvent) => {
+    onSel(id);
+    const box = boxRef.current;
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    const lay = getSettings().pad[id];
+    const dx = ((e.clientX - r.left) / r.width) * 100 - lay.x;
+    const dy = ((e.clientY - r.top) / r.height) * 100 - lay.y;
+    drag.current = { id, dx, dy };
+    const move = (ev: PointerEvent) => {
+      const b = boxRef.current;
+      if (!b || !drag.current) return;
+      const rr = b.getBoundingClientRect();
+      const x = ((ev.clientX - rr.left) / rr.width) * 100 - drag.current.dx;
+      const y = ((ev.clientY - rr.top) / rr.height) * 100 - drag.current.dy;
+      patchPadBtn(drag.current.id, { x, y });
+    };
+    const up = () => {
+      drag.current = null;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const box = boxRef.current;
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100 - drag.current.dx;
+    const y = ((e.clientY - r.top) / r.height) * 100 - drag.current.dy;
+    patchPadBtn(drag.current.id, { x, y });
+  };
+  const onUp = () => {
+    drag.current = null;
+  };
+  return (
+    <div className="absolute inset-0 z-40 flex flex-col bg-black">
+      <div
+        ref={boxRef}
+        className="relative min-h-0 flex-1"
+        style={{
+          backgroundImage: "url(/stages/sintertanya.jpg?v=30)",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      >
+        {PAD_BTNS.map((b) => (
+          <PadKey
+            key={b.id}
+            def={b}
+            layout={opt.pad[b.id]}
+            masterScale={opt.touch}
+            masterAlpha={opt.touchAlpha}
+            selected={sel === b.id}
+            onPick={onPick}
+          />
+        ))}
       </div>
-      <div className="pointer-events-auto flex flex-col items-center gap-2">
-        <div className="flex gap-2">
-          <button type="button" className={mini} {...hold("KeyL")}>
-            L1
-          </button>
-          <button type="button" className={mini} {...hold("Semicolon")}>
-            R1
-          </button>
-          <button type="button" className={mini} {...hold("Enter")}>
-            Pause
-          </button>
+      <div className="border-border bg-surface/95 z-10 border-t px-3 py-2">
+        <p className="font-display text-gold text-sm">
+          {PAD_BTNS.find((b) => b.id === sel)?.label} — húzd a gombot. L1/R1: lapozás. D-pad: tologatás.
+        </p>
+        <div className="mt-1 grid grid-cols-2 gap-3">
+          <label className="text-xs">
+            Méret {pct(cur.scale)}
+            <input
+              type="range"
+              min={25}
+              max={150}
+              value={Math.round(cur.scale * 100)}
+              onChange={(e) => patchPadBtn(sel, { scale: Number(e.target.value) / 100 })}
+              className="w-full"
+            />
+          </label>
+          <label className="text-xs">
+            Áttetszőség {pct(cur.alpha)}
+            <input
+              type="range"
+              min={25}
+              max={100}
+              value={Math.round(cur.alpha * 100)}
+              onChange={(e) => patchPadBtn(sel, { alpha: Number(e.target.value) / 100 })}
+              className="w-full"
+            />
+          </label>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <span />
-          <button type="button" className={btn} {...hold("KeyJ")}>
-            △
-          </button>
-          <span />
-          <button type="button" className={btn} {...hold("KeyN")}>
-            ✕
-          </button>
-          <button type="button" className={btn} {...hold("KeyK")}>
-            □
-          </button>
-          <button type="button" className={btn} {...hold("KeyM")}>
-            ○
-          </button>
+        <div className="mt-2 flex gap-2">
+          <MenuBtn onClick={() => resetPadLayout()}>Alaphelyzet</MenuBtn>
+          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
         </div>
       </div>
     </div>

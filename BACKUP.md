@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-06-1745.zip`  
-**Időpont:** 2026-09-06 17:45 CEST  
+**Fájl:** `Sinter-Kombat-backup-2026-09-06-1928.zip`  
+**Időpont:** 2026-09-06 19:28 CEST  
 **Verzió:** v0.16  
 
-**Állapot:** Super Dash (L2, 40 energia), beállítások, gyakorló mód, virtuális pad L2/R2.
+**Állapot:** Super Dash, virtuális pad testreszabó (javított alap layout), mobil pause sűrítés.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-06-0744.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-06-1745.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
