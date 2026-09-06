@@ -1,5 +1,5 @@
 export type NetRole = "host" | "guest";
-export type NetChar = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus";
+export type NetChar = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar";
 
 export type LobbyPlayer = {
   name: string;

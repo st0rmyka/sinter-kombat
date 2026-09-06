@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-06-0106.zip`  
-**Időpont:** 2026-09-06 01:06 CEST  
-**Verzió:** v0.13  
+**Fájl:** `Sinter-Kombat-backup-2026-09-06-0625.zip`  
+**Időpont:** 2026-09-06 06:25 CEST  
+**Verzió:** v0.15  
 
-**Állapot:** Frissítések menü, szünet Újraindítás, Jézus Szent Aura áthaladás, Irányítás csak a két aktuális karakter. CPU: Könnyű/Normál/Hard + SZOPNI FOGSZ. Timer HUD, verziószám.
+**Állapot:** Gyakorló mód, input history (utolsó 10 gomb), Lázár János kódban/fájlokban de nincs a rosterben. CPU, HUD, menük.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-06-0001.zip` (GitHub release `v0.13`)
+Előző snapshot: `Sinter-Kombat-backup-2026-09-06-0106.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
@@ -18,6 +18,6 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, script-ek, Ele
 
 ## Visszaállítás
 
-1. Csomagold ki a zip tartalmát a projekt gyökerébe (írja felül a `src`, `public`, stb. mappákat).
+1. Csomagold ki a zip tartalmát a projekt gyökerébe.
 2. `npm install`
 3. `npm run dev`

@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio } from "./audio";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.15",
+    items: [
+      "Gyakorló mód a főmenüben",
+      "Végtelen köridő, szünet: dummy / CPU / P2",
+      "Input kijelző gyakorlásban",
+    ],
+  },
+  {
+    v: "v0.14",
+    items: [
+      "Új karakter: Lázár János (WC kefe)",
+      "L1 Kefe forgószél + tornádó effekt",
+      "R1 Kefe dobás projectile",
+    ],
+  },
   {
     v: "v0.13",
     items: [
@@ -62,6 +78,10 @@ const emptyHud = (): Hud => ({
   stage: "kitchen",
   netWait: false,
   loadPct: 0,
+  training: false,
+  dummy: "idle",
+  p1Hist: [],
+  p2Hist: [],
 });
 
 export function GameView() {
@@ -139,6 +159,7 @@ export function GameView() {
     setConfirm(null);
     g.screen = "title";
     g.paused = false;
+    g.training = false;
     g.pushHud();
   };
 
@@ -282,8 +303,8 @@ export function GameView() {
         const diffs: Difficulty[] = DIFFICULTIES;
         const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
         if (menuRef.current === "root") {
-          if (m.upP) setTitleIdx((i) => (i + 3) % 4);
-          if (m.downP) setTitleIdx((i) => (i + 1) % 4);
+          if (m.upP) setTitleIdx((i) => (i + 4) % 5);
+          if (m.downP) setTitleIdx((i) => (i + 1) % 5);
           if (ok) {
             armGate();
             const i = titleIdxRef.current;
@@ -298,6 +319,10 @@ export function GameView() {
               boot();
               setNetErr(null);
               g.openOnline();
+            } else if (i === 3) {
+              boot();
+              resetSelect(true);
+              g.chooseMode(true, diffRef.current, true);
             } else {
               setPatchIdx(0);
               setUpdates(true);
@@ -348,15 +373,16 @@ export function GameView() {
             p2L = false;
             setP2Lock(false);
           }
-          if (!p1L && !p2L && backOf(a1)) {
-            armGate();
-            g.screen = "title";
-            setMenu("root");
-            g.pushHud();
-          }
           if (p1L && p2L) {
             armGate();
             g.goStage(p1CurRef.current, p2CurRef.current);
+          }
+          if (!p1L && !p2L && backOf(a1)) {
+            armGate();
+            g.training = false;
+            g.screen = "title";
+            setMenu("root");
+            g.pushHud();
           }
         } else {
           const a = sampleMenu();
@@ -370,8 +396,9 @@ export function GameView() {
             }
             if (backOf(a)) {
               armGate();
+              g.training = false;
               g.screen = "title";
-              setMenu(h.versusCpu ? "diff" : "root");
+              setMenu(h.versusCpu && !h.training ? "diff" : "root");
               g.pushHud();
             }
           } else if (!p2LockRef.current) {
@@ -415,13 +442,32 @@ export function GameView() {
             setConfirm(null);
           }
         } else if (h.screen === "pause") {
+          const n = h.training ? 6 : 4;
           if (helpRef.current) {
             /* help overlay handles close */
-          } else if (m.upP) setPauseIdx((i) => (i + 3) % 4);
-          else if (m.downP) setPauseIdx((i) => (i + 1) % 4);
-          else if (ok) {
+          } else if (m.upP) setPauseIdx((i) => (i + n - 1) % n);
+          else if (m.downP) setPauseIdx((i) => (i + 1) % n);
+          else if (h.training && (m.leftP || m.rightP)) {
+            const dir = m.leftP ? -1 : 1;
             const i = pauseIdxRef.current;
-            if (i === 0) g.pauseToggle();
+            if (i === 2) g.cycleDummy(dir as 1 | -1);
+            else if (i === 3 && g.dummy === "cpu") g.cycleTrainDiff(dir as 1 | -1);
+          } else if (back) {
+            armGate();
+            g.pauseToggle();
+          } else if (ok) {
+            const i = pauseIdxRef.current;
+            if (h.training) {
+              if (i === 0) g.pauseToggle();
+              else if (i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+              else if (i === 2) g.cycleDummy(1);
+              else if (i === 3) {
+                if (g.dummy === "cpu") g.cycleTrainDiff(1);
+              } else if (i === 4) {
+                armGate();
+                setHelp(true);
+              } else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            } else if (i === 0) g.pauseToggle();
             else if (i === 1) ask("Biztos újraindítod a meccset?", goRestart);
             else if (i === 2) {
               armGate();
@@ -491,6 +537,7 @@ export function GameView() {
                     { label: "1 Játékos VS CPU", i: 0 },
                     { label: "2 Játékos", i: 1 },
                     { label: "Online", i: 2 },
+                    { label: "Gyakorló mód", i: 3 },
                   ] as const
                 ).map((item) => (
                   <button
@@ -503,9 +550,12 @@ export function GameView() {
                       else if (item.i === 1) {
                         resetSelect(false);
                         gameRef.current?.chooseMode(false, diff);
-                      } else {
+                      } else if (item.i === 2) {
                         setNetErr(null);
                         gameRef.current?.openOnline();
+                      } else {
+                        resetSelect(true);
+                        gameRef.current?.chooseMode(true, diff, true);
                       }
                     }}
                     className={`font-display min-h-11 min-w-64 px-6 text-center text-2xl tracking-wide transition-colors sm:text-3xl ${
@@ -538,15 +588,15 @@ export function GameView() {
             <button
               type="button"
               onClick={() => {
-                setTitleIdx(3);
+                setTitleIdx(4);
                 setPatchIdx(0);
                 setUpdates(true);
               }}
               className={`font-display absolute bottom-4 right-4 z-10 min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
-                titleIdx === 3 ? "text-gold" : "text-fg/70 hover:text-fg"
+                titleIdx === 4 ? "text-gold" : "text-fg/70 hover:text-fg"
               }`}
             >
-              {titleIdx === 3 ? "▸ Frissítések" : "Frissítések"}
+              {titleIdx === 4 ? "▸ Frissítések" : "Frissítések"}
             </button>
           )}
         </div>
@@ -689,7 +739,7 @@ export function GameView() {
                       .join(", "),
                   }}
                 >
-                  <img src={`/portraits/${id}-icon.png?v=8`} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                  <img src={`/portraits/${id}-icon.png?v=9`} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
                 </button>
               );
             })}
@@ -728,9 +778,9 @@ export function GameView() {
       {hud.screen === "vs" && (
         <Overlay dim>
           <div className="flex items-center gap-6">
-            <img src={`/portraits/${hud.p1}.png?v=14`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
+            <img src={`/portraits/${hud.p1}.png?v=9`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
             <div className="font-display text-gold text-4xl">VS</div>
-            <img src={`/portraits/${hud.p2}.png?v=14`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
+            <img src={`/portraits/${hud.p2}.png?v=9`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
           </div>
         </Overlay>
       )}
@@ -747,20 +797,47 @@ export function GameView() {
             />
           ) : (
             <>
-              {(
-                [
-                  { label: "Folytatás", i: 0 },
-                  { label: "Újraindítás", i: 1 },
-                  { label: "Irányítás", i: 2 },
-                  { label: "Főmenü", i: 3 },
-                ] as const
+              {(hud.training
+                ? ([
+                    { label: "Folytatás", i: 0 },
+                    { label: "Újraindítás", i: 1 },
+                    {
+                      label: `Ellenfél: ${hud.dummy === "idle" ? "ÁLL" : hud.dummy === "cpu" ? "CPU HARCOL" : "2. JÁTÉKOS"}`,
+                      i: 2,
+                    },
+                    {
+                      label:
+                        hud.dummy === "cpu"
+                          ? `Nehézség: ${difficultyLabel(hud.difficulty)}`
+                          : "Nehézség: —",
+                      i: 3,
+                    },
+                    { label: "Irányítás", i: 4 },
+                    { label: "Főmenü", i: 5 },
+                  ] as const)
+                : ([
+                    { label: "Folytatás", i: 0 },
+                    { label: "Újraindítás", i: 1 },
+                    { label: "Irányítás", i: 2 },
+                    { label: "Főmenü", i: 3 },
+                  ] as const)
               ).map((item) => (
                 <MenuBtn
                   key={item.i}
                   active={pauseIdx === item.i}
                   onClick={() => {
                     setPauseIdx(item.i);
-                    if (item.i === 0) gameRef.current?.pauseToggle();
+                    const g = gameRef.current;
+                    if (!g) return;
+                    if (hud.training) {
+                      if (item.i === 0) g.pauseToggle();
+                      else if (item.i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+                      else if (item.i === 2) g.cycleDummy(1);
+                      else if (item.i === 3) {
+                        if (g.dummy === "cpu") g.cycleTrainDiff(1);
+                      } else if (item.i === 4) setHelp(true);
+                      else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                    } else if (item.i === 0) g.pauseToggle();
                     else if (item.i === 1) ask("Biztos újraindítod a meccset?", goRestart);
                     else if (item.i === 2) setHelp(true);
                     else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
@@ -769,6 +846,11 @@ export function GameView() {
                   {item.label}
                 </MenuBtn>
               ))}
+              {hud.training && (
+                <p className="text-muted mt-2 text-center text-xs">
+                  Ellenfél / nehézség: bal-jobb. Kör: vissza.
+                </p>
+              )}
             </>
           )}
         </Overlay>
@@ -817,6 +899,13 @@ export function GameView() {
           onClose={() => setUpdates(false)}
           onPick={setPatchIdx}
         />
+      )}
+
+      {hud.screen === "fight" && hud.training && (
+        <>
+          <InputHist items={hud.p1Hist} side="left" />
+          {hud.dummy === "p2" && <InputHist items={hud.p2Hist} side="right" />}
+        </>
       )}
 
       {hud.screen === "fight" && hud.netWait && (
@@ -914,7 +1003,7 @@ function LobbyView({
               {p ? (
                 <>
                   <img
-                    src={`/portraits/${p.char}.png?v=14`}
+                    src={`/portraits/${p.char}.png?v=9`}
                     alt=""
                     className="my-2 h-28 w-full rounded object-cover object-top"
                   />
@@ -967,18 +1056,7 @@ function SelectPanel({
   tone: "p1" | "p2";
   visible: boolean;
 }) {
-  const name =
-    id === "renike"
-      ? "Renike"
-      : id === "ricsi"
-        ? "Ricsi"
-        : id === "cica"
-          ? "Cica"
-          : id === "cricsi"
-            ? "Cigányricsi"
-            : id === "jezus"
-              ? "Jézus"
-              : "Vámpír Ági";
+  const name = CHARACTERS[id].name;
   const pos = side === "left" ? "left-[4.8%]" : "right-[4.8%]";
   return (
     <div className={`absolute top-[11%] flex h-[68%] w-[18.5%] flex-col items-center ${pos}`}>
@@ -986,7 +1064,7 @@ function SelectPanel({
         <>
           <div className="flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden">
             <img
-              src={`/sprites/${id}/idle.png?v=50`}
+              src={`/sprites/${id}/idle.png?v=60`}
               alt=""
               className={`max-h-full max-w-full object-contain object-bottom ${side === "right" ? "-scale-x-100" : ""}`}
             />
@@ -1100,6 +1178,26 @@ function ConfirmBox({
           Mégse
         </MenuBtn>
       </div>
+    </div>
+  );
+}
+
+function InputHist({ items, side }: { items: TrainPress[]; side: "left" | "right" }) {
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-24 z-20 flex w-6 flex-col items-center gap-0.5 ${
+        side === "left" ? "left-3" : "right-3"
+      }`}
+    >
+      {items.map((it) => (
+        <span
+          key={it.id}
+          className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-sm border border-gold/70 bg-black/55 px-0.5 font-display text-[10px] leading-none text-gold"
+          style={{ animation: "train-float-up 0.22s ease-out" }}
+        >
+          {it.k}
+        </span>
+      ))}
     </div>
   );
 }
