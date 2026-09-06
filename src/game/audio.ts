@@ -521,13 +521,15 @@ export const sfxPlay = {
       sfxPlay.charAttack(id);
       return;
     }
-    if (id === "agi" || id === "jezus") playOneShot(url, 1, 1);
+    if (id === "jezus") playOneShot(url, 2.4, 1);
+    else if (id === "agi") playOneShot(url, 1, 1);
     else playVoice(id, url, 1, 1);
   },
   charSpecial2: (id: string) => {
     const url = CHAR_SPECIAL2[id];
     if (!url) return;
-    if (id === "agi" || id === "cricsi" || id === "jezus") playOneShot(url, 1, 1);
+    if (id === "jezus") playOneShot(url, 2.4, 1);
+    else if (id === "agi" || id === "cricsi") playOneShot(url, 1, 1);
     else playVoice(id, url, 1, 1);
   },
   quake: () => playOneShot(CICA_QUAKE, 0.95, 0.96 + Math.random() * 0.08),

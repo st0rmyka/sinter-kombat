@@ -9,6 +9,7 @@ export type Actions = {
   kickR: boolean;
   special: boolean;
   special2: boolean;
+  superDash: boolean;
   block: boolean;
   start: boolean;
   leftP: boolean;
@@ -21,6 +22,7 @@ export type Actions = {
   kickRP: boolean;
   specialP: boolean;
   special2P: boolean;
+  superDashP: boolean;
   startP: boolean;
 };
 
@@ -35,6 +37,7 @@ const empty = (): Actions => ({
   kickR: false,
   special: false,
   special2: false,
+  superDash: false,
   block: false,
   start: false,
   leftP: false,
@@ -47,6 +50,7 @@ const empty = (): Actions => ({
   kickRP: false,
   specialP: false,
   special2P: false,
+  superDashP: false,
   startP: false,
 });
 
@@ -134,6 +138,7 @@ function fromPad(pad: Gamepad | undefined): Actions {
   a.punchL = pressed(pad, 3);
   a.special = pressed(pad, 4);
   a.special2 = pressed(pad, 5);
+  a.superDash = trigger(pad, 6);
   a.block = trigger(pad, 7);
   a.start = pressed(pad, 9) || pressed(pad, 8);
   return a;
@@ -158,6 +163,7 @@ function edges(a: Actions, prev: Actions): Actions {
   a.kickRP = a.kickR && !prev.kickR;
   a.specialP = a.special && !prev.special;
   a.special2P = a.special2 && !prev.special2;
+  a.superDashP = a.superDash && !prev.superDash;
   a.startP = a.start && !prev.start;
   return a;
 }
@@ -176,6 +182,7 @@ export function sampleP1(): Actions {
     kickR: down.has("KeyM"),
     special: down.has("KeyL"),
     special2: down.has("Semicolon") || down.has("KeyQuote"),
+    superDash: down.has("ControlLeft"),
     block: down.has("ShiftLeft") || down.has("ShiftRight"),
     start: down.has("Enter") || down.has("Escape"),
   };
@@ -198,6 +205,7 @@ export function sampleP2(): Actions {
     kickR: down.has("KeyP"),
     special: down.has("BracketLeft"),
     special2: down.has("BracketRight"),
+    superDash: down.has("ControlRight") || down.has("Minus"),
     block: down.has("Slash"),
     start: down.has("Digit0"),
   };

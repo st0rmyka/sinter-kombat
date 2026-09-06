@@ -41,7 +41,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus"];
 export type StageId = "kitchen" | "sintertanya";
 export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya"];
-export const GAME_VERSION = "v0.155";
+export const GAME_VERSION = "v0.16";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -493,14 +493,14 @@ export const CHARACTERS: Record<
     title: "A Rózsaszín Vihar",
     special: "SERPENYŐ",
     special2: "BÜDI",
-    fatality: "KITCHEN FATALITY",
+    fatality: "",
   },
   ricsi: {
     name: "RICSI",
     title: "A Kopasz Kalapács",
     special: "ÜVEGES",
     special2: "HÁNYÓSUGÁR",
-    fatality: "KITCHEN FATALITY",
+    fatality: "",
   },
   cica: {
     name: "CICA",
@@ -593,6 +593,9 @@ const WALK_FWD = 460;
 const WALK_BACK = 250;
 const DASH_SPEED = 980;
 const DASH_DUR = 0.18;
+const SUPER_DASH_COST = 40;
+const SUPER_DASH_SPEED = DASH_SPEED * 1.5;
+const SUPER_DASH_DUR = (DASH_DUR * 1.3) / 1.5;
 const TAP_WIN = 0.28;
 const GRAV = 5100;
 const JUMP_V = 1760;
@@ -650,6 +653,7 @@ type Fighter = {
   spec2Spawned: boolean;
   dashT: number;
   dashDir: 1 | -1;
+  superDash: boolean;
   tapL: number;
   tapR: number;
   walkT: number;
@@ -946,6 +950,7 @@ export class KitchenKombat {
       spec2Spawned: false,
       dashT: 0,
       dashDir: 1,
+      superDash: false,
       tapL: 0,
       tapR: 0,
       walkT: 0,
@@ -1446,6 +1451,7 @@ export class KitchenKombat {
       kickR: false,
       special: false,
       special2: false,
+      superDash: false,
       block: false,
       start: false,
       leftP: false,
@@ -1458,6 +1464,7 @@ export class KitchenKombat {
       kickRP: false,
       specialP: false,
       special2P: false,
+      superDashP: false,
       startP: false,
     };
   }
@@ -1475,6 +1482,7 @@ export class KitchenKombat {
     if (a.special) b |= 256;
     if (a.block) b |= 512;
     if (a.special2) b |= 1024;
+    if (a.superDash) b |= 2048;
     return b;
   }
 
@@ -1493,6 +1501,7 @@ export class KitchenKombat {
       [256, "L1"],
       [1024, "R1"],
       [512, "R2"],
+      [2048, "L2"],
     ];
     for (const [bit, k] of labels) {
       if (rose & bit) {
@@ -1586,6 +1595,7 @@ export class KitchenKombat {
       kickR: false,
       special: false,
       special2: false,
+      superDash: false,
       block: false,
       start: false,
       leftP: false,
@@ -1598,6 +1608,7 @@ export class KitchenKombat {
       kickRP: false,
       specialP: false,
       special2P: false,
+      superDashP: false,
       startP: false,
     };
     this.cpuDashCd = Math.max(0, this.cpuDashCd - dt);
@@ -1760,14 +1771,16 @@ export class KitchenKombat {
 
     if (f.state === "dash") {
       f.dashT -= dt;
-      f.vx = f.dashDir * DASH_SPEED;
+      f.vx = f.dashDir * (f.superDash ? SUPER_DASH_SPEED : DASH_SPEED);
       f.pose = "dash";
+      if (f.superDash) f.invuln = Math.max(f.invuln, 0.04);
       if (f.dashT <= 0) {
         f.state = "idle";
         f.vx *= 0.3;
         f.pose = "idle";
+        f.superDash = false;
       }
-      this.tryAttack(f, a);
+      if (!f.superDash) this.tryAttack(f, a);
       return;
     }
 
@@ -1810,6 +1823,7 @@ export class KitchenKombat {
     }
 
     const grounded = f.y <= 0;
+    if (grounded && a.superDashP && this.trySuperDash(f, a)) return;
     if (grounded && (f.state === "idle" || f.state === "walk" || f.state === "block")) {
       if (a.leftP) {
         if (f.tapL > 0) {
@@ -1873,15 +1887,31 @@ export class KitchenKombat {
     }
   }
 
-  startDash(f: Fighter, dir: 1 | -1) {
+  startDash(f: Fighter, dir: 1 | -1, superD = false) {
     f.state = "dash";
     f.dashDir = dir;
-    f.dashT = DASH_DUR;
+    f.superDash = superD;
+    f.dashT = superD ? SUPER_DASH_DUR : DASH_DUR;
     f.pose = "dash";
-    f.vx = dir * DASH_SPEED;
+    f.vx = dir * (superD ? SUPER_DASH_SPEED : DASH_SPEED);
     f.tapL = 0;
     f.tapR = 0;
+    if (superD) {
+      f.meter = Math.max(0, f.meter - SUPER_DASH_COST);
+      f.invuln = SUPER_DASH_DUR;
+    }
     sfxPlay.dash();
+  }
+
+  trySuperDash(f: Fighter, a: Actions) {
+    if (f.y > 0) return false;
+    if (f.state === "attack" || f.state === "dash" || f.state === "hurt" || f.state === "ko" || f.state === "win") return false;
+    if (f.meter < SUPER_DASH_COST) return false;
+    let dir: 1 | -1 = f.facing;
+    if (a.left && !a.right) dir = -1;
+    else if (a.right && !a.left) dir = 1;
+    this.startDash(f, dir, true);
+    return true;
   }
 
   buffered(f: Fighter): Atk | null {
@@ -1991,6 +2021,7 @@ export class KitchenKombat {
 
   separate() {
     if (this.f1.shieldT > 0 || this.f2.shieldT > 0) return;
+    if (this.f1.superDash || this.f2.superDash) return;
     const hb1 = this.hurtbox(this.f1);
     const hb2 = this.hurtbox(this.f2);
     const vOverlap = hb1.y < hb2.y + hb2.h && hb2.y < hb1.y + hb1.h;
@@ -2156,9 +2187,9 @@ export class KitchenKombat {
     loser.y += 20;
     loser.pose = "hurt";
     loser.bleed = 1.4;
-    this.callout = "KITCHEN FATALITY";
-    this.calloutT = 2.8;
-    this.fatality = CHARACTERS[winner.id].fatality;
+    this.callout = "K.O.";
+    this.calloutT = 1.4;
+    this.fatality = null;
     this.trauma = 1;
     this.hitstop = 0.16;
     sfxPlay.fatality();
@@ -2971,10 +3002,12 @@ export class KitchenKombat {
     if (f.state === "dash") {
       for (let i = 2; i >= 1; i--) {
         ctx.save();
-        ctx.globalAlpha = 0.16 * i;
+        ctx.globalAlpha = (f.superDash ? 0.28 : 0.16) * i;
+        if (f.superDash) ctx.filter = "brightness(1.5) saturate(2.4) sepia(0.8) hue-rotate(12deg)";
         ctx.translate(f.x - f.dashDir * i * 38 + flip * lunge, GROUND - f.y);
         ctx.scale(flip, crouchY);
         ctx.drawImage(img, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);
+        ctx.filter = "none";
         ctx.restore();
       }
     }
@@ -2982,7 +3015,10 @@ export class KitchenKombat {
     ctx.translate(f.x + flip * lunge, GROUND - f.y - bob);
     ctx.scale(flip, crouchY);
     ctx.rotate(tilt);
-    if (f.flash > 0) ctx.filter = "brightness(1.8) saturate(2.4) hue-rotate(-20deg)";
+    if (f.superDash && f.state === "dash") {
+      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.time * 28));
+      ctx.filter = `brightness(${1.25 + pulse * 0.55}) saturate(2.6) sepia(0.75) hue-rotate(10deg)`;
+    } else if (f.flash > 0) ctx.filter = "brightness(1.8) saturate(2.4) hue-rotate(-20deg)";
     else if (f.bleed > 0.15) ctx.filter = `sepia(${Math.min(0.7, f.bleed)}) saturate(2.4) hue-rotate(-18deg)`;
     if (f.state === "ko") ctx.rotate(-0.5);
     ctx.drawImage(img, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);

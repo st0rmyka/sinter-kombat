@@ -8,6 +8,13 @@ import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.16",
+    items: [
+      "Super Dash (L2): gyorsabb, messzebb, sérthetetlen, átmegy az ellenfélen",
+      "Energia metert használ, sárga villogó effekt",
+    ],
+  },
+  {
     v: "v0.155",
     items: [
       "Gyakorló szünet: Karakterválasztás, végtelen energia",
@@ -70,6 +77,7 @@ function nudgeSetting(i: number, dir: number) {
   else if (i === 3) patchSettings({ announcer: s.announcer + dir * step });
   else if (i === 4) patchSettings({ hud: s.hud + dir * 0.05 });
   else if (i === 5) patchSettings({ touch: s.touch + dir * 0.05 });
+  else if (i === 6) patchSettings({ touchAlpha: s.touchAlpha + dir * 0.05 });
   applyMix();
 }
 
@@ -355,7 +363,7 @@ export function GameView() {
           if (m.downP) setPatchIdx((i) => Math.min(PATCH_NOTES.length - 1, i + 1));
         }
         if (settingsRef.current) {
-          const rows = 6;
+          const rows = 7;
           if (m.upP) setSetIdx((i) => (i + rows - 1) % rows);
           if (m.downP) setSetIdx((i) => (i + 1) % rows);
           if (m.leftP || m.rightP) {
@@ -1074,7 +1082,7 @@ export function GameView() {
         </div>
       )}
 
-      {hud.screen === "fight" && touchUi && <TouchPad scale={opt.touch} />}
+      {hud.screen === "fight" && touchUi && <TouchPad scale={opt.touch} alpha={opt.touchAlpha} />}
       </div>
 
       {exited && (
@@ -1382,6 +1390,7 @@ function Help({ p1, p2, onClose }: { p1: CharId; p2: CharId; onClose: () => void
           <li>△ Triangle — bal ütés · □ Square — jobb ütés</li>
           <li>✕ Cross — bal rúgás · ○ Circle — jobb rúgás</li>
           <li>R2 — védekezés. Guggolva + blokk = low védés</li>
+          <li>L2 — Super Dash (40 energia): gyorsabb dash, sérthetetlen, átmegy az ellenfélen</li>
           <li>Options — szünet</li>
         </ul>
         <div className="mt-4 space-y-3 text-sm">
@@ -1496,7 +1505,7 @@ function SettingsPanel({
             }}
             className="w-full"
           />
-          {row(5, "Virtuális kontroller (mobil)", pct(opt.touch))}
+          {row(5, "Virtuális kontroller méret (mobil)", pct(opt.touch))}
           <input
             type="range"
             min={50}
@@ -1505,6 +1514,18 @@ function SettingsPanel({
             onChange={(e) => {
               onPick(5);
               patchSettings({ touch: Number(e.target.value) / 100 });
+            }}
+            className="w-full"
+          />
+          {row(6, "Virtuális kontroller áttetszőség (mobil)", pct(opt.touchAlpha))}
+          <input
+            type="range"
+            min={25}
+            max={100}
+            value={Math.round(opt.touchAlpha * 100)}
+            onChange={(e) => {
+              onPick(6);
+              patchSettings({ touchAlpha: Number(e.target.value) / 100 });
             }}
             className="w-full"
           />
@@ -1558,7 +1579,7 @@ function Updates({
   );
 }
 
-function TouchPad({ scale }: { scale: number }) {
+function TouchPad({ scale, alpha }: { scale: number; alpha: number }) {
   const hold = (code: string) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
@@ -1579,9 +1600,17 @@ function TouchPad({ scale }: { scale: number }) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-      style={{ transform: `scale(${scale})`, transformOrigin: "bottom center" }}
+      style={{ transform: `scale(${scale})`, transformOrigin: "bottom center", opacity: alpha }}
     >
       <div className="pointer-events-auto flex flex-col items-center gap-2">
+        <div className="flex gap-2">
+          <button type="button" className={mini} {...hold("ControlLeft")}>
+            L2
+          </button>
+          <button type="button" className={mini} {...hold("ShiftLeft")}>
+            R2
+          </button>
+        </div>
         <button type="button" className={btn} {...hold("ArrowUp")}>
           ↑
         </button>
@@ -1596,9 +1625,6 @@ function TouchPad({ scale }: { scale: number }) {
             →
           </button>
         </div>
-        <button type="button" className={mini} {...hold("ShiftLeft")}>
-          Blokk
-        </button>
       </div>
       <div className="pointer-events-auto flex flex-col items-center gap-2">
         <div className="flex gap-2">

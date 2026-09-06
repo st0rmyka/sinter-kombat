@@ -7,6 +7,7 @@ export type GameSettings = {
   announcer: number;
   hud: number;
   touch: number;
+  touchAlpha: number;
 };
 
 const DEF: GameSettings = {
@@ -16,6 +17,7 @@ const DEF: GameSettings = {
   announcer: 1,
   hud: 1,
   touch: 1,
+  touchAlpha: 0.75,
 };
 
 let cur: GameSettings = { ...DEF };
@@ -37,6 +39,7 @@ function load() {
       announcer: clamp(Number(p.announcer ?? 1), 0, 1),
       hud: clamp(Number(p.hud ?? 1), 0.5, 1.25),
       touch: clamp(Number(p.touch ?? 1), 0.5, 1.5),
+      touchAlpha: clamp(Number(p.touchAlpha ?? 0.75), 0.25, 1),
     };
   } catch {
     cur = { ...DEF };
@@ -72,6 +75,7 @@ export function patchSettings(p: Partial<GameSettings>) {
   if (p.announcer !== undefined) cur.announcer = clamp(p.announcer, 0, 1);
   if (p.hud !== undefined) cur.hud = clamp(p.hud, 0.5, 1.25);
   if (p.touch !== undefined) cur.touch = clamp(p.touch, 0.5, 1.5);
+  if (p.touchAlpha !== undefined) cur.touchAlpha = clamp(p.touchAlpha, 0.25, 1);
   save();
 }
 

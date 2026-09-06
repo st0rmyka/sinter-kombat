@@ -38,6 +38,7 @@ export function packBits(a: {
   kickR: boolean;
   special: boolean;
   special2?: boolean;
+  superDash?: boolean;
   block: boolean;
 }): number {
   let b = 0;
@@ -52,6 +53,7 @@ export function packBits(a: {
   if (a.special) b |= 1 << 8;
   if (a.block) b |= 1 << 9;
   if (a.special2) b |= 1 << 10;
+  if (a.superDash) b |= 1 << 11;
   return b;
 }
 
@@ -69,6 +71,7 @@ export function unpackBits(
   kickR: boolean;
   special: boolean;
   special2: boolean;
+  superDash: boolean;
   block: boolean;
   start: boolean;
   leftP: boolean;
@@ -81,6 +84,7 @@ export function unpackBits(
   kickRP: boolean;
   specialP: boolean;
   special2P: boolean;
+  superDashP: boolean;
   startP: boolean;
 } {
   const left = !!(bits & (1 << 0));
@@ -94,6 +98,7 @@ export function unpackBits(
   const special = !!(bits & (1 << 8));
   const block = !!(bits & (1 << 9));
   const special2 = !!(bits & (1 << 10));
+  const superDash = !!(bits & (1 << 11));
   return {
     left,
     right,
@@ -105,6 +110,7 @@ export function unpackBits(
     kickR,
     special,
     special2,
+    superDash,
     block,
     start: false,
     leftP: left && !(prev & (1 << 0)),
@@ -117,6 +123,7 @@ export function unpackBits(
     kickRP: kickR && !(prev & (1 << 7)),
     specialP: special && !(prev & (1 << 8)),
     special2P: special2 && !(prev & (1 << 10)),
+    superDashP: superDash && !(prev & (1 << 11)),
     startP: false,
   };
 }
