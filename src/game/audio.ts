@@ -119,6 +119,7 @@ const CHAR_NAME: Record<string, string> = {
   agi: "/sfx/name_agi.mp3",
   cricsi: "/sfx/name_ciganyricsi.mp3",
   jezus: "/sfx/name_jezus.mp3",
+  hoffer: "/sfx/name_hofferjozsi.mp3",
 };
 const CHAR_WIN: Record<string, string> = {
   ricsi: "/sfx/ricsiwins.mp3",
@@ -127,6 +128,7 @@ const CHAR_WIN: Record<string, string> = {
   agi: "/sfx/agiwins.mp3",
   cricsi: "/sfx/ciganyricsiwins.mp3",
   jezus: "/sfx/jezuswins.mp3",
+  hoffer: "/sfx/hofferjozsiwins.mp3",
 };
 
 const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK };

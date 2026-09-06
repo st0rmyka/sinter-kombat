@@ -8,6 +8,22 @@ import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.18",
+    items: [
+      "Hoffer Józsi: dühroham vörös overlay, GYERE IDE! sprite buborék nélkül",
+      "VS képernyő: Hoffer portréja fej-fókuszú",
+      "Betöltés: hibás/lassú sprite nem fagyasztja a loadingot",
+    ],
+  },
+  {
+    v: "v0.17",
+    items: [
+      "Új karakter: Hoffer Józsi",
+      "L1 Dühroham: +30% mozgás/támadás, +25% sebzés, vörös tónus",
+      "R1 GYERE IDE!: 3 mp irányításvesztés, az ellenfél Hofferhez sétál",
+    ],
+  },
+  {
     v: "v0.16",
     items: [
       "Super Dash (L2): gyorsabb, messzebb, sérthetetlen, átmegy az ellenfélen",
@@ -917,7 +933,7 @@ export function GameView() {
                       .join(", "),
                   }}
                 >
-                  <img src={`/portraits/${id}-icon.png?v=9`} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                  <img src={`/portraits/${id}-icon.png?v=10`} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
                 </button>
               );
             })}
@@ -956,9 +972,9 @@ export function GameView() {
       {hud.screen === "vs" && (
         <Overlay dim>
           <div className="flex items-center gap-6">
-            <img src={`/portraits/${hud.p1}.png?v=9`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
+            <img src={`/portraits/${hud.p1}.png?v=11`} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
             <div className="font-display text-gold text-4xl">VS</div>
-            <img src={`/portraits/${hud.p2}.png?v=9`} alt="" className="size-28 rounded-md object-cover sm:size-40" />
+            <img src={`/portraits/${hud.p2}.png?v=11`} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
           </div>
         </Overlay>
       )}
@@ -1224,7 +1240,7 @@ function LobbyView({
               {p ? (
                 <>
                   <img
-                    src={`/portraits/${p.char}.png?v=9`}
+                    src={`/portraits/${p.char}.png?v=11`}
                     alt=""
                     className="my-2 h-28 w-full rounded object-cover object-top"
                   />
@@ -1285,7 +1301,7 @@ function SelectPanel({
         <>
           <div className="flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden">
             <img
-              src={`/sprites/${id}/idle.png?v=60`}
+              src={`/sprites/${id}/idle.png?v=63`}
               alt=""
               className={`max-h-full max-w-full object-contain object-bottom ${side === "right" ? "-scale-x-100" : ""}`}
             />

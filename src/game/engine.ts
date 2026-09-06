@@ -33,15 +33,17 @@ declare global {
       koP2?: () => void;
       getCallout?: () => string | null;
       getWinner?: () => string | null;
+      getRageT?: () => number;
+      getPullT?: () => number;
     };
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar";
-export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus"];
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar" | "hoffer";
+export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya";
 export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya"];
-export const GAME_VERSION = "v0.16";
+export const GAME_VERSION = "v0.18";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -107,6 +109,8 @@ type Atk = {
   heal?: number;
   shield?: boolean;
   armor?: boolean;
+  rage?: boolean;
+  pull?: boolean;
 };
 
 const PUNCH_L: Atk = {
@@ -423,12 +427,51 @@ const SPECIAL_THROW: Atk = {
   zone: "brush",
 };
 
+const SPECIAL_RAGE: Atk = {
+  id: "special",
+  pose: "special",
+  startup: 0.16,
+  active: 0.2,
+  recover: 0.28,
+  dmg: 0,
+  hitstun: 0,
+  blockstun: 0,
+  knock: 0,
+  cost: 50,
+  hx: 0,
+  hy: 0,
+  hw: 1,
+  hh: 1,
+  cancel: [],
+  rage: true,
+};
+const SPECIAL_PULL: Atk = {
+  id: "special2",
+  pose: "special2",
+  startup: 0.18,
+  active: 0.62,
+  recover: 0.2,
+  dmg: 0,
+  hitstun: 0,
+  blockstun: 0,
+  knock: 0,
+  cost: 50,
+  hx: 0,
+  hy: 0,
+  hw: 1,
+  hh: 1,
+  cancel: [],
+  pull: true,
+  unblockable: true,
+};
+
 function special1For(id: CharId): Atk {
   if (id === "cica") return SPECIAL_TIGER;
   if (id === "agi") return SPECIAL_SPIT;
   if (id === "cricsi") return SPECIAL_SUPERMAN;
   if (id === "jezus") return SPECIAL_PILLAR;
   if (id === "lazar") return SPECIAL_SPIN;
+  if (id === "hoffer") return SPECIAL_RAGE;
   return SPECIAL;
 }
 function special2For(id: CharId): Atk {
@@ -438,6 +481,7 @@ function special2For(id: CharId): Atk {
   if (id === "cricsi") return SPECIAL2_KI;
   if (id === "jezus") return SPECIAL2_AURA;
   if (id === "lazar") return SPECIAL_THROW;
+  if (id === "hoffer") return SPECIAL_PULL;
   return SPECIAL2_VAMP;
 }
 
@@ -537,6 +581,13 @@ export const CHARACTERS: Record<
     special2: "KEFE DOBÁS",
     fatality: "KEFE FATALITY",
   },
+  hoffer: {
+    name: "HOFFER JÓZSI",
+    title: "Az Idegbeteg",
+    special: "DÜHROHAM",
+    special2: "GYERE IDE!",
+    fatality: "",
+  },
 };
 
 export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
@@ -568,6 +619,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Kefe forgószél — 2 mp pörgés WC kefével, 0,25 mp-enként sebez, +30% mozgás. Nem szakítható meg, de blokkolható.",
     s2: "R1 Kefe dobás — eldobja a WC kefét az ellenfél felé, projectile, blokkolható.",
   },
+  hoffer: {
+    s1: "L1 Dühroham — 5 mp: +30% mozgás és támadási sebesség, +25% sebzés, vörös tónus.",
+    s2: "R1 GYERE IDE! — az ellenfél 3 mp-ig elveszti az irányítást és lassan Hoffer felé sétál.",
+  },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
@@ -582,7 +637,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", lazar: "Lázár János" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", lazar: "Lázár János", hoffer: "Hoffer Józsi" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -661,6 +716,8 @@ type Fighter = {
   crouchGuard: boolean;
   shieldT: number;
   spinAcc: number;
+  rageT: number;
+  pullT: number;
 };
 
 type ImgBag = {
@@ -671,6 +728,7 @@ type ImgBag = {
   cricsi: Record<Pose, HTMLImageElement>;
   jezus: Record<Pose, HTMLImageElement>;
   lazar: Record<Pose, HTMLImageElement>;
+  hoffer: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
 };
@@ -714,27 +772,36 @@ function overlap(a: Box, b: Box) {
 }
 
 function measureBox(im: HTMLImageElement): Box {
+  const w = im.naturalWidth || im.width;
+  const h = im.naturalHeight || im.height;
+  if (!w || !h) return { x: 0, y: 0, w: 1, h: 1, foot: 1 };
   const c = document.createElement("canvas");
-  c.width = im.width;
-  c.height = im.height;
-  const g = c.getContext("2d")!;
-  g.drawImage(im, 0, 0);
-  const d = g.getImageData(0, 0, im.width, im.height).data;
-  let x0 = im.width,
-    y0 = im.height,
-    x1 = 0,
-    y1 = 0;
-  for (let y = 0; y < im.height; y += 2) {
-    for (let x = 0; x < im.width; x += 2) {
-      if (d[(y * im.width + x) * 4 + 3] > 12) {
-        if (x < x0) x0 = x;
-        if (y < y0) y0 = y;
-        if (x > x1) x1 = x;
-        if (y > y1) y1 = y;
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d");
+  if (!g) return { x: 0, y: 0, w, h, foot: h };
+  try {
+    g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, w, h).data;
+    let x0 = w,
+      y0 = h,
+      x1 = 0,
+      y1 = 0;
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        if (d[(y * w + x) * 4 + 3] > 12) {
+          if (x < x0) x0 = x;
+          if (y < y0) y0 = y;
+          if (x > x1) x1 = x;
+          if (y > y1) y1 = y;
+        }
       }
     }
+    if (x1 <= x0 || y1 <= y0) return { x: 0, y: 0, w, h, foot: h };
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, foot: y1 };
+  } catch {
+    return { x: 0, y: 0, w, h, foot: h };
   }
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, foot: y1 };
 }
 
 export class KitchenKombat {
@@ -747,6 +814,7 @@ export class KitchenKombat {
   stageArts: Partial<Record<StageId, HTMLImageElement>> = {};
   brushImg: HTMLImageElement | null = null;
   tornadoImg: HTMLImageElement | null = null;
+  rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
   phase: "intro" | "fight" | "ko" | "finish" | "fatality" | "end" = "intro";
   versusCpu = true;
@@ -893,6 +961,8 @@ export class KitchenKombat {
       koP2: () => this.onKo(this.f1, this.f2),
       getCallout: () => this.callout,
       getWinner: () => this.winner,
+      getRageT: () => this.f1.rageT,
+      getPullT: () => this.f2.pullT,
       playAs: (id: string) => {
         const who = (CHAR_IDS as string[]).includes(id) ? (id as CharId) : "renike";
         this.versusCpu = false;
@@ -958,16 +1028,20 @@ export class KitchenKombat {
       crouchGuard: false,
       shieldT: 0,
       spinAcc: 0,
+      rageT: 0,
+      pullT: 0,
     };
   }
 
   async load() {
     const load = (src: string) =>
-      new Promise<HTMLImageElement>((res, rej) => {
+      new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         im.crossOrigin = "anonymous";
-        im.onload = () => res(im);
-        im.onerror = () => rej(new Error(src));
+        const done = () => res(im);
+        im.onload = done;
+        im.onerror = done;
+        window.setTimeout(done, 12000);
         im.src = src;
       });
     const poses: Pose[] = [
@@ -998,11 +1072,11 @@ export class KitchenKombat {
       "special2",
       "crouch",
     ];
-    const bust = "?v=60";
+    const bust = "?v=64";
     const ui = [
       "/ui/mainmenu.png",
       "/ui/selection.jpg",
-      ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=9`, `/portraits/${id}-icon.png?v=9`]),
+      ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;
@@ -1033,8 +1107,9 @@ export class KitchenKombat {
       cricsi: {} as Record<Pose, HTMLImageElement>,
       jezus: {} as Record<Pose, HTMLImageElement>,
       lazar: {} as Record<Pose, HTMLImageElement>,
+      hoffer: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     let kitchen!: HTMLImageElement;
     let sintertanya!: HTMLImageElement;
@@ -1074,7 +1149,7 @@ export class KitchenKombat {
     this.stageArts = { kitchen, sintertanya };
     this.stage = kitchen;
     this.images = { ...bags, anims, stage: kitchen };
-    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {} };
+    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
     for (const id of CHAR_IDS) {
       for (const p of poses) this.boxes[id][p] = measureBox(this.images[id][p]);
     }
@@ -1757,21 +1832,47 @@ export class KitchenKombat {
     f.squash += (1 - f.squash) * Math.min(1, dt * 10);
     f.bleed = Math.max(0, f.bleed - dt * 0.35);
     if (f.shieldT > 0) f.shieldT = Math.max(0, f.shieldT - dt);
+    if (f.rageT > 0) f.rageT = Math.max(0, f.rageT - dt);
+    if (f.pullT > 0) f.pullT = Math.max(0, f.pullT - dt);
 
     if (f.state === "hurt") {
       f.stun -= dt;
       f.pose = "hurt";
       if (f.stun <= 0 && f.hp > 0) {
-        f.state = f.y > 4 ? "jump" : "idle";
-        f.pose = f.y > 4 ? "jump" : "idle";
+        if (f.pullT > 0) {
+          f.state = f.y > 4 ? "jump" : "walk";
+          f.pose = f.y > 4 ? "jump" : "walk0";
+        } else {
+          f.state = f.y > 4 ? "jump" : "idle";
+          f.pose = f.y > 4 ? "jump" : "idle";
+        }
       }
       return;
     }
     if (f.state === "ko" || f.state === "win") return;
 
+    if (f.pullT > 0) {
+      const other = f === this.f1 ? this.f2 : this.f1;
+      const dir: 1 | -1 = other.x >= f.x ? 1 : -1;
+      f.facing = dir;
+      const dist = Math.abs(other.x - f.x);
+      f.vx = dist < 110 ? 0 : dir * 155;
+      f.atk = null;
+      f.superDash = false;
+      if (f.y > 4) {
+        f.state = "jump";
+        f.pose = "jump";
+      } else {
+        f.state = "walk";
+        f.walkT += dt;
+        f.pose = (`walk${Math.floor(f.walkT * 10) % 4}`) as Pose;
+      }
+      return;
+    }
+
     if (f.state === "dash") {
       f.dashT -= dt;
-      f.vx = f.dashDir * (f.superDash ? SUPER_DASH_SPEED : DASH_SPEED);
+      f.vx = f.dashDir * (f.superDash ? SUPER_DASH_SPEED : DASH_SPEED) * (f.rageT > 0 ? 1.3 : 1);
       f.pose = "dash";
       if (f.superDash) f.invuln = Math.max(f.invuln, 0.04);
       if (f.dashT <= 0) {
@@ -1785,7 +1886,7 @@ export class KitchenKombat {
     }
 
     if (f.state === "attack" && f.atk) {
-      f.atkT += dt;
+      f.atkT += dt * (f.rageT > 0 ? 1.3 : 1);
       if (f.atk.zone === "spin") {
         f.pose = "special";
         const axis = (a.right ? 1 : 0) + (a.left ? -1 : 0);
@@ -1871,7 +1972,8 @@ export class KitchenKombat {
     f.crouchGuard = false;
     if (axis !== 0 && grounded) {
       const fwd = axis === f.facing;
-      f.vx = axis * (fwd ? WALK_FWD : WALK_BACK);
+      const mul = f.rageT > 0 ? 1.3 : 1;
+      f.vx = axis * (fwd ? WALK_FWD : WALK_BACK) * mul;
       f.state = "walk";
       f.walkT += dt;
       const rate = f.id === "agi" ? 8 : 12;
@@ -1882,7 +1984,7 @@ export class KitchenKombat {
       f.state = "idle";
       f.pose = "idle";
     } else {
-      if (axis) f.vx = axis * 400;
+      if (axis) f.vx = axis * 400 * (f.rageT > 0 ? 1.3 : 1);
       f.pose = "jump";
     }
   }
@@ -1927,6 +2029,7 @@ export class KitchenKombat {
   tryAttack(f: Fighter, a: Actions) {
     if (this.phase === "intro") return false;
     if (f.shieldT > 0) return false;
+    if (f.pullT > 0) return false;
     const nxt = this.buffered(f);
     if (!nxt) return false;
     if (nxt.id === "special" || nxt.id === "special2") {
@@ -2037,7 +2140,7 @@ export class KitchenKombat {
   }
 
   face() {
-    const locked = (f: Fighter) => f.state === "attack" || f.state === "hurt" || f.state === "ko";
+    const locked = (f: Fighter) => f.state === "attack" || f.state === "hurt" || f.state === "ko" || f.pullT > 0;
     if (!locked(this.f1)) this.f1.facing = this.f1.x <= this.f2.x ? 1 : -1;
     if (!locked(this.f2)) this.f2.facing = this.f2.x <= this.f1.x ? 1 : -1;
   }
@@ -2054,7 +2157,7 @@ export class KitchenKombat {
 
   combat(att: Fighter, def: Fighter) {
     if (!att.atk || att.hasHit || att.state !== "attack") return;
-    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.shield) return;
+    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.shield || att.atk.rage || att.atk.pull) return;
     if (att.atkT < att.atk.startup || att.atkT > att.atk.startup + att.atk.active) return;
     if (def.invuln > 0 || def.state === "ko") return;
     const hb = this.hitbox(att, att.atk);
@@ -2106,6 +2209,7 @@ export class KitchenKombat {
     att.chain = this.comboSide === side ? [...att.chain, att.atk.id] : [att.atk.id];
     const route = matchCombo(att.chain);
     let dmg = Math.max(1, Math.round(att.atk.dmg * scale));
+    if (att.rageT > 0) dmg = Math.max(1, Math.round(dmg * 1.25));
     if (route && route.name !== att.comboTag) {
       att.comboTag = route.name;
       dmg += route.bonus;
@@ -2436,6 +2540,42 @@ export class KitchenKombat {
       f.shieldT = 5;
       this.callout = CHARACTERS[f.id].special2;
       this.calloutT = 0.8;
+      return;
+    }
+    if (f.atk.rage) {
+      f.spec2Spawned = true;
+      f.rageT = 5;
+      this.callout = CHARACTERS[f.id].special;
+      this.calloutT = 1.2;
+      this.trauma = Math.min(1, this.trauma + 0.22);
+      rumble(f === this.f1 ? 0 : 1, 160, 0.55);
+      this.spawnGuardSmoke(f.x + f.facing * 24, GROUND - f.y - 210, f.facing);
+      return;
+    }
+    if (f.atk.pull) {
+      f.spec2Spawned = true;
+      const def = f === this.f1 ? this.f2 : this.f1;
+      if (def.state !== "ko") {
+        def.pullT = 3;
+        def.atk = null;
+        def.stun = 0;
+        def.superDash = false;
+        def.dashT = 0;
+        def.invuln = 0;
+        if (def.y > 4) {
+          def.state = "jump";
+          def.pose = "jump";
+        } else {
+          def.state = "walk";
+          def.pose = "walk0";
+        }
+      }
+      this.callout = CHARACTERS[f.id].special2;
+      this.calloutT = 1.2;
+      this.trauma = Math.min(1, this.trauma + 0.28);
+      rumble(0, 180, 0.5);
+      rumble(1, 180, 0.5);
+      this.spawnGuardSmoke(f.x + f.facing * 30, GROUND - f.y - 210, f.facing);
       return;
     }
     if (f.atk.zone === "spit") {
@@ -2963,11 +3103,13 @@ export class KitchenKombat {
     if (f.id === "cica" && f.pose.startsWith("low")) scale *= 0.6;
     if (f.id === "cica" && (f.pose === "special" || (f.state === "attack" && f.atk?.pounce))) scale *= 0.68;
     if (f.id === "agi" && (f.pose.startsWith("low") || f.pose === "crouch")) scale *= 1.12;
+    if (f.id === "hoffer" && (f.pose === "crouch" || f.pose.startsWith("low"))) scale *= 0.72;
     const crouchY = (() => {
       if (f.id === "agi" && (f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "lazar" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
+      if (f.id === "hoffer" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.state === "crouch" || (f.state === "block" && f.crouchGuard)) return 0.8;
       return 1;
     })();
@@ -3018,10 +3160,21 @@ export class KitchenKombat {
     if (f.superDash && f.state === "dash") {
       const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.time * 28));
       ctx.filter = `brightness(${1.25 + pulse * 0.55}) saturate(2.6) sepia(0.75) hue-rotate(10deg)`;
+    } else if (f.pullT > 0) {
+      ctx.filter = "brightness(0.92) saturate(0.65) sepia(0.15)";
     } else if (f.flash > 0) ctx.filter = "brightness(1.8) saturate(2.4) hue-rotate(-20deg)";
     else if (f.bleed > 0.15) ctx.filter = `sepia(${Math.min(0.7, f.bleed)}) saturate(2.4) hue-rotate(-18deg)`;
     if (f.state === "ko") ctx.rotate(-0.5);
-    ctx.drawImage(img, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);
+    const dx = (-img.width * scale) / 2;
+    const dy = -idle.foot * scale;
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    if (f.rageT > 0) {
+      const tinted = this.tintSpriteRed(img, 0.62 + 0.18 * Math.abs(Math.sin(this.time * 14)));
+      ctx.drawImage(tinted, dx, dy, dw, dh);
+    } else {
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
     ctx.filter = "none";
     ctx.restore();
     if (f.id === "lazar" && f.state === "attack" && f.atk?.zone === "spin" && f.atkT >= f.atk.startup) {
@@ -3042,6 +3195,21 @@ export class KitchenKombat {
       ctx2.fill();
       ctx2.restore();
     }
+  }
+
+  tintSpriteRed(img: HTMLImageElement, alpha: number): HTMLCanvasElement {
+    if (!this.rageBuf) this.rageBuf = document.createElement("canvas");
+    const c = this.rageBuf;
+    if (c.width !== img.width) c.width = img.width;
+    if (c.height !== img.height) c.height = img.height;
+    const g = c.getContext("2d")!;
+    g.clearRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = "source-atop";
+    g.fillStyle = `rgba(210, 8, 8, ${Math.min(0.85, alpha)})`;
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = "source-over";
+    return c;
   }
 
   drawTornado(f: Fighter) {
