@@ -107,6 +107,17 @@ const JEZUS_DAMAGE: VoicePool = {
 const JEZUS_DEFEAT = "/sfx/jezus_defeat.mp3";
 const JEZUS_OSZLOP = "/sfx/jezus_special_oszlop.mp3";
 const JEZUS_VEDOGOMB = "/sfx/jezus_special_vedogomb.mp3";
+const HOFFER_ATTACK: VoicePool = {
+  files: ["/sfx/hofferjozsi_attack1.mp3", "/sfx/hofferjozsi_attack2.mp3", "/sfx/hofferjozsi_attack3.mp3"],
+  last: -1,
+};
+const HOFFER_DAMAGE: VoicePool = {
+  files: ["/sfx/hofferjozsi_damage1.mp3", "/sfx/hofferjozsi_damage2.mp3", "/sfx/hofferjozsi_damage3.mp3"],
+  last: -1,
+};
+const HOFFER_DEFEAT = "/sfx/hofferjozsi_defeat.mp3";
+const HOFFER_DUHROHAM = "/sfx/hofferjozsi_special_duhroham.mp3";
+const HOFFER_GYEREIDE = "/sfx/hofferjozsi_special_gyereide.mp3";
 const RENIKE_FING = "/sfx/renike_fing.mp3";
 const RICSI_HANYAS = "/sfx/ricsi_hanyas.mp3";
 const CICA_QUAKE = "/sfx/cica_quake.mp3";
@@ -131,11 +142,11 @@ const CHAR_WIN: Record<string, string> = {
   hoffer: "/sfx/hofferjozsiwins.mp3",
 };
 
-const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK };
-const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE };
-const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT };
-const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP };
-const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB };
+const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK };
+const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE };
+const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT };
+const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM };
+const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE };
 
 const voices = new Map<string, AudioBufferSourceNode>();
 
@@ -301,6 +312,11 @@ export function sfxPreloadList(): string[] {
     JEZUS_DEFEAT,
     JEZUS_OSZLOP,
     JEZUS_VEDOGOMB,
+    HOFFER_DEFEAT,
+    ...HOFFER_ATTACK.files,
+    ...HOFFER_DAMAGE.files,
+    HOFFER_DUHROHAM,
+    HOFFER_GYEREIDE,
     RENIKE_FING,
     RICSI_HANYAS,
     CICA_QUAKE,
@@ -524,14 +540,14 @@ export const sfxPlay = {
       return;
     }
     if (id === "jezus") playOneShot(url, 2.4, 1);
-    else if (id === "agi") playOneShot(url, 1, 1);
+    else if (id === "agi" || id === "hoffer") playOneShot(url, 1, 1);
     else playVoice(id, url, 1, 1);
   },
   charSpecial2: (id: string) => {
     const url = CHAR_SPECIAL2[id];
     if (!url) return;
     if (id === "jezus") playOneShot(url, 2.4, 1);
-    else if (id === "agi" || id === "cricsi") playOneShot(url, 1, 1);
+    else if (id === "agi" || id === "cricsi" || id === "hoffer") playOneShot(url, 1, 1);
     else playVoice(id, url, 1, 1);
   },
   quake: () => playOneShot(CICA_QUAKE, 0.95, 0.96 + Math.random() * 0.08),

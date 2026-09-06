@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-0008.zip`  
-**Időpont:** 2026-09-07 00:08 CEST  
-**Verzió:** v0.18  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-0124.zip`  
+**Időpont:** 2026-09-07 01:24 CEST  
+**Verzió:** v0.175  
 
-**Állapot:** Hoffer Józsi a rosterben (Dühroham + GYERE IDE!), vörös rage overlay, buborék nélküli special sprite, VS fej-portré, stabilabb loading.
+**Állapot:** Hoffer harci hangok (special nem szakítható), Super Dash arany overlay minden karakteren.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-06-1928.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0008.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 

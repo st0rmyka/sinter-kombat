@@ -43,7 +43,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya";
 export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya"];
-export const GAME_VERSION = "v0.18";
+export const GAME_VERSION = "v0.175";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -3145,11 +3145,10 @@ export class KitchenKombat {
       for (let i = 2; i >= 1; i--) {
         ctx.save();
         ctx.globalAlpha = (f.superDash ? 0.28 : 0.16) * i;
-        if (f.superDash) ctx.filter = "brightness(1.5) saturate(2.4) sepia(0.8) hue-rotate(12deg)";
         ctx.translate(f.x - f.dashDir * i * 38 + flip * lunge, GROUND - f.y);
         ctx.scale(flip, crouchY);
-        ctx.drawImage(img, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);
-        ctx.filter = "none";
+        const ghost = f.superDash ? this.tintSprite(img, 232, 176, 24, 0.7) : img;
+        ctx.drawImage(ghost, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);
         ctx.restore();
       }
     }
@@ -3157,10 +3156,7 @@ export class KitchenKombat {
     ctx.translate(f.x + flip * lunge, GROUND - f.y - bob);
     ctx.scale(flip, crouchY);
     ctx.rotate(tilt);
-    if (f.superDash && f.state === "dash") {
-      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(this.time * 28));
-      ctx.filter = `brightness(${1.25 + pulse * 0.55}) saturate(2.6) sepia(0.75) hue-rotate(10deg)`;
-    } else if (f.pullT > 0) {
+    if (f.pullT > 0) {
       ctx.filter = "brightness(0.92) saturate(0.65) sepia(0.15)";
     } else if (f.flash > 0) ctx.filter = "brightness(1.8) saturate(2.4) hue-rotate(-20deg)";
     else if (f.bleed > 0.15) ctx.filter = `sepia(${Math.min(0.7, f.bleed)}) saturate(2.4) hue-rotate(-18deg)`;
@@ -3169,9 +3165,12 @@ export class KitchenKombat {
     const dy = -idle.foot * scale;
     const dw = img.width * scale;
     const dh = img.height * scale;
-    if (f.rageT > 0) {
-      const tinted = this.tintSpriteRed(img, 0.62 + 0.18 * Math.abs(Math.sin(this.time * 14)));
-      ctx.drawImage(tinted, dx, dy, dw, dh);
+    if (f.superDash && f.state === "dash") {
+      const pulse = 0.62 + 0.2 * Math.abs(Math.sin(this.time * 16));
+      ctx.drawImage(this.tintSprite(img, 232, 176, 24, pulse), dx, dy, dw, dh);
+    } else if (f.rageT > 0) {
+      const pulse = 0.62 + 0.18 * Math.abs(Math.sin(this.time * 14));
+      ctx.drawImage(this.tintSprite(img, 210, 8, 8, pulse), dx, dy, dw, dh);
     } else {
       ctx.drawImage(img, dx, dy, dw, dh);
     }
@@ -3197,7 +3196,7 @@ export class KitchenKombat {
     }
   }
 
-  tintSpriteRed(img: HTMLImageElement, alpha: number): HTMLCanvasElement {
+  tintSprite(img: HTMLImageElement, r: number, gch: number, b: number, alpha: number): HTMLCanvasElement {
     if (!this.rageBuf) this.rageBuf = document.createElement("canvas");
     const c = this.rageBuf;
     if (c.width !== img.width) c.width = img.width;
@@ -3206,7 +3205,7 @@ export class KitchenKombat {
     g.clearRect(0, 0, c.width, c.height);
     g.drawImage(img, 0, 0);
     g.globalCompositeOperation = "source-atop";
-    g.fillStyle = `rgba(210, 8, 8, ${Math.min(0.85, alpha)})`;
+    g.fillStyle = `rgba(${r}, ${gch}, ${b}, ${Math.min(0.85, alpha)})`;
     g.fillRect(0, 0, c.width, c.height);
     g.globalCompositeOperation = "source-over";
     return c;
