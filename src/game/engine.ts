@@ -1,3 +1,4 @@
+import { getHudScale } from "./settings";
 import { getPadCount, rumble, sampleP1, sampleP2, injectKeys, type Actions } from "./input";
 import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic, sfxPreloadList, musicPreloadList } from "./audio";
 import { packBits, unpackBits } from "./net";
@@ -40,7 +41,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus"];
 export type StageId = "kitchen" | "sintertanya";
 export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya"];
-export const GAME_VERSION = "v0.15";
+export const GAME_VERSION = "v0.155";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -699,6 +700,7 @@ export type Hud = {
   loadPct: number;
   training: boolean;
   dummy: DummyMode;
+  trainMeter: boolean;
   p1Hist: TrainPress[];
   p2Hist: TrainPress[];
 };
@@ -746,6 +748,7 @@ export class KitchenKombat {
   versusCpu = true;
   training = false;
   dummy: DummyMode = "idle";
+  trainMeter = false;
   p1Bits = 0;
   p2Bits = 0;
   p1Hist: TrainPress[] = [];
@@ -1123,6 +1126,7 @@ export class KitchenKombat {
     this.difficulty = diff;
     this.training = training;
     this.dummy = training ? "idle" : "cpu";
+    this.trainMeter = training ? this.trainMeter : false;
     this.screen = "select";
     this.selectSlot = 1;
     this.pushHud();
@@ -1215,6 +1219,7 @@ export class KitchenKombat {
     this.netWaiting = false;
     this.paused = false;
     this.training = false;
+    this.trainMeter = false;
     this.screen = "title";
     stopStageMusic();
     startMenuMusic();
@@ -1422,6 +1427,10 @@ export class KitchenKombat {
       this.f1.hp = MAX_HP;
       this.f2.hp = MAX_HP;
     }
+    if (this.training && this.trainMeter) {
+      this.f1.meter = 100;
+      this.f2.meter = 100;
+    }
     this.pushHud();
   }
 
@@ -1505,6 +1514,15 @@ export class KitchenKombat {
   cycleTrainDiff(dir: 1 | -1) {
     const i = (DIFFICULTIES.indexOf(this.difficulty) + dir + DIFFICULTIES.length) % DIFFICULTIES.length;
     this.difficulty = DIFFICULTIES[i]!;
+    this.pushHud();
+  }
+
+  toggleTrainMeter() {
+    this.trainMeter = !this.trainMeter;
+    if (this.trainMeter) {
+      this.f1.meter = 100;
+      this.f2.meter = 100;
+    }
     this.pushHud();
   }
 
@@ -3294,6 +3312,11 @@ export class KitchenKombat {
 
   drawHudBars() {
     const ctx = this.ctx;
+    const s = getHudScale();
+    ctx.save();
+    ctx.translate(W / 2, 0);
+    ctx.scale(s, s);
+    ctx.translate(-W / 2, 0);
     const bar = (x: number, y: number, w: number, hp: number, flip: boolean) => {
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillRect(x - 4, y - 4, w + 8, 28);
@@ -3368,6 +3391,7 @@ export class KitchenKombat {
         ctx.fillText(this.comboName, cx, 146);
       }
     }
+    ctx.restore();
     if (this.callout) {
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -3441,10 +3465,11 @@ export class KitchenKombat {
       netWait: this.netWaiting,
       training: this.training,
       dummy: this.dummy,
+      trainMeter: this.trainMeter,
       p1Hist: this.p1Hist.slice(),
       p2Hist: this.p2Hist.slice(),
     };
-    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.round(h.loadPct * 100)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
+    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.round(h.loadPct * 100)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.onHud(h);

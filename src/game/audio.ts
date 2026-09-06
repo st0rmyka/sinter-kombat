@@ -1,3 +1,5 @@
+import { getSettings } from "./settings";
+
 let ctx: AudioContext | null = null;
 let muted = false;
 let drone: OscillatorNode | null = null;
@@ -5,6 +7,7 @@ let droneGain: GainNode | null = null;
 let master: GainNode | null = null;
 let sfxGain: GainNode | null = null;
 let musicGain: GainNode | null = null;
+let announcerGain: GainNode | null = null;
 let visibilityHooked = false;
 let announcer: AudioBufferSourceNode | null = null;
 let musicEl: HTMLAudioElement | null = null;
@@ -134,22 +137,33 @@ const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICS
 
 const voices = new Map<string, AudioBufferSourceNode>();
 
+function mix() {
+  const s = getSettings();
+  const on = s.soundOn && !muted;
+  return {
+    on,
+    sfx: on ? s.sfx : 0,
+    music: on ? MUSIC_VOL * s.music : 0,
+    announcer: on ? s.announcer : 0,
+  };
+}
+
+export function applyMix() {
+  const c = ctx;
+  const m = mix();
+  if (c && sfxGain) sfxGain.gain.setTargetAtTime(m.sfx, c.currentTime, 0.02);
+  if (c && musicGain) musicGain.gain.setTargetAtTime(m.music, c.currentTime, 0.04);
+  if (c && announcerGain) announcerGain.gain.setTargetAtTime(m.announcer, c.currentTime, 0.02);
+  if (musicEl) musicEl.muted = !m.on;
+}
+
 export function isMuted() {
-  return muted;
+  return muted || !getSettings().soundOn;
 }
 
 export function setMuted(v: boolean) {
   muted = v;
-  const c = ctx;
-  if (!c) {
-    if (droneGain) droneGain.gain.value = v ? 0 : 0.03;
-    if (musicEl) musicEl.muted = v;
-    return;
-  }
-  if (sfxGain) sfxGain.gain.setTargetAtTime(v ? 0 : 1, c.currentTime, 0.02);
-  if (droneGain) droneGain.gain.setTargetAtTime(v ? 0 : 0.03, c.currentTime, 0.02);
-  if (musicGain) musicGain.gain.setTargetAtTime(v ? 0 : MUSIC_VOL, c.currentTime, 0.04);
-  if (musicEl) musicEl.muted = v;
+  applyMix();
 }
 
 function ac() {
@@ -169,12 +183,13 @@ function ac() {
     master = ctx.createGain();
     sfxGain = ctx.createGain();
     musicGain = ctx.createGain();
+    announcerGain = ctx.createGain();
     sfxGain.connect(master);
     musicGain.connect(master);
+    announcerGain.connect(master);
     master.connect(ctx.destination);
     master.gain.value = 1;
-    sfxGain.gain.value = muted ? 0 : 1;
-    musicGain.gain.value = muted ? 0 : MUSIC_VOL;
+    applyMix();
   }
   return ctx;
 }
@@ -197,8 +212,45 @@ function dest() {
   return sfxGain ?? ctx!.destination;
 }
 
+function destAnn() {
+  ac();
+  return announcerGain ?? dest();
+}
+
+function playAnnouncerShot(url: string, vol = 1) {
+  if (mix().announcer <= 0) return;
+  const buf = buffers.get(url);
+  if (!buf) {
+    void decodeUrl(url)
+      .then((decoded) => {
+        buffers.set(url, decoded);
+        playAnnouncerShot(url, vol);
+      })
+      .catch(() => {
+        /* missing */
+      });
+    return;
+  }
+  const c = ac();
+  if (c.state === "suspended") void c.resume();
+  const src = c.createBufferSource();
+  const g = c.createGain();
+  src.buffer = buf;
+  g.gain.value = vol;
+  src.connect(g).connect(destAnn());
+  src.onended = () => {
+    try {
+      src.disconnect();
+      g.disconnect();
+    } catch {
+      /* ignore */
+    }
+  };
+  src.start();
+}
+
 function beep(freq: number, dur: number, type: OscillatorType, vol: number, slide = 0) {
-  if (muted) return;
+  if (mix().sfx <= 0) return;
   const c = ac();
   const o = c.createOscillator();
   const g = c.createGain();
@@ -298,7 +350,7 @@ export async function preloadSfx(onItem?: () => void) {
 }
 
 function playBuffer(url: string, vol = 0.95) {
-  if (muted) return;
+  if (mix().announcer <= 0) return;
   const buf = buffers.get(url);
   if (!buf) return;
   const c = ac();
@@ -315,7 +367,7 @@ function playBuffer(url: string, vol = 0.95) {
   const g = c.createGain();
   src.buffer = buf;
   g.gain.value = vol;
-  src.connect(g).connect(dest());
+  src.connect(g).connect(destAnn());
   src.onended = () => {
     if (announcer === src) announcer = null;
     try {
@@ -330,7 +382,7 @@ function playBuffer(url: string, vol = 0.95) {
 }
 
 function playOneShot(url: string, vol: number, rate: number) {
-  if (muted) return;
+  if (mix().sfx <= 0) return;
   const buf = buffers.get(url);
   if (!buf) {
     void decodeUrl(url)
@@ -381,7 +433,7 @@ function pickFrom(pool: VoicePool) {
 }
 
 function playVoice(who: string, url: string, vol: number, rate = 1) {
-  if (muted) return;
+  if (mix().sfx <= 0) return;
   const buf = buffers.get(url);
   if (!buf) {
     void decodeUrl(url)
@@ -482,7 +534,7 @@ export const sfxPlay = {
   charName: (id: string) => {
     const url = CHAR_NAME[id];
     if (!url) return;
-    playOneShot(url, 1, 1);
+    playAnnouncerShot(url, 1);
   },
   charWin: (id: string) => {
     const url = CHAR_WIN[id];
@@ -564,14 +616,13 @@ function hookMusicGraph(el: HTMLAudioElement) {
   const c = ac();
   if (!musicGain) {
     musicGain = c.createGain();
-    musicGain.gain.value = muted ? 0 : MUSIC_VOL;
     musicGain.connect(master ?? c.destination);
   }
   if (!musicNode) {
     musicNode = c.createMediaElementSource(el);
     musicNode.connect(musicGain);
   }
-  el.muted = muted;
+  applyMix();
   el.volume = 1;
 }
 
@@ -590,7 +641,7 @@ export function startMenuMusic() {
     }
   }
   void unlockAudio().then(() => {
-    el.muted = muted;
+    el.muted = mix().music <= 0;
     void el.play().catch(() => {
       /* autoplay blocked until next gesture */
     });
@@ -610,7 +661,7 @@ export function startStageMusic(stage: string) {
     /* ignore */
   }
   void unlockAudio().then(() => {
-    el.muted = muted;
+    el.muted = mix().music <= 0;
     void el.play().catch(() => {
       /* autoplay blocked until next gesture */
     });

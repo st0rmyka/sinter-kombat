@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-06-0726.zip`  
-**Időpont:** 2026-09-06 07:26 CEST  
-**Verzió:** v0.15  
+**Fájl:** `Sinter-Kombat-backup-2026-09-06-0744.zip`  
+**Időpont:** 2026-09-06 07:44 CEST  
+**Verzió:** v0.155  
 
-**Állapot:** Gyakorló mód, input history (utolsó 10 gomb), Lázár János kódban/fájlokban de nincs a rosterben. CPU, HUD, menük.
+**Állapot:** Gyakorló mód (karakterválasztás, végtelen energia), Beállítások (hang/HUD/touch), Kilépés, Lázár János kint a rosterből.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-06-0625.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-06-0726.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 

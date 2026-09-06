@@ -2,10 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
-import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio } from "./audio";
+import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix } from "./audio";
+import { getSettings, patchSettings, subscribeSettings, type GameSettings } from "./settings";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.155",
+    items: [
+      "Gyakorló szünet: Karakterválasztás, végtelen energia",
+      "Beállítások: hang, HUD, virtuális kontroller",
+      "Kilépés a játékból",
+      "Lázár János átmenetileg nem elérhető, a karaktert reworkolni kell.",
+    ],
+  },
   {
     v: "v0.15",
     items: [
@@ -51,6 +61,18 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
   },
 ];
 
+function nudgeSetting(i: number, dir: number) {
+  const s = getSettings();
+  const step = 0.05;
+  if (i === 0) patchSettings({ soundOn: !s.soundOn });
+  else if (i === 1) patchSettings({ sfx: s.sfx + dir * step });
+  else if (i === 2) patchSettings({ music: s.music + dir * step });
+  else if (i === 3) patchSettings({ announcer: s.announcer + dir * step });
+  else if (i === 4) patchSettings({ hud: s.hud + dir * 0.05 });
+  else if (i === 5) patchSettings({ touch: s.touch + dir * 0.05 });
+  applyMix();
+}
+
 const emptyHud = (): Hud => ({
   screen: "title",
   p1: "renike",
@@ -80,6 +102,7 @@ const emptyHud = (): Hud => ({
   loadPct: 0,
   training: false,
   dummy: "idle",
+  trainMeter: false,
   p1Hist: [],
   p2Hist: [],
 });
@@ -92,6 +115,10 @@ export function GameView() {
   const [muted, setMutedUi] = useState(false);
   const [help, setHelp] = useState(false);
   const [updates, setUpdates] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [setIdx, setSetIdx] = useState(0);
+  const [opt, setOpt] = useState<GameSettings>(getSettings);
+  const [exited, setExited] = useState(false);
   const [patchIdx, setPatchIdx] = useState(0);
   const [diff, setDiff] = useState<Difficulty>("normal");
   const [menu, setMenu] = useState<"root" | "diff">("root");
@@ -117,6 +144,10 @@ export function GameView() {
   helpRef.current = help;
   const updatesRef = useRef(updates);
   updatesRef.current = updates;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const setIdxRef = useRef(setIdx);
+  setIdxRef.current = setIdx;
   const patchIdxRef = useRef(patchIdx);
   patchIdxRef.current = patchIdx;
   const diffRef = useRef(diff);
@@ -160,6 +191,7 @@ export function GameView() {
     g.screen = "title";
     g.paused = false;
     g.training = false;
+    g.trainMeter = false;
     g.pushHud();
   };
 
@@ -185,6 +217,28 @@ export function GameView() {
     setConfirm(null);
     setHelp(false);
     g.beginMatch();
+  };
+
+  const goTrainChars = () => {
+    const g = gameRef.current;
+    if (!g) return;
+    setConfirm(null);
+    setHelp(false);
+    setSettings(false);
+    startMenuMusic();
+    resetSelect(true);
+    g.paused = false;
+    g.chooseMode(true, g.difficulty, true);
+  };
+
+  const goExit = () => {
+    const g = gameRef.current;
+    setConfirm(null);
+    stopKitchenDrone();
+    stopStageMusic();
+    g?.destroy();
+    setExited(true);
+    window.close();
   };
 
   const ask = (q: string, yes: () => void) => {
@@ -260,6 +314,16 @@ export function GameView() {
   }, []);
 
   useEffect(() => {
+    applyMix();
+    setMutedUi(isMuted());
+    return subscribeSettings(() => {
+      setOpt(getSettings());
+      applyMix();
+      setMutedUi(isMuted());
+    });
+  }, []);
+
+  useEffect(() => {
     if (hud.screen === "result") {
       setResultIdx(0);
       setConfirm(null);
@@ -284,27 +348,64 @@ export function GameView() {
         raf = requestAnimationFrame(tick);
         return;
       }
-      if (helpRef.current || updatesRef.current) {
+      if (helpRef.current || updatesRef.current || settingsRef.current) {
         const m = sampleMenu();
         if (updatesRef.current) {
           if (m.upP) setPatchIdx((i) => Math.max(0, i - 1));
           if (m.downP) setPatchIdx((i) => Math.min(PATCH_NOTES.length - 1, i + 1));
         }
-        if (!gated() && (m.kickLP || m.kickRP || m.startP)) {
+        if (settingsRef.current) {
+          const rows = 6;
+          if (m.upP) setSetIdx((i) => (i + rows - 1) % rows);
+          if (m.downP) setSetIdx((i) => (i + 1) % rows);
+          if (m.leftP || m.rightP) {
+            const dir = m.leftP ? -1 : 1;
+            nudgeSetting(setIdxRef.current, dir);
+          }
+        }
+        if (!gated() && (m.kickRP || (settingsRef.current ? false : m.kickLP) || m.startP)) {
+          if (settingsRef.current && (m.kickLP || m.startP) && !m.kickRP) {
+            /* confirm row unused */
+          } else if (!gated() && (m.kickRP || m.startP)) {
+            armGate();
+            setHelp(false);
+            setUpdates(false);
+            setSettings(false);
+          }
+        }
+        if (!gated() && m.kickRP) {
           armGate();
           setHelp(false);
           setUpdates(false);
+          setSettings(false);
         }
         raf = requestAnimationFrame(tick);
         return;
       }
       if (h.screen === "title") {
         const m = sampleMenu();
+        const c = confirmRef.current;
+        if (c) {
+          const ok = !gated() && (m.kickLP || m.punchLP || m.punchRP || m.startP);
+          const back = !gated() && m.kickRP;
+          if (m.leftP) setConfirmChoice(0);
+          if (m.rightP) setConfirmChoice(1);
+          if (ok) {
+            armGate();
+            if (confirmChoiceRef.current === 0) c.yes();
+            else setConfirm(null);
+          } else if (back) {
+            armGate();
+            setConfirm(null);
+          }
+          raf = requestAnimationFrame(tick);
+          return;
+        }
         const diffs: Difficulty[] = DIFFICULTIES;
         const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
         if (menuRef.current === "root") {
-          if (m.upP) setTitleIdx((i) => (i + 4) % 5);
-          if (m.downP) setTitleIdx((i) => (i + 1) % 5);
+          if (m.upP) setTitleIdx((i) => (i + 6) % 7);
+          if (m.downP) setTitleIdx((i) => (i + 1) % 7);
           if (ok) {
             armGate();
             const i = titleIdxRef.current;
@@ -323,6 +424,11 @@ export function GameView() {
               boot();
               resetSelect(true);
               g.chooseMode(true, diffRef.current, true);
+            } else if (i === 4) {
+              ask("Biztos ki akarsz lépni a játékból?", goExit);
+            } else if (i === 5) {
+              setSetIdx(0);
+              setSettings(true);
             } else {
               setPatchIdx(0);
               setUpdates(true);
@@ -442,7 +548,7 @@ export function GameView() {
             setConfirm(null);
           }
         } else if (h.screen === "pause") {
-          const n = h.training ? 6 : 4;
+          const n = h.training ? 9 : 6;
           if (helpRef.current) {
             /* help overlay handles close */
           } else if (m.upP) setPauseIdx((i) => (i + n - 1) % n);
@@ -452,6 +558,7 @@ export function GameView() {
             const i = pauseIdxRef.current;
             if (i === 2) g.cycleDummy(dir as 1 | -1);
             else if (i === 3 && g.dummy === "cpu") g.cycleTrainDiff(dir as 1 | -1);
+            else if (i === 4) g.toggleTrainMeter();
           } else if (back) {
             armGate();
             g.pauseToggle();
@@ -459,20 +566,31 @@ export function GameView() {
             const i = pauseIdxRef.current;
             if (h.training) {
               if (i === 0) g.pauseToggle();
-              else if (i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+              else if (i === 1) ask("Biztos a karakterválasztóra lépsz?", goTrainChars);
               else if (i === 2) g.cycleDummy(1);
               else if (i === 3) {
                 if (g.dummy === "cpu") g.cycleTrainDiff(1);
-              } else if (i === 4) {
+              } else if (i === 4) g.toggleTrainMeter();
+              else if (i === 5) {
                 armGate();
                 setHelp(true);
-              } else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+              } else if (i === 6) {
+                armGate();
+                setSetIdx(0);
+                setSettings(true);
+              } else if (i === 7) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+              else ask("Biztos ki akarsz lépni a játékból?", goExit);
             } else if (i === 0) g.pauseToggle();
             else if (i === 1) ask("Biztos újraindítod a meccset?", goRestart);
             else if (i === 2) {
               armGate();
               setHelp(true);
-            } else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            } else if (i === 3) {
+              armGate();
+              setSetIdx(0);
+              setSettings(true);
+            } else if (i === 4) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            else ask("Biztos ki akarsz lépni a játékból?", goExit);
           }
         } else if (h.screen === "result") {
           if (m.upP) setResultIdx((i) => (i + 2) % 3);
@@ -531,13 +649,16 @@ export function GameView() {
           }}
         >
           <div className="from-bg/90 mt-auto flex flex-col items-center gap-1 bg-gradient-to-t to-transparent px-4 pb-10 pt-16">
-            {menu === "root"
+            {confirm && hud.screen === "title" ? (
+              <ConfirmBox q={confirm.q} choice={confirmChoice} onYes={confirm.yes} onNo={() => setConfirm(null)} />
+            ) : menu === "root"
               ? (
                   [
                     { label: "1 Játékos VS CPU", i: 0 },
                     { label: "2 Játékos", i: 1 },
                     { label: "Online", i: 2 },
                     { label: "Gyakorló mód", i: 3 },
+                    { label: "Kilépés a Játékból", i: 4 },
                   ] as const
                 ).map((item) => (
                   <button
@@ -553,10 +674,10 @@ export function GameView() {
                       } else if (item.i === 2) {
                         setNetErr(null);
                         gameRef.current?.openOnline();
-                      } else {
+                      } else if (item.i === 3) {
                         resetSelect(true);
                         gameRef.current?.chooseMode(true, diff, true);
-                      }
+                      } else ask("Biztos ki akarsz lépni a játékból?", goExit);
                     }}
                     className={`font-display min-h-11 min-w-64 px-6 text-center text-2xl tracking-wide transition-colors sm:text-3xl ${
                       titleIdx === item.i ? "text-gold" : "text-fg/70 hover:text-fg"
@@ -585,19 +706,34 @@ export function GameView() {
                 ))}
           </div>
           {menu === "root" && (
-            <button
-              type="button"
-              onClick={() => {
-                setTitleIdx(4);
-                setPatchIdx(0);
-                setUpdates(true);
-              }}
-              className={`font-display absolute bottom-4 right-4 z-10 min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
-                titleIdx === 4 ? "text-gold" : "text-fg/70 hover:text-fg"
-              }`}
-            >
-              {titleIdx === 4 ? "▸ Frissítések" : "Frissítések"}
-            </button>
+            <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setTitleIdx(5);
+                  setSetIdx(0);
+                  setSettings(true);
+                }}
+                className={`font-display min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
+                  titleIdx === 5 ? "text-gold" : "text-fg/70 hover:text-fg"
+                }`}
+              >
+                {titleIdx === 5 ? "▸ Beállítások" : "Beállítások"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTitleIdx(6);
+                  setPatchIdx(0);
+                  setUpdates(true);
+                }}
+                className={`font-display min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
+                  titleIdx === 6 ? "text-gold" : "text-fg/70 hover:text-fg"
+                }`}
+              >
+                {titleIdx === 6 ? "▸ Frissítések" : "Frissítések"}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -800,7 +936,7 @@ export function GameView() {
               {(hud.training
                 ? ([
                     { label: "Folytatás", i: 0 },
-                    { label: "Újraindítás", i: 1 },
+                    { label: "Karakterválasztás", i: 1 },
                     {
                       label: `Ellenfél: ${hud.dummy === "idle" ? "ÁLL" : hud.dummy === "cpu" ? "CPU HARCOL" : "2. JÁTÉKOS"}`,
                       i: 2,
@@ -812,14 +948,19 @@ export function GameView() {
                           : "Nehézség: —",
                       i: 3,
                     },
-                    { label: "Irányítás", i: 4 },
-                    { label: "Főmenü", i: 5 },
+                    { label: `Végtelen energia: ${hud.trainMeter ? "BE" : "KI"}`, i: 4 },
+                    { label: "Irányítás", i: 5 },
+                    { label: "Beállítások", i: 6 },
+                    { label: "Főmenü", i: 7 },
+                    { label: "Kilépés a Játékból", i: 8 },
                   ] as const)
                 : ([
                     { label: "Folytatás", i: 0 },
                     { label: "Újraindítás", i: 1 },
                     { label: "Irányítás", i: 2 },
-                    { label: "Főmenü", i: 3 },
+                    { label: "Beállítások", i: 3 },
+                    { label: "Főmenü", i: 4 },
+                    { label: "Kilépés a Játékból", i: 5 },
                   ] as const)
               ).map((item) => (
                 <MenuBtn
@@ -831,16 +972,25 @@ export function GameView() {
                     if (!g) return;
                     if (hud.training) {
                       if (item.i === 0) g.pauseToggle();
-                      else if (item.i === 1) ask("Biztos újraindítod a meccset?", goRestart);
+                      else if (item.i === 1) ask("Biztos a karakterválasztóra lépsz?", goTrainChars);
                       else if (item.i === 2) g.cycleDummy(1);
                       else if (item.i === 3) {
                         if (g.dummy === "cpu") g.cycleTrainDiff(1);
-                      } else if (item.i === 4) setHelp(true);
-                      else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                      } else if (item.i === 4) g.toggleTrainMeter();
+                      else if (item.i === 5) setHelp(true);
+                      else if (item.i === 6) {
+                        setSetIdx(0);
+                        setSettings(true);
+                      } else if (item.i === 7) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                      else ask("Biztos ki akarsz lépni a játékból?", goExit);
                     } else if (item.i === 0) g.pauseToggle();
                     else if (item.i === 1) ask("Biztos újraindítod a meccset?", goRestart);
                     else if (item.i === 2) setHelp(true);
-                    else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                    else if (item.i === 3) {
+                      setSetIdx(0);
+                      setSettings(true);
+                    } else if (item.i === 4) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                    else ask("Biztos ki akarsz lépni a játékból?", goExit);
                   }}
                 >
                   {item.label}
@@ -848,7 +998,7 @@ export function GameView() {
               ))}
               {hud.training && (
                 <p className="text-muted mt-2 text-center text-xs">
-                  Ellenfél / nehézség: bal-jobb. Kör: vissza.
+                  Ellenfél / nehézség / energia: bal-jobb. Kör: vissza.
                 </p>
               )}
             </>
@@ -900,6 +1050,14 @@ export function GameView() {
           onPick={setPatchIdx}
         />
       )}
+      {settings && (
+        <SettingsPanel
+          sel={setIdx}
+          opt={opt}
+          onClose={() => setSettings(false)}
+          onPick={setSetIdx}
+        />
+      )}
 
       {hud.screen === "fight" && hud.training && (
         <>
@@ -916,10 +1074,14 @@ export function GameView() {
         </div>
       )}
 
-      {hud.screen === "fight" && touchUi && <TouchPad />}
+      {hud.screen === "fight" && touchUi && <TouchPad scale={opt.touch} />}
       </div>
 
-      {touchUi && !landscape && <RotateHint />}
+      {exited && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg">
+          <p className="font-display text-2xl">Játék bezárva</p>
+        </div>
+      )}
 
       <div
         className="pointer-events-none absolute bottom-2 left-3 z-30 font-display text-[11px] tracking-[0.18em] text-white/75"
@@ -933,14 +1095,16 @@ export function GameView() {
         className="absolute right-3 top-3 z-20 rounded-full border border-border bg-surface/80 p-2"
         onClick={() => {
           void unlockAudio().then((wasSuspended) => {
-            if (wasSuspended && !isMuted()) {
+            if (wasSuspended && getSettings().soundOn) {
               startMenuMusic();
               return;
             }
-            const n = !isMuted();
-            setMuted(n);
-            setMutedUi(n);
-            if (!n) startMenuMusic();
+            const on = !getSettings().soundOn;
+            patchSettings({ soundOn: on });
+            setMuted(!on);
+            applyMix();
+            setMutedUi(!on);
+            if (on) startMenuMusic();
           });
         }}
         aria-label={muted ? "Hang be" : "Némítás"}
@@ -1238,6 +1402,121 @@ function Help({ p1, p2, onClose }: { p1: CharId; p2: CharId; onClose: () => void
   );
 }
 
+function pct(n: number) {
+  return `${Math.round(n * 100)}%`;
+}
+
+function SettingsPanel({
+  sel,
+  opt,
+  onClose,
+  onPick,
+}: {
+  sel: number;
+  opt: GameSettings;
+  onClose: () => void;
+  onPick: (i: number) => void;
+}) {
+  const row = (i: number, label: string, value: string, extra?: React.ReactNode) => (
+    <button
+      key={i}
+      type="button"
+      onClick={() => {
+        onPick(i);
+        if (i === 0) nudgeSetting(0, 1);
+      }}
+      className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm ${
+        sel === i ? "border-gold bg-gold/10" : "border-border"
+      }`}
+    >
+      <span>{label}</span>
+      <span className="text-gold font-display">{value}</span>
+      {extra}
+    </button>
+  );
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/90 px-4">
+      <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
+        <h3 className="font-display text-2xl">Beállítások</h3>
+        <p className="text-muted mt-1 text-sm">Bal-jobb: állítás. Kör: vissza.</p>
+        <p className="font-display text-gold mt-4 text-lg">Hangok</p>
+        <div className="mt-2 space-y-2">
+          {row(0, "Minden hang", opt.soundOn ? "BE" : "KI")}
+          {row(1, "Hangeffektek", pct(opt.sfx))}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(opt.sfx * 100)}
+            onChange={(e) => {
+              onPick(1);
+              patchSettings({ sfx: Number(e.target.value) / 100 });
+              applyMix();
+            }}
+            className="w-full"
+          />
+          {row(2, "Zene", pct(opt.music))}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(opt.music * 100)}
+            onChange={(e) => {
+              onPick(2);
+              patchSettings({ music: Number(e.target.value) / 100 });
+              applyMix();
+            }}
+            className="w-full"
+          />
+          {row(3, "Bejelentő", pct(opt.announcer))}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(opt.announcer * 100)}
+            onChange={(e) => {
+              onPick(3);
+              patchSettings({ announcer: Number(e.target.value) / 100 });
+              applyMix();
+            }}
+            className="w-full"
+          />
+        </div>
+        <p className="font-display text-gold mt-4 text-lg">Videó</p>
+        <div className="mt-2 space-y-2">
+          {row(4, "HUD méret", pct(opt.hud))}
+          <input
+            type="range"
+            min={50}
+            max={125}
+            value={Math.round(opt.hud * 100)}
+            onChange={(e) => {
+              onPick(4);
+              patchSettings({ hud: Number(e.target.value) / 100 });
+            }}
+            className="w-full"
+          />
+          {row(5, "Virtuális kontroller (mobil)", pct(opt.touch))}
+          <input
+            type="range"
+            min={50}
+            max={150}
+            value={Math.round(opt.touch * 100)}
+            onChange={(e) => {
+              onPick(5);
+              patchSettings({ touch: Number(e.target.value) / 100 });
+            }}
+            className="w-full"
+          />
+        </div>
+        <div className="mt-4">
+          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Updates({
   sel,
   onClose,
@@ -1279,7 +1558,7 @@ function Updates({
   );
 }
 
-function TouchPad() {
+function TouchPad({ scale }: { scale: number }) {
   const hold = (code: string) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
@@ -1298,7 +1577,10 @@ function TouchPad() {
   const mini =
     "flex h-11 min-w-14 items-center justify-center rounded-md border border-gold/70 bg-surface/80 px-2 text-xs font-bold uppercase text-fg active:bg-gold active:text-bg";
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      style={{ transform: `scale(${scale})`, transformOrigin: "bottom center" }}
+    >
       <div className="pointer-events-auto flex flex-col items-center gap-2">
         <button type="button" className={btn} {...hold("ArrowUp")}>
           ↑
