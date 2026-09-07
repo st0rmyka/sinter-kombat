@@ -187,6 +187,13 @@ function ac() {
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     ctx = new Ctor({ latencyHint: "interactive" });
+    ctx.addEventListener("statechange", () => {
+      if (ctx?.state === "running" && musicEl && musicEl.paused) {
+        void musicEl.play().catch(() => {
+          /* still blocked */
+        });
+      }
+    });
   }
   if (!visibilityHooked) {
     visibilityHooked = true;
@@ -209,6 +216,38 @@ function ac() {
   return ctx;
 }
 
+let primed = false;
+
+export function isAudioPrimed() {
+  return primed && ctx?.state === "running";
+}
+
+/** Call from a real user gesture (click / tap / key). Gamepad does not count. */
+export function primeAudio() {
+  const c = ac();
+  void c.resume();
+  try {
+    const buf = c.createBuffer(1, 1, c.sampleRate);
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.connect(c.destination);
+    src.start();
+  } catch {
+    /* ignore */
+  }
+  primed = true;
+  if (musicKind === "stage") {
+    if (musicEl) {
+      musicEl.muted = mix().music <= 0;
+      void musicEl.play().catch(() => {
+        /* blocked */
+      });
+    }
+  } else {
+    startMenuMusic();
+  }
+}
+
 export async function unlockAudio() {
   const c = ac();
   if (c.state === "suspended") {
@@ -217,8 +256,18 @@ export async function unlockAudio() {
     } catch {
       /* gesture required */
     }
+    if (ac().state === "running") {
+      primed = true;
+      if (musicEl && musicEl.paused) {
+        musicEl.muted = mix().music <= 0;
+        void musicEl.play().catch(() => {
+          /* blocked */
+        });
+      }
+    }
     return true;
   }
+  primed = true;
   return false;
 }
 
@@ -654,7 +703,9 @@ function hookMusicGraph(el: HTMLAudioElement) {
 }
 
 export function startMenuMusic() {
-  if (musicKind === "menu" && musicEl && !musicEl.paused && ctx?.state === "running") return;
+  const c = ac();
+  if (c.state === "suspended") void c.resume();
+  if (musicKind === "menu" && musicEl && !musicEl.paused && c.state === "running") return;
   const switched = musicKind !== "menu";
   const el = ensureMusicEl(MENU_FILE, "menu");
   if (!el) return;
@@ -667,17 +718,17 @@ export function startMenuMusic() {
       /* ignore */
     }
   }
-  void unlockAudio().then(() => {
-    el.muted = mix().music <= 0;
-    void el.play().catch(() => {
-      /* autoplay blocked until next gesture */
-    });
+  el.muted = mix().music <= 0;
+  void el.play().catch(() => {
+    /* autoplay blocked until next gesture */
   });
 }
 
 export function startStageMusic(stage: string) {
   const url = MUSIC_FILES[stage] ?? MUSIC_FILES.kitchen;
   if (!url) return;
+  const c = ac();
+  if (c.state === "suspended") void c.resume();
   const el = ensureMusicEl(url, "stage");
   if (!el) return;
   hookMusicGraph(el);
@@ -687,11 +738,9 @@ export function startStageMusic(stage: string) {
   } catch {
     /* ignore */
   }
-  void unlockAudio().then(() => {
-    el.muted = mix().music <= 0;
-    void el.play().catch(() => {
-      /* autoplay blocked until next gesture */
-    });
+  el.muted = mix().music <= 0;
+  void el.play().catch(() => {
+    /* autoplay blocked until next gesture */
   });
 }
 

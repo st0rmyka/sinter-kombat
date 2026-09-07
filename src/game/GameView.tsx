@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
-import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix } from "./audio";
+import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
 import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
@@ -174,12 +174,14 @@ export function GameView() {
   const [p2Cur, setP2Cur] = useState<CharId>("ricsi");
   const [p1Lock, setP1Lock] = useState(false);
   const [p2Lock, setP2Lock] = useState(false);
+  const [touchPick, setTouchPick] = useState<{ slot: 1 | 2; id: CharId } | null>(null);
   const [stageCur, setStageCur] = useState<StageId>("kitchen");
   const [joinAddr, setJoinAddr] = useState("127.0.0.1");
   const [hostIps, setHostIps] = useState<string[]>([]);
   const [hostPort, setHostPort] = useState(8080);
   const [netErr, setNetErr] = useState<string | null>(null);
   const [lobbyTick, setLobbyTick] = useState(0);
+  const [audioReady, setAudioReady] = useState(false);
   const netRef = useRef(new NetPlay());
   const hudRef = useRef(hud);
   hudRef.current = hud;
@@ -299,12 +301,14 @@ export function GameView() {
     setP2Cur("ricsi");
     setP1Lock(false);
     setP2Lock(false);
+    setTouchPick(null);
     setStageCur("kitchen");
     void cpu;
   };
 
   const boot = () => {
-    unlockAudio();
+    primeAudio();
+    setAudioReady(true);
     goLandscape();
     const s = hudRef.current.screen;
     if (s === "title" || s === "select" || s === "stage" || s === "online" || s === "lobby") startMenuMusic();
@@ -349,10 +353,18 @@ export function GameView() {
       if (e.code === "Escape") game.pauseToggle();
     };
     window.addEventListener("keydown", onKey);
+    const onGesture = () => {
+      primeAudio();
+      setAudioReady(true);
+    };
+    window.addEventListener("pointerdown", onGesture, { capture: true });
+    window.addEventListener("keydown", onGesture, { capture: true });
     return () => {
       unbind();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onGesture, { capture: true } as EventListenerOptions);
+      window.removeEventListener("keydown", onGesture, { capture: true } as EventListenerOptions);
       game.destroy();
       net.disconnect();
       stopKitchenDrone();
@@ -688,6 +700,35 @@ export function GameView() {
   const touchUi = useTouchUi();
   const landscape = useLandscape();
 
+  const pickSelectChar = (id: CharId) => {
+    if (gated()) return;
+    const dual = !hud.versusCpu && hud.pads >= 2;
+    const slot: 1 | 2 = !p1Lock ? 1 : 2;
+    if (p1Lock && p2Lock) return;
+    if (touchUi) {
+      if (!(touchPick && touchPick.slot === slot && touchPick.id === id)) {
+        setTouchPick({ slot, id });
+        if (slot === 1) setP1Cur(id);
+        else setP2Cur(id);
+        return;
+      }
+    }
+    setTouchPick(null);
+    if (slot === 1) {
+      setP1Cur(id);
+      setP1Lock(true);
+      sfxPlay.charName(id);
+      armGate();
+      if (dual && p2Lock) gameRef.current?.goStage(id, p2Cur);
+    } else {
+      setP2Cur(id);
+      setP2Lock(true);
+      sfxPlay.charName(id);
+      armGate();
+      gameRef.current?.goStage(p1Cur, id);
+    }
+  };
+
   return (
     <div
       ref={wrapRef}
@@ -712,6 +753,21 @@ export function GameView() {
           </div>
           <p className="font-display text-gold text-xl">{Math.round(hud.loadPct * 100)}%</p>
         </Overlay>
+      )}
+
+      {!hud.loading && !audioReady && (
+        <div
+          className="absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-black/80"
+          onPointerDown={() => {
+            primeAudio();
+            setAudioReady(true);
+            sfxPlay.title();
+            startMenuMusic();
+          }}
+        >
+          <h2 className="font-display text-gold text-4xl tracking-[0.2em] sm:text-5xl">SINTER KOMBAT</h2>
+          <p className="mt-6 font-display text-xl tracking-[0.25em] text-white/90 sm:text-2xl">NYOMJ MEG EGY GOMBOT</p>
+        </div>
       )}
 
       {hud.screen === "title" && !hud.loading && (
@@ -892,6 +948,17 @@ export function GameView() {
           className="absolute inset-0 z-10 bg-cover bg-center"
           style={{ backgroundImage: "url(/ui/selection.jpg)" }}
         >
+          <button
+            type="button"
+            onClick={() => {
+              armGate();
+              resetSelect(hud.versusCpu);
+              goTitle();
+            }}
+            className="font-display absolute left-3 top-3 z-20 min-h-11 rounded-md border border-border bg-black/65 px-4 text-sm tracking-wide text-fg/90 hover:text-gold sm:text-base"
+          >
+            Főmenü
+          </button>
           <SelectPanel side="left" id={p1Cur} locked={p1Lock} tone="p1" visible />
           <SelectPanel
             side="right"
@@ -909,40 +976,7 @@ export function GameView() {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => {
-                    if (gated()) return;
-                    const dual = !hud.versusCpu && hud.pads >= 2;
-                    if (dual) {
-                      if (!p1Lock) {
-                        setP1Cur(id);
-                        setP1Lock(true);
-                        sfxPlay.charName(id);
-                        if (p2Lock) {
-                          armGate();
-                          gameRef.current?.goStage(id, p2Cur);
-                        }
-                      } else if (!p2Lock) {
-                        setP2Cur(id);
-                        setP2Lock(true);
-                        sfxPlay.charName(id);
-                        armGate();
-                        gameRef.current?.goStage(p1Cur, id);
-                      }
-                      return;
-                    }
-                    if (!p1Lock) {
-                      setP1Cur(id);
-                      setP1Lock(true);
-                      sfxPlay.charName(id);
-                      armGate();
-                    } else if (!p2Lock) {
-                      setP2Cur(id);
-                      setP2Lock(true);
-                      sfxPlay.charName(id);
-                      armGate();
-                      gameRef.current?.goStage(p1Cur, id);
-                    }
-                  }}
+                  onClick={() => pickSelectChar(id)}
                   className="relative size-12 overflow-hidden rounded-sm bg-bg/80 sm:size-14"
                   style={{
                     boxShadow: [p1on ? "0 0 0 2px #c43b2e" : "0 0 0 1px #3a2a22", p2on ? "0 0 0 4px #2e6ec4" : ""]
@@ -1184,6 +1218,8 @@ export function GameView() {
         type="button"
         className="absolute right-3 top-3 z-20 rounded-full border border-border bg-surface/80 p-2"
         onClick={() => {
+          primeAudio();
+          setAudioReady(true);
           void unlockAudio().then((wasSuspended) => {
             if (wasSuspended && getSettings().soundOn) {
               startMenuMusic();
