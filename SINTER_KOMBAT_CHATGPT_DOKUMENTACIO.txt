@@ -6,6 +6,13 @@ Aktuális játékverzió: v0.185  (a kódban: src/game/engine.ts → GAME_VERSIO
 Tulajdonos / döntéshozó: Richárd Apostol (X: estroop3), magyarul kommunikál.
 Másik fejlesztő AI: Grok (xAI, Grok Build sandbox). Te (ChatGPT) társként segítesz.
 
+MUNKAMEGOSZTÁS (2026-09-07-től, lásd WORKFLOW.md):
+  ChatGPT = GRAFIKA (minden sprite, portrait, ikon, pálya/menü háttér, FX).
+  Grok    = KÓD (engine, roster, special logika, hang bekötés, bugfix).
+  User    = közvetítő: letölti a PNG-ket ChatGPT-től, átadja Groknak.
+  Grok NEM generál helyettesítő artot. ChatGPT a referencia sheet + idle.png
+  alapján dolgozik; a sprite fájlnevek és a spec2 vs special2 csapda ALÁBB.
+
 Ez a dokumentum SZÁNDÉKOSAN HOSSZÚ. Nincs karakterlimit. Olvasd végig, mielőtt
 bármit javasolsz vagy kódot írsz. A tulajdonos gyakran dühös, ha a karakter
 kinézete elcsúszik, ha a rossz specialt nyúlod, vagy ha a sprite-ok tükrözve

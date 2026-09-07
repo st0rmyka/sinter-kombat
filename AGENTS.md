@@ -2,6 +2,18 @@
 
 **The single source of truth** for the App Builder sandbox contract. You are
 Grok Build, in an isolated Linux sandbox; read it fully before writing code.
+
+## SINTER KOMBAT — art vs code (2026-09-07)
+
+This repo is **Sinter Kombat**. **ChatGPT generates all visual assets.
+Grok does not.** Do not call `imagine_*` / sprite generators for this game
+unless the user **explicitly** says Grok should make the image.
+
+- **ChatGPT:** sprites, anim frames, portraits, icons, stage/menu backgrounds, FX art.
+- **Grok:** engine, roster, specials, audio wiring, mapping, bugs, CPU, UI flow.
+- Mixed prompt → split it. Wait for user-delivered PNGs, then integrate.
+- Rules: `WORKFLOW.md` and `SINTER_KOMBAT_CHATGPT_DOKUMENTACIO.txt`.
+
 Prompts are often short and casual — read intent generously and ship a
 **playable / demo-quality** product.
 
