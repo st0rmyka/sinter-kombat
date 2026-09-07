@@ -1,20 +1,22 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-0856.zip`  
-**Időpont:** 2026-09-07 08:56 CEST  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-1124.zip`  
+**Időpont:** 2026-09-07 11:24 CEST  
 **Verzió:** v0.185  
-**Git tag:** `restore-2026-09-07-pre-major`  
-**Részletek:** [RESTORE_POINT.md](RESTORE_POINT.md)
+**Git tag:** `v0.185.2`
 
-**Állapot:** NAGY VÁLTOZÁSOK ELŐTTI restore pont. Játszható v0.185 + ChatGPT briefing.
+**Állapot:** Endgame Victory Screen (ChatGPT art, Grok integráció). Workflow: ChatGPT grafika / Grok kód.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0529.zip` (tag v0.185.1)
+Előző snapshotok:
+- `restore-2026-09-07-pre-major` — nagy változások előtti restore
+- `Sinter-Kombat-backup-2026-09-07-0856.zip`
+- `graphics-pack-2026-09-07` — grafikai ZIP ChatGPT-nek
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
 ## Mi van benne
 
-Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, script-ek, Electron héj, feltöltött referenciaképek, dokumentáció.
+Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory art, script-ek, Electron héj, feltöltött referenciaképek, dokumentáció.
 
 **Nincs benne:** `node_modules`, git, Vite cache, nyers generálási `artifacts`, screenshotok, korábbi zippek.
 
@@ -24,4 +26,4 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, script-ek, Ele
 2. `npm install`
 3. `npm run dev`
 
-Vagy: `git checkout restore-2026-09-07-pre-major`
+Vagy: `git checkout v0.185.2`

@@ -642,6 +642,16 @@ export function winLine(id: CharId) {
   return `${n} a Győztes!`;
 }
 
+export const VICTORY_ART: Partial<Record<CharId, string>> = {
+  renike: "/ui/victory/Victory_Renike.png",
+  ricsi: "/ui/victory/Victory_Ricsi.png",
+  cica: "/ui/victory/Victory_Cica.png",
+  agi: "/ui/victory/Victory_Vampir_Agi.png",
+  cricsi: "/ui/victory/Victory_Ciganyricsi.png",
+  jezus: "/ui/victory/Victory_Jezus.png",
+  hoffer: "/ui/victory/Victory_Hoffer_Jozsi.png",
+};
+
 const W = 1280;
 const H = 720;
 const GROUND = 668;
@@ -1084,6 +1094,7 @@ export class KitchenKombat {
       "/ui/mainmenu.png",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
+      ...CHAR_IDS.map((id) => VICTORY_ART[id]).filter((u): u is string => !!u),
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;

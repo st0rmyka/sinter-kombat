@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, VICTORY_ART, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
@@ -1117,39 +1117,50 @@ export function GameView() {
       )}
 
       {hud.screen === "result" && (
-        <Overlay>
-          <h2 className="font-display text-4xl">{hud.winner ? winLine(hud.winner) : "DÖNTETLEN"}</h2>
-          {hud.fatality && <p className="text-gold text-xl">{hud.fatality}</p>}
-          {confirm ? (
-            <ConfirmBox
-              q={confirm.q}
-              choice={confirmChoice}
-              onYes={confirm.yes}
-              onNo={() => setConfirm(null)}
+        <div className="absolute inset-0 z-10">
+          {hud.winner && VICTORY_ART[hud.winner] && (
+            <img
+              src={`${VICTORY_ART[hud.winner]}?v=1`}
+              alt=""
+              className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
-          ) : (
-            (
-              [
-                { label: "Új harc", i: 0 },
-                { label: "Visszavágó", i: 1 },
-                { label: "Főmenü", i: 2 },
-              ] as const
-            ).map((item) => (
-              <MenuBtn
-                key={item.i}
-                active={resultIdx === item.i}
-                onClick={() => {
-                  setResultIdx(item.i);
-                  if (item.i === 0) ask("Biztos új harcot indítasz?", goNewFight);
-                  else if (item.i === 1) ask("Biztos visszavágót akarsz?", goRematch);
-                  else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
-                }}
-              >
-                {item.label}
-              </MenuBtn>
-            ))
           )}
-        </Overlay>
+          <div className="absolute inset-y-0 right-0 flex w-[48%] max-w-[28rem] flex-col items-center justify-center gap-3 bg-gradient-to-l from-black/80 via-black/55 to-transparent px-8 py-6 sm:w-[42%]">
+            <h2 className="font-display text-center text-3xl sm:text-4xl">
+              {hud.winner ? winLine(hud.winner) : "DÖNTETLEN"}
+            </h2>
+            {hud.fatality && <p className="text-gold text-xl">{hud.fatality}</p>}
+            {confirm ? (
+              <ConfirmBox
+                q={confirm.q}
+                choice={confirmChoice}
+                onYes={confirm.yes}
+                onNo={() => setConfirm(null)}
+              />
+            ) : (
+              (
+                [
+                  { label: "Új harc", i: 0 },
+                  { label: "Visszavágó", i: 1 },
+                  { label: "Főmenü", i: 2 },
+                ] as const
+              ).map((item) => (
+                <MenuBtn
+                  key={item.i}
+                  active={resultIdx === item.i}
+                  onClick={() => {
+                    setResultIdx(item.i);
+                    if (item.i === 0) ask("Biztos új harcot indítasz?", goNewFight);
+                    else if (item.i === 1) ask("Biztos visszavágót akarsz?", goRematch);
+                    else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                  }}
+                >
+                  {item.label}
+                </MenuBtn>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
       {help && <Help p1={hud.p1} p2={hud.p2} onClose={() => setHelp(false)} />}
