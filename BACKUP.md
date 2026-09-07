@@ -1,16 +1,11 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-1124.zip`  
-**Időpont:** 2026-09-07 11:24 CEST  
-**Verzió:** v0.185  
-**Git tag:** `v0.185.2`
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-1239.zip`  
+**Időpont:** 2026-09-07 12:39 CEST  
+**Verzió:** v0.19  
+**Git tag:** `v0.19`
 
-**Állapot:** Endgame Victory Screen (ChatGPT art, Grok integráció). Workflow: ChatGPT grafika / Grok kód.
-
-Előző snapshotok:
-- `restore-2026-09-07-pre-major` — nagy változások előtti restore
-- `Sinter-Kombat-backup-2026-09-07-0856.zip`
-- `graphics-pack-2026-09-07` — grafikai ZIP ChatGPT-nek
+**Állapot:** Új főmenü + zene, Victory Screen, Golgota, Népszínház utca, Super Dash SFX, Konyha rejtve, Sintertanya → Duranda.
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
@@ -26,4 +21,4 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory art, s
 2. `npm install`
 3. `npm run dev`
 
-Vagy: `git checkout v0.185.2`
+Vagy: `git checkout v0.19`

@@ -41,9 +41,9 @@ declare global {
 
 export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar" | "hoffer";
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
-export type StageId = "kitchen" | "sintertanya" | "kisterenye";
-export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya", "kisterenye"];
-export const GAME_VERSION = "v0.185";
+export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
+export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
+export const GAME_VERSION = "v0.19";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -627,8 +627,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
   kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=31" },
-  sintertanya: { id: "sintertanya", name: "SINTERTANYA", nameHu: "Sintertanya", art: "/stages/sintertanya.jpg?v=31" },
+  sintertanya: { id: "sintertanya", name: "DURANDA", nameHu: "Duranda", art: "/stages/sintertanya.jpg?v=31" },
   kisterenye: { id: "kisterenye", name: "KISTERENYE", nameHu: "Kisterenye", art: "/stages/kisterenye.jpg?v=31" },
+  golgota: { id: "golgota", name: "GOLGOTA", nameHu: "Golgota", art: "/stages/golgota.jpg?v=19" },
+  nepszinhaz: { id: "nepszinhaz", name: "NEPSZINHAZ", nameHu: "Népszínház utca", art: "/stages/nepszinhaz.jpg?v=19" },
 };
 
 export const ROUND_CALL: Record<number, string> = {
@@ -851,7 +853,7 @@ export class KitchenKombat {
   cpuAtkCd = 0;
   p1id: CharId = "renike";
   p2id: CharId = "ricsi";
-  stageId: StageId = "kitchen";
+  stageId: StageId = "sintertanya";
   f1!: Fighter;
   f2!: Fighter;
   timer = ROUND_TIME;
@@ -1091,14 +1093,14 @@ export class KitchenKombat {
     ];
     const bust = "?v=64";
     const ui = [
-      "/ui/mainmenu.png",
+      "/ui/mainmenu.png?v=19",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
       ...CHAR_IDS.map((id) => VICTORY_ART[id]).filter((u): u is string => !!u),
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;
-    const total = spriteJobs + ui.length + 3 + sfxPreloadList().length + musicPreloadList().length;
+    const total = spriteJobs + ui.length + STAGE_IDS.length + 2 + sfxPreloadList().length + musicPreloadList().length;
     let done = 0;
     const tick = () => {
       done += 1;
@@ -1129,9 +1131,7 @@ export class KitchenKombat {
     };
     const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
-    let kitchen!: HTMLImageElement;
-    let sintertanya!: HTMLImageElement;
-    let kisterenye!: HTMLImageElement;
+    const stageImgs = {} as Record<StageId, HTMLImageElement>;
     await Promise.all([
       ...CHAR_IDS.flatMap((id) =>
         poses.map(async (p) => {
@@ -1151,14 +1151,8 @@ export class KitchenKombat {
         );
       }),
       ...ui.map((src) => loadTick(src)),
-      loadTick(`/stages/kitchen.jpg${bust}`).then((im) => {
-        kitchen = im;
-      }),
-      loadTick(`/stages/sintertanya.jpg${bust}`).then((im) => {
-        sintertanya = im;
-      }),
-      loadTick(`/stages/kisterenye.jpg${bust}`).then((im) => {
-        kisterenye = im;
+      ...STAGE_IDS.map(async (id) => {
+        stageImgs[id] = await loadTick(STAGES[id].art);
       }),
       loadTick(`/fx/brush.png${bust}`).then((im) => {
         this.brushImg = im;
@@ -1168,9 +1162,9 @@ export class KitchenKombat {
       }),
       preloadSfx(tick),
     ]);
-    this.stageArts = { kitchen, sintertanya, kisterenye };
-    this.stage = kitchen;
-    this.images = { ...bags, anims, stage: kitchen };
+    this.stageArts = stageImgs;
+    this.stage = stageImgs.sintertanya ?? stageImgs.kitchen;
+    this.images = { ...bags, anims, stage: this.stage };
     this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
     for (const id of CHAR_IDS) {
       for (const p of poses) this.boxes[id][p] = measureBox(this.images[id][p]);
@@ -2066,7 +2060,8 @@ export class KitchenKombat {
       f.meter = Math.max(0, f.meter - SUPER_DASH_COST);
       f.invuln = SUPER_DASH_DUR;
     }
-    sfxPlay.dash();
+    if (superD) sfxPlay.superDash();
+    else sfxPlay.dash();
   }
 
   trySuperDash(f: Fighter, a: Actions) {

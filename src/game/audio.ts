@@ -16,11 +16,13 @@ let musicKind: "menu" | "stage" | null = null;
 let musicSrc: string | null = null;
 const MUSIC_BLOBS: Record<string, string> = {};
 
-const MENU_FILE = "/music/menu.mp3";
+const MENU_FILE = "/music/menu.mp3?v=19";
 const MUSIC_FILES: Record<string, string> = {
   kitchen: "/music/kitchen.mp3",
   sintertanya: "/music/sintertanya.mp3",
   kisterenye: "/music/kisterenye.mp3",
+  golgota: "/music/golgota.mp3",
+  nepszinhaz: "/music/nepszinhaz.mp3",
 };
 const MUSIC_VOL = 0.48;
 
@@ -125,6 +127,7 @@ const RICSI_HANYAS = "/sfx/ricsi_hanyas.mp3";
 const CICA_QUAKE = "/sfx/cica_quake.mp3";
 const TITLE_FILE = "/sfx/sinterkombat_title.mp3";
 const KO_FILE = "/sfx/ko.mp3";
+const SUPER_DASH_FILE = "/sfx/superdash.mp3";
 const CHAR_NAME: Record<string, string> = {
   ricsi: "/sfx/name_ricsi.mp3",
   renike: "/sfx/name_renike.mp3",
@@ -373,6 +376,7 @@ export function sfxPreloadList(): string[] {
     CICA_QUAKE,
     TITLE_FILE,
     KO_FILE,
+    SUPER_DASH_FILE,
     ...Object.values(CHAR_NAME),
     ...Object.values(CHAR_WIN),
   ];
@@ -571,6 +575,7 @@ export const sfxPlay = {
     beep(160, 0.4, "square", 0.1, -80);
   },
   dash: () => beep(240, 0.08, "square", 0.07, 180),
+  superDash: () => playOneShot(SUPER_DASH_FILE, 1, 1),
   charAttack: (id: string) => {
     const pool = CHAR_ATTACK[id];
     if (!pool) return;

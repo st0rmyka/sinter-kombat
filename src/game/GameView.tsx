@@ -8,6 +8,19 @@ import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.19",
+    items: [
+      "Új főmenü háttérkép",
+      "Új menüzene",
+      "Endgame: győztes karakter Victory képe a pálya fölött, menü jobbra",
+      "Új pálya: Golgota, saját zene",
+      "Új pálya: Népszínház utca, saját zene",
+      "Super Dash saját hangeffekt",
+      "Konyha pálya átmenetileg nem választható",
+      "Sintertanya pálya új neve: Duranda",
+    ],
+  },
+  {
     v: "v0.185",
     items: [
       "CPU védekezés közben is támad, Jézus CPU használja a specialjait",
@@ -138,7 +151,7 @@ const emptyHud = (): Hud => ({
   selectSlot: 1,
   loading: true,
   pads: 0,
-  stage: "kitchen",
+  stage: "sintertanya",
   netWait: false,
   loadPct: 0,
   training: false,
@@ -175,7 +188,7 @@ export function GameView() {
   const [p1Lock, setP1Lock] = useState(false);
   const [p2Lock, setP2Lock] = useState(false);
   const [touchPick, setTouchPick] = useState<{ slot: 1 | 2; id: CharId } | null>(null);
-  const [stageCur, setStageCur] = useState<StageId>("kitchen");
+  const [stageCur, setStageCur] = useState<StageId>("sintertanya");
   const [joinAddr, setJoinAddr] = useState("127.0.0.1");
   const [hostIps, setHostIps] = useState<string[]>([]);
   const [hostPort, setHostPort] = useState(8080);
@@ -302,7 +315,7 @@ export function GameView() {
     setP1Lock(false);
     setP2Lock(false);
     setTouchPick(null);
-    setStageCur("kitchen");
+    setStageCur("sintertanya");
     void cpu;
   };
 
@@ -774,7 +787,7 @@ export function GameView() {
         <div
           className="absolute inset-0 z-10 flex flex-col"
           style={{
-            backgroundImage: "url(/ui/mainmenu.png)",
+            backgroundImage: "url(/ui/mainmenu.png?v=19)",
             backgroundSize: "cover",
             backgroundPosition: "center top",
           }}
