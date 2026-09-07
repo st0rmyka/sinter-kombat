@@ -8,6 +8,14 @@ import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.185",
+    items: [
+      "CPU védekezés közben is támad, Jézus CPU használja a specialjait",
+      "Azonos támadás spammelése: −10% sebzés, 35%-ig",
+      "Életerő és energia sáv: aktuális/max számokkal",
+    ],
+  },
+  {
     v: "v0.18",
     items: [
       "Új pálya: Kisterenye, saját zene",

@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-0327.zip`  
-**Időpont:** 2026-09-07 03:27 CEST  
-**Verzió:** v0.18  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-0400.zip`  
+**Időpont:** 2026-09-07 04:00 CEST  
+**Verzió:** v0.185  
 
-**Állapot:** Kisterenye pálya + zene, Sintertanya saját zene, Dühroham max 13% önsebzés, Cica/Hoffer halkabb voice.
+**Állapot:** CPU blokk ellen támad, Jézus specialozik, spam scaling 35%-ig, HP/energia számok.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0124.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0327.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 

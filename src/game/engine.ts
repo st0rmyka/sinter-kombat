@@ -43,7 +43,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye";
 export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya", "kisterenye"];
-export const GAME_VERSION = "v0.18";
+export const GAME_VERSION = "v0.185";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -720,6 +720,8 @@ type Fighter = {
   rageT: number;
   rageAcc: number;
   pullT: number;
+  sameAtkId: AtkId | "";
+  sameAtkN: number;
 };
 
 type ImgBag = {
@@ -1033,6 +1035,8 @@ export class KitchenKombat {
       rageT: 0,
       rageAcc: 0,
       pullT: 0,
+      sameAtkId: "",
+      sameAtkN: 0,
     };
   }
 
@@ -1640,10 +1644,12 @@ export class KitchenKombat {
     }
   }
 
-  cpuStartString(a: Actions, combo: number, spec: number, dist: number, meter: number) {
-    if (meter >= 50 && Math.random() < spec) {
+  cpuStartString(a: Actions, combo: number, spec: number, dist: number, meter: number, id?: CharId) {
+    const jesus = id === "jezus";
+    if (meter >= 50 && Math.random() < (jesus ? Math.max(0.42, spec * 3.2) : spec)) {
       this.cpuPlan = [];
-      this.cpuPress(a, Math.random() < 0.55 ? "special2" : "special");
+      if (jesus) this.cpuPress(a, dist > 140 || Math.random() < 0.62 ? "special" : "special2");
+      else this.cpuPress(a, Math.random() < 0.55 ? "special2" : "special");
       return;
     }
     if (dist < 105 && Math.random() < 0.18) {
@@ -1748,7 +1754,7 @@ export class KitchenKombat {
       if (!hell || !youAtk || dist > 240) this.cpuGuard = false;
       else if (youRecover && Math.random() < spec.punish) {
         this.cpuGuard = false;
-        this.cpuStartString(a, spec.combo, spec.special, dist, me.meter);
+        this.cpuStartString(a, spec.combo, spec.special, dist, me.meter, me.id);
         this.cpuAtkCd = 0.08;
         return a;
       } else {
@@ -1760,7 +1766,7 @@ export class KitchenKombat {
 
     if (youAtk && yat && dist < 220) {
       if (youRecover && Math.random() < spec.punish) {
-        this.cpuStartString(a, spec.combo, spec.special, dist, me.meter);
+        this.cpuStartString(a, spec.combo, spec.special, dist, me.meter, me.id);
         this.cpuAtkCd = hell ? 0.08 : hard ? 0.32 : easy ? 0.8 : 0.63;
         return a;
       }
@@ -1784,6 +1790,19 @@ export class KitchenKombat {
       return a;
     }
 
+    if (me.id === "jezus" && me.meter >= 50 && me.y <= 0) {
+      if (youAtk && dist < 260 && Math.random() < 0.38) {
+        this.cpuPress(a, "special2");
+        this.cpuAtkCd = 0.4;
+        return a;
+      }
+      if (dist > 90 && Math.random() < 0.2) {
+        this.cpuPress(a, "special");
+        this.cpuAtkCd = hell ? 0.35 : 0.7;
+        return a;
+      }
+    }
+
     if (dist > 185) {
       if (faceIn) a.right = true;
       else a.left = true;
@@ -1796,8 +1815,8 @@ export class KitchenKombat {
         this.startDash(me, faceIn ? 1 : -1);
         this.cpuDashCd = hell ? 0.7 : hard ? 1.09 : easy ? 1.84 : 1.55;
       }
-      if (dist > 220 && me.meter >= 50 && Math.random() < spec.special * dt * 1.8) {
-        this.cpuPress(a, Math.random() < 0.55 ? "special" : "special2");
+      if (dist > 200 && me.meter >= 50 && Math.random() < (me.id === "jezus" ? 0.28 : spec.special * dt * 1.8)) {
+        this.cpuPress(a, me.id === "jezus" || Math.random() < 0.45 ? "special" : "special2");
       }
       return a;
     }
@@ -1810,10 +1829,21 @@ export class KitchenKombat {
       else a.left = true;
     }
 
-    const youOpen = you.state === "idle" || you.state === "walk" || you.state === "crouch" || you.state === "hurt";
-    if (dist < 195 && youOpen && this.cpuAtkCd <= 0 && Math.random() < spec.atk) {
-      this.cpuStartString(a, spec.combo, spec.special, dist, me.meter);
-      this.cpuAtkCd = hell ? 0.06 : hard ? 0.37 : easy ? 1.01 : 0.67;
+    const youBlock = you.state === "block";
+    const youOpen =
+      you.state === "idle" ||
+      you.state === "walk" ||
+      you.state === "crouch" ||
+      you.state === "hurt" ||
+      youBlock;
+    if (dist < 195 && youOpen && this.cpuAtkCd <= 0 && Math.random() < (youBlock ? Math.max(spec.atk, 0.48) : spec.atk)) {
+      if (youBlock && !you.crouchGuard && Math.random() < 0.55) {
+        this.cpuPress(a, Math.random() < 0.55 ? "kickL" : "punchL", true);
+        this.cpuPlan = Math.random() < spec.combo ? ["kickR"] : [];
+      } else {
+        this.cpuStartString(a, spec.combo, spec.special, dist, me.meter, me.id);
+      }
+      this.cpuAtkCd = hell ? 0.06 : hard ? 0.28 : easy ? 0.72 : 0.48;
     }
 
     return a;
@@ -2075,6 +2105,11 @@ export class KitchenKombat {
       low = !air && !!f.atk?.low && atk.id !== "special" && atk.id !== "special2";
     }
     const pose = air ? (JUMP_POSE[atk.id] ?? atk.pose) : low ? (LOW_POSE[atk.id] ?? atk.pose) : atk.pose;
+    if (f.sameAtkId === atk.id) f.sameAtkN += 1;
+    else {
+      f.sameAtkId = atk.id;
+      f.sameAtkN = 1;
+    }
     f.state = "attack";
     if (air) {
       f.atk = {
@@ -2231,7 +2266,8 @@ export class KitchenKombat {
     const scale = Math.max(0.4, 1 - 0.12 * prior);
     att.chain = this.comboSide === side ? [...att.chain, att.atk.id] : [att.atk.id];
     const route = matchCombo(att.chain);
-    let dmg = Math.max(1, Math.round(att.atk.dmg * scale));
+    const spam = Math.max(0.35, 1 - 0.1 * Math.max(0, att.sameAtkN - 1));
+    let dmg = Math.max(1, Math.round(att.atk.dmg * scale * spam));
     if (route && route.name !== att.comboTag) {
       att.comboTag = route.name;
       dmg += route.bonus;
@@ -3542,6 +3578,14 @@ export class KitchenKombat {
     ctx.translate(W / 2, 0);
     ctx.scale(s, s);
     ctx.translate(-W / 2, 0);
+    const outline = (txt: string, x: number, y: number, align: CanvasTextAlign) => {
+      ctx.textAlign = align;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.fillStyle = "#f3e6d0";
+      ctx.strokeText(txt, x, y);
+      ctx.fillText(txt, x, y);
+    };
     const bar = (x: number, y: number, w: number, hp: number, flip: boolean) => {
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillRect(x - 4, y - 4, w + 8, 28);
@@ -3551,6 +3595,9 @@ export class KitchenKombat {
       const hw = (w * hp) / MAX_HP;
       if (flip) ctx.fillRect(x + w - hw, y, hw, 20);
       else ctx.fillRect(x, y, hw, 20);
+      ctx.font = "700 15px 'Barlow Condensed', sans-serif";
+      ctx.textBaseline = "middle";
+      outline(`${Math.round(hp)}/${MAX_HP}`, flip ? x + w - 8 : x + 8, y + 10, flip ? "right" : "left");
     };
     bar(40, 28, 480, this.f1.hp, false);
     bar(W - 520, 28, 480, this.f2.hp, true);
@@ -3560,12 +3607,16 @@ export class KitchenKombat {
       ctx.fillStyle = "#2a2418";
       ctx.fillRect(x, y, w, 6);
       ctx.fillStyle = m >= 50 ? "#e2c15a" : "#8a7028";
-      const mw = (w * m) / 100;
+      const mw = (w * Math.min(100, m)) / 100;
       if (flip) ctx.fillRect(x + w - mw, y, mw, 6);
       else ctx.fillRect(x, y, mw, 6);
+      ctx.font = "700 13px 'Barlow Condensed', sans-serif";
+      ctx.textBaseline = "middle";
+      outline(`${Math.round(m)}/100`, flip ? x - 8 : x + w + 8, y + 3, flip ? "right" : "left");
     };
     meter(40, 52, 220, this.f1.meter, false);
     meter(W - 260, 52, 220, this.f2.meter, true);
+    ctx.textBaseline = "alphabetic";
     ctx.save();
     ctx.beginPath();
     ctx.arc(W / 2, 40, 34, 0, Math.PI * 2);
