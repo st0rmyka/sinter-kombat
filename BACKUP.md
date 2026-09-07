@@ -1,12 +1,14 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-0529.zip`  
-**Időpont:** 2026-09-07 05:29 CEST  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-0856.zip`  
+**Időpont:** 2026-09-07 08:56 CEST  
 **Verzió:** v0.185  
+**Git tag:** `restore-2026-09-07-pre-major`  
+**Részletek:** [RESTORE_POINT.md](RESTORE_POINT.md)
 
-**Állapot:** Hang gesztus-képernyő, karakterválasztó Főmenü gomb, mobilon két koppintásos választás.
+**Állapot:** NAGY VÁLTOZÁSOK ELŐTTI restore pont. Játszható v0.185 + ChatGPT briefing.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0400.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0529.zip` (tag v0.185.1)
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
@@ -21,3 +23,5 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, script-ek, Ele
 1. Csomagold ki a zip tartalmát a projekt gyökerébe.
 2. `npm install`
 3. `npm run dev`
+
+Vagy: `git checkout restore-2026-09-07-pre-major`
