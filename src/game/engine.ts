@@ -2414,6 +2414,7 @@ export class KitchenKombat {
   goResult() {
     this.screen = "result";
     this.phase = "end";
+    if (this.winner) sfxPlay.charTaunt(this.winner);
     this.pushHud();
   }
 

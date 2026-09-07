@@ -146,6 +146,15 @@ const CHAR_WIN: Record<string, string> = {
   jezus: "/sfx/jezuswins.mp3",
   hoffer: "/sfx/hofferjozsiwins.mp3",
 };
+const CHAR_TAUNT: Record<string, string> = {
+  ricsi: "/sfx/ricsi_taunt.mp3",
+  renike: "/sfx/renike_taunt.mp3",
+  cica: "/sfx/cica_taunt.mp3",
+  agi: "/sfx/vampiragi_taunt.mp3",
+  cricsi: "/sfx/ciganyricsi_taunt.mp3",
+  jezus: "/sfx/jezus_taunt.mp3",
+  hoffer: "/sfx/hofferjozsi_taunt.mp3",
+};
 
 const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK };
 const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE };
@@ -379,6 +388,7 @@ export function sfxPreloadList(): string[] {
     SUPER_DASH_FILE,
     ...Object.values(CHAR_NAME),
     ...Object.values(CHAR_WIN),
+    ...Object.values(CHAR_TAUNT),
   ];
 }
 
@@ -631,6 +641,11 @@ export const sfxPlay = {
       .catch(() => {
         /* announcer missing */
       });
+  },
+  charTaunt: (id: string) => {
+    const url = CHAR_TAUNT[id];
+    if (!url) return;
+    playOneShot(url, voiceVol(id, 1), 1);
   },
   title: () => {
     if (buffers.has(TITLE_FILE)) {
