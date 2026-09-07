@@ -1,0 +1,732 @@
+================================================================================
+SINTER KOMBAT — TELJES BRIEFING CHATGPT SZÁMÁRA
+================================================================================
+Készült: 2026-09-07
+Aktuális játékverzió: v0.185  (a kódban: src/game/engine.ts → GAME_VERSION)
+Tulajdonos / döntéshozó: Richárd Apostol (X: estroop3), magyarul kommunikál.
+Másik fejlesztő AI: Grok (xAI, Grok Build sandbox). Te (ChatGPT) társként segítesz.
+
+Ez a dokumentum SZÁNDÉKOSAN HOSSZÚ. Nincs karakterlimit. Olvasd végig, mielőtt
+bármit javasolsz vagy kódot írsz. A tulajdonos gyakran dühös, ha a karakter
+kinézete elcsúszik, ha a rossz specialt nyúlod, vagy ha a sprite-ok tükrözve
+vannak. A lenti szabályok nem opcionálisak.
+
+A régi DOKUMENTACIO.md (Kitchen Kombat, 2 karakter, 99 mp-es kör) ELAVULT.
+Ezt a fájlt használd.
+
+
+--------------------------------------------------------------------------------
+0. KI VAGY TE, MIT CSINÁLJ, MIT NE
+--------------------------------------------------------------------------------
+
+Célod: segíteni a Sinter Kombat 2D verekedős játék továbbfejlesztésében.
+A tulajdonos magyarul ír, durva/laza stílusban. Válaszolj magyarul, tömören,
+konkrétan. Ne aranyozd a kódot. Ne refaktorálj, ha nem kérte.
+
+A Grok sandboxban fut a játék (Vite + React + saját Canvas engine). A webes
+preview és a GitHub repo a kanonikus másolat.
+
+MIT TILOS:
+- Új karakter sprite-jait kitalálni „hasonló stílusban”, a feltöltött
+  referenciakép helyett. MINDIG a user által feltöltött character sheet a
+  forrás. Karakterkonzisztencia = 1. számú követelmény (arc, haj, ruha, test).
+- Meglévő, jó special-sprite-okhoz nyúlni, ha a kérés MÁS dologról szól.
+  (Klasszikus hiba: Renike serpenyős L1-ét vagy Ricsi üveges L1-ét
+  szétcseszték, amikor a Büdi / Hányósugár special2-t kellett javítani.)
+- Minden sprite-ot tükrözni „javításnak”. Az engine P2-t automatikusan
+  tükrözi. A nyers sprite-ok ALAPBÓL JOBBRA NÉZNEK (profil, side-view).
+- Lázár Jánost visszarakni a rosterbe a tulaj kérése nélkül. A fájljai
+  megvannak, de CHAR_IDS-ből ki van véve, rework kell.
+- Kitchen Fatality szöveget visszahozni — már nem releváns.
+- A menüzenét megszakítani title → select → stage között.
+- Hangokat játék közben streamelni: loading screen előre betölti az asseteket.
+- Böngésző autoplay-t figyelmen kívül hagyni: első gesztus kell a hanghoz.
+
+HA CSAK KÉPET KÉR:
+Ne nyúlj a játékkódhoz. Csak generálj / vágj PNG-t.
+
+HA ÚJ KARAKTERT KÉR:
+Minden kell, ami a meglévőknek van: sprite-ok, portré, ikon, engine bekötés,
+special1 + special2, hanghelyek (később tölti fel), announcer name/win,
+CHAR_IDS, CHARACTERS, CHAR_SKILLS, audio pool. Ugyanaz a rendszer, ugyanaz a
+logika, ugyanannyi mozdulat.
+
+
+--------------------------------------------------------------------------------
+1. MI EZ A JÁTÉK
+--------------------------------------------------------------------------------
+
+Név: Sinter Kombat
+Műfaj: 2D 1v1 verekedős (Mortal Kombat / Tekken hangulat, konyhai-magyar
+       mémvilág, Nógrád / Kisterenye / Sintertanya esztétika)
+Felület: 1280×720, 60 fps fix timestep, Canvas 2D
+Nyelve: MAGYAR (menük, announcer, feliratok)
+Motor: saját engine, NEM Unity, NEM Phaser
+  src/game/engine.ts     — harc, AI, sprite rajzolás, HUD, roundok
+  src/game/GameView.tsx  — React UI: menük, select, pause, settings, touch
+  src/game/audio.ts      — SFX, announcer, menü/pályazene
+  src/game/input.ts      — billentyű + DualSense/Gamepad API + virtuális pad
+  src/game/settings.ts   — hang/HUD/virtuális kontroller, localStorage
+  src/game/net.ts        — LAN online (host/join WebSocket)
+
+Stack:
+  React 19 + TanStack Start + Vite + Tailwind
+  Electron héj: desktop/ (Windows build script: scripts/build-win-app.mjs)
+  GitHub: https://github.com/st0rmyka/sinter-kombat  (privát)
+  Backup zippek GitHub Releases-en (pl. v0.185, v0.185.1)
+
+Meccs:
+  Best of 3 (2 nyert kör = meccs)
+  Köridő: 45 másodperc  (ROUND_TIME)
+  Max HP: 170           (eredeti ~100, +70%)
+  Meter (energia): 0–100, special 50, Super Dash 40
+  Time over: több HP nyer
+  KO: announcer „ko.mp3”, győztes kör pipa
+  Meccs vége: „X a Győztes!” + karakter wins hang, ~5 mp szünet, aztán result
+  Visszavágó: ugyanazok a karakterek, ugyanaz a pálya
+  Gyakorló mód: végtelen idő, HP refill, dummy/CPU/P2, input display
+
+
+--------------------------------------------------------------------------------
+2. KÉPERNYŐFOLYAM
+--------------------------------------------------------------------------------
+
+Screen típus: title | select | stage | vs | fight | pause | result | online | lobby
+
+Főmenü (title) — háttér: /ui/mainmenu.png  (Sinter Kombat logó FENT, a menü
+pontok ALUL KÖZÉPEN, egymás alatt). Minden más szöveg TŰNJÖN EL a háttérről.
+
+  1 Játékos VS CPU  → nehézségválasztó (Könnyű / Normál / Nehéz / SZOPNI FOGSZ)
+                      → karakterválasztó (először P1, aztán CPU)
+  2 Játékos         → karakterválasztó (2 pad esetén SZIMULTÁN)
+  Online            → Host / Join lobby
+  Gyakorló mód      → karakterválasztó → pálya → fight training=true
+  Beállítások       (Frissítések FELETT)
+  Frissítések       — PATCH_NOTES lista, kontrollerrel navigálható
+  Kilépés a Játékból — legalul, megerősítés Igen/Mégse
+
+Karakterválasztó (select) — háttér: /ui/selection.jpg
+  Karakter ikonok LENT KÖZÉPEN (kicsik, hogy férjen a bővítés).
+  Bal kocka = P1 egész alakos idle + név, jobb kocka = P2.
+  P1 kurzor piros kontúr, P2 kék.
+  X / △ / Start = lock. Kör = vissza.
+  Névbemondás CSAK KIVÁLASZTÁSKOR (lock), nem hoverre.
+  Mobilon: ELSŐ koppintás csak kijelöl, MÁSODIK ugyanarra a karakterre = lock.
+  Bal felső sarok: „Főmenü” gomb → title.
+  Ha mindkettő lockolva → pályaválasztó.
+
+Pályaválasztó (stage)
+  kitchen     = Konyha        /stages/kitchen.jpg      zene: kitchen.mp3
+  sintertanya = Sintertanya   /stages/sintertanya.jpg  zene: sintertanya.mp3
+  kisterenye  = Kisterenye    /stages/kisterenye.jpg   zene: kisterenye.mp3
+
+VS kártya: P1 vs P2 portrék (portraits/{id}.png, object-top — a fej LÁTSZÓDJON)
+
+Fight intro: amíg az announcer nem mondja a „HARC!”-ot, TÁMADNI nem lehet,
+MOZOGNI lehet. Szövegek:
+  Kör 1: „Első Kör. HARC!”      hang: /sfx/roundone.mp3
+  Kör 2: „Második Kör. HARC!”   hang: /sfx/roundtwo.mp3
+  Kör 3: „VÉGSŐ KÖR. HARC!”     hang: /sfx/finalround.mp3
+
+Pause: folytatás, irányítások (CSAK az aktuális két karakter specialjai),
+beállítások, újraindítás (gyakorlóban NINCS — helyette Karakterválasztás),
+főmenü, kilépés. Minden veszélyes menüponthoz megerősítés. Kontroller MŰKÖDJÖN
+pause-ban és confirmban is. Pause NEM indíthatja el a menüzenét — a pálya
+zenéje marad.
+
+Result: Új harc / Visszavágó / Főmenü, megerősítéssel. Itt még mehet a pálya
+zenéje.
+
+Loading: indításkor előre tölti a sprite-okat, SFX-eket, zenéket.
+Utána „NYOMJ MEG EGY GOMBOT” — böngésző autoplay miatt gesztus kell, különben
+nincs hang a karakterválasztóig. primeAudio() pointerdown/keydown-on.
+
+Menüzene: EGYETLEN loop (/music/menu.mp3), title+select+stage+online alatt
+FOLYAMATOS, lépkedés NEM szakítja meg. Fight-nál pályazene. Endgame-en marad
+a pályazene.
+
+
+--------------------------------------------------------------------------------
+3. IRÁNYÍTÁS (PS5 DualSense a kanon)
+--------------------------------------------------------------------------------
+
+A kiosztás SZÁNDÉKOSAN MK/Tekken-szerű, NEM Street Fighter 6.
+
+Gamepad index (Gamepad API):
+  0 Cross (X)     = kickL     bal rúgás
+  1 Circle (O)    = kickR     jobb rúgás
+  2 Square (□)    = punchR    jobb ütés
+  3 Triangle (△)  = punchL    bal ütés
+  4 L1            = special   Special 1
+  5 R1            = special2  Special 2
+  6 L2 (trigger)  = superDash Super Dash (40 meter)
+  7 R2 (trigger)  = block     védekezés
+  12–15 D-pad     = fel/le/bal/jobb
+  8/9 Options     = start/pause
+
+Billentyű P1:
+  A/D vagy nyilak  mozgás
+  W / ↑ / Space    ugrás
+  S / ↓            guggolás
+  J                punchL (△)
+  K                punchR (□)
+  N                kickL  (X)
+  M                kickR  (O)
+  L                special  (L1)
+  ; vagy '         special2 (R1)
+  Left Ctrl        Super Dash (L2)
+  Shift            block (R2)
+  Esc / Enter      pause
+
+Billentyű P2: F/H/T/G mozgás, U/I/O/P ütések, [ ] special, RightCtrl/- superdash, / block
+
+Mozgás:
+  Előre WALK_FWD=460, hátra WALK_BACK=250
+  Dupla előre / hátra 0.28 s-en belül = Dash (980 px/s, 0.18 s, dash.png + afterimage)
+  Super Dash: +50% sebesség, +30% táv, 40 meter, sérthetetlen, ÁTMEGY az
+    ellenfélen (sarokból menekülés). Dash sprite + ARANY overlay a hatóidőre.
+  Ugrás JUMP_V=1760, GRAV=5100 — át lehet ugrani egymást
+  Facing automatikusan a másik felé fordul (kivéve attack/hurt/KO)
+  Guggolás: hurtbox alacsonyabb (~155 vs 250)
+
+Blokk:
+  Álló blokk = magas támadást véd
+  Guggolva+blokk = low-t véd
+  Low attackot álló blokk NEM véd
+  Unblockable specialok (Büdi, Hányósugár, Ki Blast, stb.) átmennek
+  Cica Földrengés: guggolva-blokkolva védhető
+
+Menü: X/△/Start OK, Kör vissza. Confirm dialógusban bárelyik pad mehet.
+
+
+--------------------------------------------------------------------------------
+4. HARCRENDSZER
+--------------------------------------------------------------------------------
+
+Minden támadás: startup → active → recover. Találat csak active alatt.
+Cancel: a cancel listán szereplő következő ütés (combo). Buffer 0.14 s.
+Meter NEM regenerál magától. Találat +12 támadónak; blokk +4 támadó / +8 védő.
+Roundok között a meter MEGMARAD. Gyakorlóban kapcsolható végtelen energia.
+
+Alapütések (állva):
+
+  ID      Dmg  Start Active Recover Knock
+  punchL   6   0.05  0.06   0.14    70     △ / J
+  punchR  10   0.08  0.08   0.16    150    □ / K
+  kickL   12   0.10  0.08   0.18    190    X / N
+  kickR   16   0.13  0.10   0.24    380    O / M
+  special 26   0.18  0.14   0.30    560    L1 / L   (alap, 50 meter)
+  special2 karakterenként eltér                       R1 / ;   (50 meter)
+
+Jump attack: y>4, a 4 támadógomb. Special levegőben NEM. 1 légi támadás / ugrás.
+Sprite: jumpPunchL/R.png, jumpKickL/R.png (1 frame).
+
+Low: guggolva + 4 támadógomb. Dmg ≈ 90%. Sprite: lowPunchL/R, lowKickL/R.
+Special NEM low.
+
+SPAM SCALING (v0.185):
+  Ugyanaz az AtkId egymás után: minden ismétlés −10% sebzés, padló 35%.
+  1. ütés 100%, 2. 90%, … 7.+ 35%.
+  MÁS támadás-ID → vissza 100%-ra.
+  startAttack-nál számolódik (sameAtkId / sameAtkN), resolveHit-nél szorzó.
+  A zónás special tickekre (oszlop, spin) NEM ez megy, azok saját pulse-ok.
+
+Combo scaling is van: max(0.4, 1 - 0.12 * comboHits) + névbonus (MOSOGATÓ stb.).
+
+Kombónevek (lánc vége egyezés):
+  MOSOGATÓ            punchL punchR kickL kickR     +10
+  KONYHAI VIHAR       punchL punchR kickR special   +14
+  SERPENYŐ LÁNCOLAT   punchL punchR special         +10
+  DUPLA JAB           punchL punchL punchR          +6
+  FAZOSS              punchL kickL kickR            +8
+  KERESZT             punchL punchR kickR           +7
+
+HUD:
+  HP sáv: aktuális/170 szám a sávon
+  Energia: aktuális/100 a sáv mellett
+  Köridő: közép, szürke áttetsző kör + fekete körvonal a számon
+  Verziószám: bal alsó sarok
+  HUD méret beállítás 50–125%
+
+Intro alatt (phase==="intro") tryAttack false — csak mozgás.
+
+
+--------------------------------------------------------------------------------
+5. ROSTER
+--------------------------------------------------------------------------------
+
+CHAR_IDS (választható, sorrend):
+  renike, ricsi, cica, agi, cricsi, jezus, hoffer
+
+Lázár János (lazar) — sprite-ok, portré, engine kód MEGVAN, de NINCS a CHAR_IDS-ben.
+  „Lázár János átmenetileg nem elérhető, a karaktert reworkolni kell.”
+  NE töröld a fájljait. NE rakd vissza kérés nélkül.
+
+Minden karakternek KÉT specialja van: L1 = special, R1 = special2.
+Engine: special1For(id) / special2For(id).
+
+----- RENIKE  id=renike  „A Rózsaszín Vihar” -----
+Kinézet (KANON): szőke nő, dusty-rose / púderrózsaszín napiruha, konty/félkonty,
+NEM szemüveges. Referencia: attachments/Unknown-9.jpg, Unknown-11/12, idle.png.
+L1 SERPENYŐ — közepes hatótávú serpenyős ütés, blokkolható. Sprite: special.png
+  + special0–3 anim. EZT NE NYÚLD, ha más specialt javítasz.
+R1 BÜDI — zöld fingós gázfelhő, zone=cloud, unblockable, ugrással védhető.
+  Hang: /sfx/renike_fing.mp3
+  Callout: „Büdi”
+VO: renike_attack1–3, damage1–3, defeat. Announcer: name_renike, renikewins.
+
+----- RICSI  id=ricsi  „A Kopasz Kalapács” (a TITLE régi; a sprite-on VAN haja) -----
+Kinézet (KANON, JELENLEGI): félmeztelen, izmos, rövid sötétbarna kócos haj,
+sötét stubble, NEM szemüveges, fekete melegítőnadrág zsinórral.
+  NE generálj kopaszt, NE rakj rá szemüveget.
+  Ikon: user fotóból vágott, félmeztelen arcközeli, szürke háttér.
+  Referencia: public/sprites/ricsi/idle.png, portraits/ricsi-icon.png
+L1 ÜVEGES — borosüveges ütés, blokkolható. NE NYÚLD, ha a Hányósugarat javítod.
+R1 HÁNYÓSUGÁR — zöld sugár előre, zone=beam, unblockable, guggolással védhető.
+  Hang: /sfx/ricsi_hanyas.mp3
+VO: ricsi_attack1–4, damage1–4, defeat. Announcer: name_ricsi, ricsiwins.
+
+----- CICA  id=cica  „A Tuxedo Bestia” -----
+Ember-macska hibrid. Referencia: attachments/cica_karaktersheet.png
+  + assets/sprites/cica/refs/
+L1 TIGRISUGRÁS — pounce=true, nagy hatótávú vetődés. Blokkolható.
+R1 FÖLDRENGETŐ — zone=quake, low, 3 földütés, terület. Guggolva-blokkolva védhető.
+  Hang: /sfx/cica_quake.mp3
+VO halkítva (voiceVol * 0.32): cica_attack1–3, damage1–3, defeat.
+Announcer: name_cica, cicawins.
+FIGYELEM: jump+rúgás sprite-okat egyszer tükrözni kellett. Crouch attack ne
+„nőjön meg” (scale). Cica volt OP — ne buffold kérés nélkül.
+
+----- VÁMPÍR ÁGI  id=agi  „A Vámpír” -----
+Vámpír nő. Referencia: ChatGPT Image 2026. szept. 5. 06_27_48.png
+L1 KÖPÉS — zone=spit, projectile. Találat felirat: „Köpköd a Vámpír!”
+  Hang: agi_kopes.mp3 — NEM SZAKÍTHATÓ MEG (playOneShot)
+R1 VÉRSZÍVÁS — heal=12, sebez és gyógyít.
+  Hang: agi_verszivas.mp3 — NEM SZAKÍTHATÓ MEG
+VO: agi_attack1–3, damage1–3, defeat. Announcer: name_agi, agiwins.
+A köpés sprite kék. Walk: valódi bal-jobb lépés, ne rezegjen 1 frame-ből.
+Magenta/rózsaszín háttér maradék a lábánál TILOS.
+
+----- CIGÁNYRICSI  id=cricsi  „A GymBeam Harcos” -----
+Kigyúrt harcos. Referencia: ChatGPT Image 2026. szept. 5. 07_56_56.png
+L1 SUPERMAN PUNCH — pounce=true, long range, blokkolható.
+R1 KI ROBBANÁS — zone=ki, unblockable AOE gömb.
+  Hang: special_kiblast.mp3 — NEM SZAKÍTHATÓ MEG
+VO: ciganyricsi_attack1–3, damage1–3, defeat.
+Announcer: name_ciganyricsi, ciganyricsiwins.
+Gyakori hiba: sprite-ok ellenfélnek háttal (tükrözve). punchL és punchR
+KÜLÖN kar, ne ugyanaz a frame.
+
+----- JÉZUS  id=jezus  „A Megváltó” -----
+Jézus Krisztus. Referencia: 3B997C31-... + IMG_4488.jpg (idle)
+L1 FÉNYOSZLOP — zone=pillar, 5 mp az ELLENFÉL pozícióján, 0.25 mp-enként sebez
+  (dmg 4) és Jézust gyógyítja (heal 2 / tick). Hang: jezus_special_oszlop.mp3
+  (fájl a diszken: Jezus_Special_SzentOszlop.mp3 → átmásolva oszlop névre)
+  Hangosabb (vol 2.4), NEM szakítható.
+R1 SZENT AURA — shield=true, 5 mp. Elnyel MINDEN bejövő sebzést. Ezalatt
+  Jézus NEM támadhat (tryAttack false ha shieldT>0). Plusz: ÁTMEGY az
+  ellenfélen (sarokból másik térfél). Hang: jezus_special_vedogomb.mp3
+CPU-nak AKTÍVAN kell használnia mindkét specialt (külön jezus-ág a cpu()-ban).
+VO: jezus_attack1–3, damage1–3, defeat. Announcer: name_jezus, jezuswins.
+Idle hajánál ne maradjon lila/rózsaszín chroma. Hurt sprite irányára figyelj.
+
+----- HOFFER JÓZSI  id=hoffer  „Az Idegbeteg” -----
+Barátok közt-ös alkoholista. Referencia: 8AED1BEF / E1FBCA4C feltöltések.
+L1 DÜHROHAM — rage=true, 5 mp: +30% mozgás- és támadási sebesség, ERŐS vörös
+  overlay (offscreen canvas source-atop, NEM ctx.filter).
+  Önsebzés: a 5 mp alatt ÖSSZESEN max 13% HP (MAX_HP * 0.13), NEM az ellenfélre.
+  A +25% kimenő sebzés MÁR NINCS — áttetettük önsebzésre.
+  Hang: hofferjozsi_special_duhroham.mp3 — NEM szakítható
+R1 GYERE IDE! — pull=true, sprite ~1 mp, hatás 3 mp: ellenfél elveszti az
+  irányítást és lassan Hoffer felé sétál. Sprite-on NINCS szövegbuborék
+  (ki kellett radírozni a fehér blobot). Hang: hofferjozsi_special_gyereide.mp3
+  — NEM szakítható
+VO halkítva (*0.32): hofferjozsi_attack1–3, damage1–3, defeat.
+Announcer: name_hofferjozsi, hofferjozsiwins.
+VS portré: FEJ-fókuszú crop, ne vágja le a fejet (object-top).
+Idle keze ne legyen kinyújtva. Crouch/low sprite méret: ne legyen lyukas
+(túlagresszív chroma).
+
+----- LÁZÁR JÁNOS  id=lazar  (KIKAPCSOLVA) -----
+WC kefés politikus. Punch/block kefével, rúgás nélküle.
+L1 Kefe forgószél — zone=spin, 2 mp, 0.25s tick, +30% move, armor, blokkolható,
+  tornádó FX /fx/tornado.png
+R1 Kefe dobás — zone=brush, projectile /fx/brush.png
+Fájlok: public/sprites/lazar/*  — NE TÖRÖLD.
+
+
+--------------------------------------------------------------------------------
+6. SPRITE RENDSZER — HOGYAN ÉPÜL FEL EGY KARAKTER
+--------------------------------------------------------------------------------
+
+Mappa: public/sprites/{charId}/
+Portré: public/portraits/{charId}.png          (egész alakos, VS kocka)
+Ikon:   public/portraits/{charId}-icon.png     (ARCKÖZELI, szürke háttér, kitölti
+                                                 a kis ikont)
+
+Engine load (KitchenKombat.load):
+  poses[] minden Pose-ra: /sprites/{id}/{pose}.png?v=64
+  KIVÉTEL: pose === "special2" → fájlnév "spec2.png"   (poseFile helper)
+  ANIM_ATKS = punchL, punchR, kickL, kickR, special
+    → {atk}0.png {atk}1.png {atk}2.png {atk}3.png   (4 frame)
+  special2 anim: special20.png … special25.png       (6 frame)
+
+Kötelező fájlok karakterenként (kb. 50–54 PNG):
+
+  idle.png
+  walk0.png walk1.png walk2.png walk3.png     ← LÉPÉS, ne 1 frame rezgés
+  crouch.png
+  jump.png
+  block.png
+  dash.png                                    ← Super Dash is ezt használja + arany tint
+  hurt.png
+  punchL.png punchR.png kickL.png kickR.png   ← standing, 1-frame fallback
+  punchL0–3 punchR0–3 kickL0–3 kickR0–3       ← 4 frame anim
+  jumpPunchL/R.png jumpKickL/R.png
+  lowPunchL/R.png lowKickL/R.png
+  special.png special0–3.png                  ← L1
+  spec2.png                                   ← R1 idle/pose (NEM special2.png a loadban)
+  special2.png                                ← gyakran ott van, a spec2 másolat / extra
+  special20–25.png                            ← R1 6 frame
+
+Opcionális / legacy (nem mindig töltődik): punch.png, kick.png, punchWind.png,
+kickExt.png, specialPeak.png, spec2call.png, spec2charge.png
+
+RAJZOLÁS:
+  Canvas 1280×720, GROUND=668.
+  Sprite canvas tipikusan ~520×780, láb FOOT_Y≈749 a process scriptben.
+  P1 facing=+1 (jobbra néz, ahogy a sprite van), P2 facing=-1 → ctx.scale(-1,1).
+  EZÉRT a nyers PNG-eknek JOBBRA kell nézniük. Ha „háttal áll az ellenfélnek”,
+  a sprite van tükrözve, NEM az engine.
+
+  measureBox(): az átlátszó pixelek bounding boxa a lábhoz igazít.
+  Crouch: a sprite TÉNYLEG guggoljon, ne csak kicsinyítsd az idle-t.
+  Low attack sprite mérete ≈ crouch, NE nőjön óriásra (Cica/Hoffer/Ági bug).
+
+WALK:
+  4 frame, váltott láb. 1 frame-es „rezgő” walk TILOS.
+
+
+--------------------------------------------------------------------------------
+7. HOGYAN GENERÁLJA A GROK A SPRITE-OKAT (KÖVESD EZT)
+--------------------------------------------------------------------------------
+
+Eszközök: imagine_text_to_image, imagine_image_to_image, imagine_reference_to_image.
+Referencia: a user character sheetje + már jó idle.png.
+
+PIPELINE LÉPÉSEI:
+
+  1) Olvasd el a feltöltött sheetet (több nézet: front/side/back).
+  2) Prompt: UGYANAZ a karakter, side-view, JOBBRA néz, MAGENTA #FF00FF háttér,
+     teljes alak, láb a vásznon, ne vágódjon. Nincs extra ember, nincs szöveg,
+     nincs speech bubble (kivéve ha KÉRI).
+  3) Stílus: 2D fighting-game sprite, realisztikus-stilizált, NEM chibi, NEM
+     anime-elcsúszás. Ruha/haj/arc = referencia.
+  4) Chroma-key: scripts/process_fighter_sprite.py
+       python3 scripts/process_fighter_sprite.py <src.jpg> <dst.png> [target_h]
+     Canvas 520×780, láb FOOT_Y=749, TARGET_H=640, MAX_H=732.
+     Magenta kulcs: (~230, 33, 165) + forró pink. 1px erode a JPEG fringére.
+  5) Ellenőrizd: nincs lyuk a karakteren (túlagresszív key), nincs magenta
+     udvar (túlgyenge key), a láb a canvas alján van, a méret az idle-hez
+     hasonló.
+  6) Másold public/sprites/{id}/{pose}.png
+  7) Cache bust: engine.ts load() `const bust = "?v=64"` — emeld, ha a böngésző
+     a régi sprite-ot cache-eli. Portréknál ?v=10 / ?v=11.
+
+PROMPT SZOKÁSOK, AMIK BEJÖTTEK:
+  - „exact same character as reference, identical face, hair, clothes”
+  - „side profile facing RIGHT, fighting game sprite”
+  - „solid chroma key MAGENTA #FF00FF background, no floor, no shadow”
+  - „full body, feet visible, not cropped”
+  - punchL vs punchR: BAL vs JOBB kar — ne ugyanaz a pose tükrözve
+  - crouch: térd hajlítva, csípő le, fej alacsonyabban
+  - walk: contact / passing / contact opposite / passing opposite
+
+GYAKORI HIBÁK (a tulaj ezeken ment ki a világból):
+  - Elölnézet / kamera felé néz, holott OLDALRA kell
+  - Tükrözött irány (balra néz)
+  - punchL == punchR
+  - Walk 1 frame, rezeg
+  - Crouch túl kicsi VAGY attacknál hirtelen óriás
+  - Háttér nincs kiszűrve (magenta/rózsaszín a hajban, lábánál)
+  - Lyukas karakter (chroma a ruha/haj sötét részét is kivágta)
+  - Másik special sprite-ja villan be egy frame-re (rossz pose map)
+  - Identitáscsere (Renike/Ricsi szemüveg, kopasz Ricsi, rossz ruha)
+
+JAVÍTÁS MÓDJA:
+  - Ha csak az IRÁNY rossz: tükrözd a PNG-t (PIL transpose FLIP_LEFT_RIGHT),
+    NE generálj újat.
+  - Ha a póz rossz: újragenerálás referenciával (idle + sheet).
+  - Ha a háttér rossz: újra chroma, ne az egész karaktert.
+  - Egy pose-t kértek? CSAK azt cseréld.
+
+ÚJ KARAKTER CHECKLIST:
+  [ ] CharId típus + CHAR_IDS (lazar-t ne automatikusan)
+  [ ] CHARACTERS name/title/special/special2
+  [ ] CHAR_SKILLS s1/s2 szöveg (pause Irányítások)
+  [ ] special1For / special2For + Atk flags (zone, pounce, rage, pull, shield…)
+  [ ] teljes sprite set + 4-frame attack + 6-frame special2
+  [ ] portraits/{id}.png (fej látszik) + {id}-icon.png (arc, szürke bg)
+  [ ] audio.ts: CHAR_NAME, CHAR_WIN, CHAR_ATTACK/DAMAGE/DEFEAT, special one-shot
+      ha a hang NEM szakítható
+  [ ] sfxPreloadList
+  [ ] CPU: ha a special extra (Jézus oszlop/aura), külön ág
+  [ ] PATCH_NOTES + GAME_VERSION a tulaj kérése szerint
+  [ ] winLine() győzelem szöveg: „X a Győztes!”
+
+
+--------------------------------------------------------------------------------
+8. HANGRENDSZER
+--------------------------------------------------------------------------------
+
+Könyvtár: public/sfx/ és public/music/
+
+Announcer (preload, playBuffer / playAnnouncerShot):
+  name_{char}.mp3          karakterválasztáskor
+  {char}wins.mp3           CSAK a meccs végső győztesénél, NEM minden nyert körnél
+  roundone / roundtwo / finalround.mp3
+  ko.mp3                   minden nyert körnél
+  sinterkombat_title.mp3   főmenü sting
+
+Karakter VO minta (a tulaj ÍGY tölti fel későbbi karaktereknek is):
+  {id}_attack1.mp3  attack2  attack3   (+ ricsinek attack4)
+  {id}_damage1.mp3  damage2  damage3
+  {id}_defeat.mp3
+  special-specifikus fájlnevek (agi_kopes, hofferjozsi_special_duhroham, …)
+
+playVoice(who, url): MEGÁLLÍTJA az előző VO-t ugyanazon a karakteren.
+playOneShot: NEM állítja meg — ezt használd a „ne szakítható” specialokra:
+  Ági kopes + verszivas
+  Jézus oszlop + vedogomb (vol 2.4)
+  Cigányricsi kiblast
+  Hoffer duhroham + gyereide
+
+Cica és Hoffer VO hangerő: voiceVol = base * 0.32 (a felvételek hangosabbak).
+
+Zene:
+  /music/menu.mp3          menü (title/select/stage/online)
+  /music/kitchen.mp3       Konyha pálya
+  /music/sintertanya.mp3   Sintertanya
+  /music/kisterenye.mp3    Kisterenye
+  startStageMusic(stageId) — stage váltáskor ÚJ src (musicSrc tracker).
+  MUSIC_BLOBS kulcs = URL, ne „menu”/„kitchen” kind.
+
+Beállítások: soundOn, sfx 0–100, music 0–100, announcer 0–100.
+
+
+--------------------------------------------------------------------------------
+9. CPU / NEHÉZSÉG
+--------------------------------------------------------------------------------
+
+DIFFICULTIES: easy, normal, hard, szopni
+Címkék: Könnyű, Normál, Nehéz, SZOPNI FOGSZ
+
+cpu() a f2-t irányítja (1P vs CPU). Training dummy: idle | cpu | p2.
+
+Támadjon BLOKKOLÓ játékosra is (youOpen tartalmazza a block state-et).
+Álló blokkra keverjen LOW-t (guggolós kickL/punchL).
+
+Jézus: külön ág, meter>=50-nél oszlop távolról, aura nyomás alatt.
+
+SZOPNI FOGSZ ≈ régi „verhetetlen hard”: block 1, atk 1, combo 1, special 0.38…
+Könnyű/normál/hard le van hangolva, ne emeld vissza kérés nélkül.
+
+
+--------------------------------------------------------------------------------
+10. GYAKORLÓ MÓD
+--------------------------------------------------------------------------------
+
+Főmenü: Gyakorló mód (Online alatt).
+Végtelen idő, HP refill minden tickben ha training.
+Pause extra:
+  Dummy: semmit / CPU / P2
+  CPU nehézség ha CPU be
+  Végtelen energia ki/be
+  Karakterválasztás (NINCS Újraindítás)
+Input display: utolsó 10 gomb, P1 bal, P2 jobb, felfelé úszik, kicsi.
+Mobil pause skálázva, hogy kiférjen.
+
+
+--------------------------------------------------------------------------------
+11. BEÁLLÍTÁSOK
+--------------------------------------------------------------------------------
+
+Hang: master ki/be, SFX / Zene / Announcer csúszka.
+Videó: HUD méret 50–125% (alap 100%).
+Virtuális kontroller (csak mobil):
+  méret 50–150% (alap 100%)
+  áttetszőség 25–100% (alap 75%)
+  „Virtuális kontroller Testreszabása”: Sintertanya háttér, gombonként
+  scale/alpha + drag pozíció. Alap layout NE takarja egymást.
+  L2 (Super Dash) és R2 (Blokk) a D-pad FELETT, bal oldalon.
+
+localStorage key: sinter-settings-v1
+
+
+--------------------------------------------------------------------------------
+12. ONLINE
+--------------------------------------------------------------------------------
+
+Host/Join WebSocket, LAN. net.ts packBits/unpackBits delay-el.
+Kevésbé tesztelt, mint a local. Ne töröld.
+
+
+--------------------------------------------------------------------------------
+13. FÁJLMAPPA-TÉRKÉP
+--------------------------------------------------------------------------------
+
+/workspace
+  src/game/           ← A JÁTÉK
+  public/sprites/     ← karakter PNG-k
+  public/portraits/
+  public/sfx/  public/music/  public/stages/  public/ui/  public/fx/
+  scripts/process_fighter_sprite.py
+  scripts/process_hoffer.py     (Hoffer-specifikus chroma, ha kell)
+  assets/sprites/{id}/refs/     nyers referenciák
+  attachments/                  user feltöltések (képek, mp3)
+  desktop/                      Electron
+  BACKUP.md                     utolsó zip infó
+  SINTER_KOMBAT_CHATGPT_DOKUMENTACIO.txt  ← EZ A FÁJL
+
+GitHub release zippek ~150–170 MB, node_modules nélkül.
+
+
+--------------------------------------------------------------------------------
+14. TULAJDONOSI ÍZLÉS / FOLYAMAT
+--------------------------------------------------------------------------------
+
+Nyelv: magyar, közvetlen. „Na fasza” = jó. „Nemjó / semmi nem változott” =
+  a preview cache vagy tényleg nem ment a fájl a public/-ba. Emeld a ?v= bustot,
+  hard refresh, ellenőrizd hogy a PNG tényleg felülíródott.
+
+Backup kérés: zip + git commit + tag + gh release. Verziót CSAK ha mondja.
+
+Webes preview: néha nem frissül — manuális deploy / cache bust.
+
+Új special hang: a tulaj megmondja a fájlnevet, te bemásolod public/sfx-be
+és bekötöd. Special hangoknál kérdezd meg / nézd a mintát: Ági/Jézus/Hoffer
+típusúak NEM szakíthatók.
+
+Ha elakadsz sprite-on: MUTASD a referenciát és a hibás frame-et, ne generálj
+20 variációt vakon. Egy pose = egy javítás.
+
+Karakterkonzisztencia checklist minden új PNG előtt:
+  [ ] Arc egyezik az idle-lel
+  [ ] Haj
+  [ ] Ruha / mezítelenség
+  [ ] Testalkat / arány
+  [ ] Irány: jobbra néz
+  [ ] Magenta háttér ki van szűrve
+  [ ] Méret ≈ idle (különösen crouch/low)
+  [ ] Nincs speech bubble / extra prop, hacsak nem a special része
+      ( Renike serpenyő, Ricsi üveg, Lázár kefe — ezek MARADJANAK )
+
+
+--------------------------------------------------------------------------------
+15. KONSTANS GYORSLISTA
+--------------------------------------------------------------------------------
+
+GAME_VERSION     v0.185
+MAX_HP           170
+ROUND_TIME       45
+Special cost     50
+Super Dash cost  40
+SUPER_DASH_SPEED DASH_SPEED * 1.5
+WALK_FWD 460 / WALK_BACK 250 / DASH_SPEED 980 / DASH_DUR 0.18
+GROUND 668
+Canvas 1280×720
+Sprite canvas ~520×780, FOOT_Y 749
+Spam floor 0.35, step 0.10
+Hoffer rage self-dmg 13% / 5s
+Jézus aura/oszlop 5s
+Hoffer pull 3s
+Cica/Hoffer VO * 0.32
+
+CHAR_IDS = renike ricsi cica agi cricsi jezus hoffer
+STAGE_IDS = kitchen sintertanya kisterenye
+
+
+--------------------------------------------------------------------------------
+16. SZÖVEGEK (MAGYAR, NE FORDíTSD visSZA ANGOLRA)
+--------------------------------------------------------------------------------
+
+winLine(id): „{Név} a Győztes!”
+Round: „Első Kör. HARC!” / „Második Kör. HARC!” / „VÉGSŐ KÖR. HARC!”
+Confirm példák:
+  „Biztos vissza akarsz lépni a főmenübe? Igen — Mégse”
+Nehézség: Könnyű, Normál, Nehéz, SZOPNI FOGSZ
+
+Ági köpés callout: „Köpköd a Vámpír!”  (NE „Vérszívás”)
+Hoffer pull callout: „GYERE IDE!”  sprite-on NINCS buborék.
+
+
+--------------------------------------------------------------------------------
+17. A LEGFONTOSABB CSAPDÁK (OLVASD EL KÉTSZER)
+--------------------------------------------------------------------------------
+
+1) special2.png NEM az R1 special.
+   A loader:
+     pose "special2" → FÁJLNÉV "spec2.png"   (R1 hold pose)
+     L1 anim frame index 2 → "special2.png"  (special0, special1, special2, special3)
+     R1 anim → special20.png … special25.png
+   Ha felülírod a special2.png-t az R1-gyel, SZÉTCSESZED az L1 3. frame-jét
+   (Renike serpenyő / Ricsi üveg). Ez TÖRTÉNT már, a tulaj megőrült tőle.
+
+2) Lázár János: típusokban, sprite mappában, CHARACTERS-ben, load bags-ben
+   BENNE VAN, CHAR_IDS-ből KI VAN VÉVE. Ne „javítsd vissza” kérés nélkül.
+   Nulla SFX-e van.
+
+3) Hoffer Dühroham: NINCS +25% kimenő sebzés a jelenlegi kódban. Csak +30%
+   speed + max 13% önsebzés (~22 HP / 5 mp). A v0.17 patch note hazudik.
+
+4) Hányósugár (beam) a NORMÁL combat() hitboxot használja (nem tickZones).
+   Cloud/quake/spit/ki/pillar/spin/brush a zónás ágon mennek, a combat()
+   skippeli őket. Új specialt ne rakj mindkét ágra, mert duplán sebez.
+
+5) Draw-scale hackek — NE „javítsd ki” a sprite méretét ezek nélkül:
+     Cica low ×0.6, Cica special/pounce ×0.68
+     Ági low/crouch ×1.12
+     Hoffer crouch/low ×0.72
+     Ricsi jump ×1.16
+     Crouch squash 0.8 CSAK renike/ricsi/cica — a többinek van igazi crouch PNG
+   Ha újragenerálsz „helyes méretű” PNG-t a hack bent hagyásával, kétszeres
+   hiba lesz.
+
+6) Disk vs CharId fájlnevek:
+     cricsi  → ciganyricsi_attack1.mp3, name_ciganyricsi.mp3
+     hoffer  → hofferjozsi_attack1.mp3, name_hofferjozsi.mp3
+   A CharId RÖVID, a hangfájl HOSSZÚ.
+
+7) Hoffer chroma: scripts/process_hoffer.py  (véd navy kockás inget / bőrt)
+   A generic process_fighter_sprite.py LYUKAT ESzik a ruhájába.
+
+8) Engine osztály neve: KitchenKombat. Terméknév: Sinter Kombat.
+   Ne rename-eld végig kérés nélkül.
+
+9) Fatality stringek (KAROM FATALITY stb.) LÉTEZNEK a CHARACTERS-ben, de a
+   doFatality gyakorlatilag KO + special pose. Ne építs rájuk rendszert.
+
+10) Meter CSAK hit/block-ból. Nincs passzív regen, kivéve gyakorló toggle.
+
+11) Ági walkT rate 8, a többieké 12 — szándékos, lassabb lépés.
+
+12) Portrait cache: ikon ?v=10, VS ?v=11, sprite ?v=64, select idle ?v=63.
+    Cserénél BUST.
+
+13) Böngésző hang: gamepad NEM oldja fel az AudioContextet. Kattintás/billentyű
+    kell. Ezért van a „NYOMJ MEG EGY GOMBOT” overlay.
+
+14) P2 facing runtime ctx.scale(-1). Select panel P2 idle CSS -scale-x-100.
+    Generált art MINDIG jobbra nézzen.
+
+15) Jump/low PNG-t eleve kicsit kompaktabbra generáld, a draw kód újra skáláz.
+
+
+================================================================================
+VÉGE. Ha bizonytalan vagy egy sprite identitásában, NYISD MEG
+public/sprites/{id}/idle.png ÉS a user feltöltött sheetet, mielőtt
+generálsz. Ez a projekt ezen bukott el a legtöbbször.
+
+Fájl: /workspace/SINTER_KOMBAT_CHATGPT_DOKUMENTACIO.txt
+Add oda a fizetős ChatGPT-nek ezt a txt-t. A régi DOKUMENTACIO.md ELAVULT.
+================================================================================
