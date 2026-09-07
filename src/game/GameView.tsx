@@ -8,18 +8,20 @@ import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.18",
+    items: [
+      "Új pálya: Kisterenye, saját zene",
+      "Sintertanya saját háttérzene",
+      "Dühroham: periódikus sebzés Hofferre megy, nem az ellenfélre",
+      "Hoffer Józsi: dühroham vörös overlay, GYERE IDE! sprite buborék nélkül",
+      "VS képernyő: Hoffer portréja fej-fókuszú",
+    ],
+  },
+  {
     v: "v0.175",
     items: [
       "Hoffer Józsi harci hangok; special hangok nem szakíthatók meg",
       "Super Dash: arany overlay minden karakteren a hatóidő alatt",
-    ],
-  },
-  {
-    v: "v0.18",
-    items: [
-      "Hoffer Józsi: dühroham vörös overlay, GYERE IDE! sprite buborék nélkül",
-      "VS képernyő: Hoffer portréja fej-fókuszú",
-      "Betöltés: hibás/lassú sprite nem fagyasztja a loadingot",
     ],
   },
   {

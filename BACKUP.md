@@ -1,12 +1,12 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-0124.zip`  
-**Időpont:** 2026-09-07 01:24 CEST  
-**Verzió:** v0.175  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-0327.zip`  
+**Időpont:** 2026-09-07 03:27 CEST  
+**Verzió:** v0.18  
 
-**Állapot:** Hoffer harci hangok (special nem szakítható), Super Dash arany overlay minden karakteren.
+**Állapot:** Kisterenye pálya + zene, Sintertanya saját zene, Dühroham max 13% önsebzés, Cica/Hoffer halkabb voice.
 
-Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0008.zip`
+Előző snapshot: `Sinter-Kombat-backup-2026-09-07-0124.zip`
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 

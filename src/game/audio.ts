@@ -13,12 +13,14 @@ let announcer: AudioBufferSourceNode | null = null;
 let musicEl: HTMLAudioElement | null = null;
 let musicNode: MediaElementAudioSourceNode | null = null;
 let musicKind: "menu" | "stage" | null = null;
+let musicSrc: string | null = null;
 const MUSIC_BLOBS: Record<string, string> = {};
 
 const MENU_FILE = "/music/menu.mp3";
 const MUSIC_FILES: Record<string, string> = {
   kitchen: "/music/kitchen.mp3",
-  sintertanya: "/music/kitchen.mp3",
+  sintertanya: "/music/sintertanya.mp3",
+  kisterenye: "/music/kisterenye.mp3",
 };
 const MUSIC_VOL = 0.48;
 
@@ -328,7 +330,7 @@ export function sfxPreloadList(): string[] {
 }
 
 export function musicPreloadList(): string[] {
-  return [MENU_FILE, MUSIC_FILES.kitchen];
+  return [MENU_FILE, ...Object.values(MUSIC_FILES)];
 }
 
 export async function preloadSfx(onItem?: () => void) {
@@ -349,15 +351,12 @@ export async function preloadSfx(onItem?: () => void) {
     }),
   );
   await Promise.all(
-    [
-      ["menu", MENU_FILE],
-      ["kitchen", MUSIC_FILES.kitchen],
-    ].map(async ([kind, url]) => {
+    [MENU_FILE, ...Object.values(MUSIC_FILES)].map(async (url) => {
       try {
         const res = await fetch(url);
         if (res.ok) {
           const blob = await res.blob();
-          MUSIC_BLOBS[kind] = URL.createObjectURL(blob);
+          MUSIC_BLOBS[url] = URL.createObjectURL(blob);
         }
       } catch {
         /* ignore */
@@ -494,6 +493,11 @@ function playVoice(who: string, url: string, vol: number, rate = 1) {
   voices.set(who, src);
 }
 
+function voiceVol(id: string, base: number) {
+  if (id === "hoffer" || id === "cica") return base * 0.32;
+  return base;
+}
+
 export const sfxPlay = {
   hit: () => playHit(0.92),
   heavy: () => playHit(1),
@@ -521,17 +525,17 @@ export const sfxPlay = {
   charAttack: (id: string) => {
     const pool = CHAR_ATTACK[id];
     if (!pool) return;
-    playVoice(id, pickFrom(pool), 0.96, 0.98 + Math.random() * 0.04);
+    playVoice(id, pickFrom(pool), voiceVol(id, 0.96), 0.98 + Math.random() * 0.04);
   },
   charDamage: (id: string) => {
     const pool = CHAR_DAMAGE[id];
     if (!pool) return;
-    playVoice(id, pickFrom(pool), 1, 0.98 + Math.random() * 0.04);
+    playVoice(id, pickFrom(pool), voiceVol(id, 1), 0.98 + Math.random() * 0.04);
   },
   charDefeat: (id: string) => {
     const url = CHAR_DEFEAT[id];
     if (!url) return;
-    playVoice(id, url, 1, 1);
+    playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial1: (id: string) => {
     const url = CHAR_SPECIAL1[id];
@@ -540,17 +544,19 @@ export const sfxPlay = {
       return;
     }
     if (id === "jezus") playOneShot(url, 2.4, 1);
-    else if (id === "agi" || id === "hoffer") playOneShot(url, 1, 1);
-    else playVoice(id, url, 1, 1);
+    else if (id === "agi") playOneShot(url, 1, 1);
+    else if (id === "hoffer") playOneShot(url, voiceVol(id, 1), 1);
+    else playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial2: (id: string) => {
     const url = CHAR_SPECIAL2[id];
     if (!url) return;
     if (id === "jezus") playOneShot(url, 2.4, 1);
-    else if (id === "agi" || id === "cricsi" || id === "hoffer") playOneShot(url, 1, 1);
-    else playVoice(id, url, 1, 1);
+    else if (id === "agi" || id === "cricsi") playOneShot(url, 1, 1);
+    else if (id === "hoffer") playOneShot(url, voiceVol(id, 1), 1);
+    else playVoice(id, url, voiceVol(id, 1), 1);
   },
-  quake: () => playOneShot(CICA_QUAKE, 0.95, 0.96 + Math.random() * 0.08),
+  quake: () => playOneShot(CICA_QUAKE, voiceVol("cica", 0.95), 0.96 + Math.random() * 0.08),
   charName: (id: string) => {
     const url = CHAR_NAME[id];
     if (!url) return;
@@ -619,16 +625,17 @@ export function stopKitchenDrone() {
 }
 
 function ensureMusicEl(url: string, kind: "menu" | "stage") {
-  const resolved = MUSIC_BLOBS[kind] ?? url;
+  const resolved = MUSIC_BLOBS[url] ?? url;
   if (!musicEl) {
     musicEl = new Audio(resolved);
     musicEl.loop = true;
     musicEl.preload = "auto";
     musicEl.crossOrigin = "anonymous";
-  } else if (musicKind !== kind) {
+  } else if (musicKind !== kind || musicSrc !== resolved) {
     musicEl.src = resolved;
   }
   musicKind = kind;
+  musicSrc = resolved;
   return musicEl;
 }
 

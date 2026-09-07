@@ -41,9 +41,9 @@ declare global {
 
 export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar" | "hoffer";
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
-export type StageId = "kitchen" | "sintertanya";
-export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya"];
-export const GAME_VERSION = "v0.175";
+export type StageId = "kitchen" | "sintertanya" | "kisterenye";
+export const STAGE_IDS: StageId[] = ["kitchen", "sintertanya", "kisterenye"];
+export const GAME_VERSION = "v0.18";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -620,14 +620,15 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s2: "R1 Kefe dobás — eldobja a WC kefét az ellenfél felé, projectile, blokkolható.",
   },
   hoffer: {
-    s1: "L1 Dühroham — 5 mp: +30% mozgás és támadási sebesség, +25% sebzés, vörös tónus.",
+    s1: "L1 Dühroham — 5 mp: +30% mozgás és támadási sebesség, vörös tónus, a hatás alatt max 13% önsebzés.",
     s2: "R1 GYERE IDE! — az ellenfél 3 mp-ig elveszti az irányítást és lassan Hoffer felé sétál.",
   },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
-  kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=30" },
-  sintertanya: { id: "sintertanya", name: "SINTERTANYA", nameHu: "Sintertanya", art: "/stages/sintertanya.jpg?v=30" },
+  kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=31" },
+  sintertanya: { id: "sintertanya", name: "SINTERTANYA", nameHu: "Sintertanya", art: "/stages/sintertanya.jpg?v=31" },
+  kisterenye: { id: "kisterenye", name: "KISTERENYE", nameHu: "Kisterenye", art: "/stages/kisterenye.jpg?v=31" },
 };
 
 export const ROUND_CALL: Record<number, string> = {
@@ -717,6 +718,7 @@ type Fighter = {
   shieldT: number;
   spinAcc: number;
   rageT: number;
+  rageAcc: number;
   pullT: number;
 };
 
@@ -1029,6 +1031,7 @@ export class KitchenKombat {
       shieldT: 0,
       spinAcc: 0,
       rageT: 0,
+      rageAcc: 0,
       pullT: 0,
     };
   }
@@ -1080,7 +1083,7 @@ export class KitchenKombat {
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;
-    const total = spriteJobs + ui.length + 2 + sfxPreloadList().length + musicPreloadList().length;
+    const total = spriteJobs + ui.length + 3 + sfxPreloadList().length + musicPreloadList().length;
     let done = 0;
     const tick = () => {
       done += 1;
@@ -1113,6 +1116,7 @@ export class KitchenKombat {
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     let kitchen!: HTMLImageElement;
     let sintertanya!: HTMLImageElement;
+    let kisterenye!: HTMLImageElement;
     await Promise.all([
       ...CHAR_IDS.flatMap((id) =>
         poses.map(async (p) => {
@@ -1138,6 +1142,9 @@ export class KitchenKombat {
       loadTick(`/stages/sintertanya.jpg${bust}`).then((im) => {
         sintertanya = im;
       }),
+      loadTick(`/stages/kisterenye.jpg${bust}`).then((im) => {
+        kisterenye = im;
+      }),
       loadTick(`/fx/brush.png${bust}`).then((im) => {
         this.brushImg = im;
       }),
@@ -1146,7 +1153,7 @@ export class KitchenKombat {
       }),
       preloadSfx(tick),
     ]);
-    this.stageArts = { kitchen, sintertanya };
+    this.stageArts = { kitchen, sintertanya, kisterenye };
     this.stage = kitchen;
     this.images = { ...bags, anims, stage: kitchen };
     this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
@@ -1832,7 +1839,23 @@ export class KitchenKombat {
     f.squash += (1 - f.squash) * Math.min(1, dt * 10);
     f.bleed = Math.max(0, f.bleed - dt * 0.35);
     if (f.shieldT > 0) f.shieldT = Math.max(0, f.shieldT - dt);
-    if (f.rageT > 0) f.rageT = Math.max(0, f.rageT - dt);
+    if (f.rageT > 0) {
+      const before = f.rageT;
+      f.rageT = Math.max(0, f.rageT - dt);
+      f.rageAcc += MAX_HP * 0.13 * ((before - f.rageT) / 5);
+      const take = Math.floor(f.rageAcc);
+      if (take > 0 && f.state !== "ko" && f.hp > 0) {
+        f.rageAcc -= take;
+        f.hp = Math.max(0, f.hp - take);
+        f.flash = Math.max(f.flash, 0.05);
+        if (f.hp <= 0) {
+          const other = f === this.f1 ? this.f2 : this.f1;
+          this.onKo(other, f);
+        }
+      }
+    } else {
+      f.rageAcc = 0;
+    }
     if (f.pullT > 0) f.pullT = Math.max(0, f.pullT - dt);
 
     if (f.state === "hurt") {
@@ -2209,7 +2232,6 @@ export class KitchenKombat {
     att.chain = this.comboSide === side ? [...att.chain, att.atk.id] : [att.atk.id];
     const route = matchCombo(att.chain);
     let dmg = Math.max(1, Math.round(att.atk.dmg * scale));
-    if (att.rageT > 0) dmg = Math.max(1, Math.round(dmg * 1.25));
     if (route && route.name !== att.comboTag) {
       att.comboTag = route.name;
       dmg += route.bonus;
