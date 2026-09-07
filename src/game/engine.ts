@@ -664,6 +664,10 @@ const DASH_DUR = 0.18;
 const SUPER_DASH_COST = 40;
 const SUPER_DASH_SPEED = DASH_SPEED * 1.5;
 const SUPER_DASH_DUR = (DASH_DUR * 1.3) / 1.5;
+const METER_HIT_ATT = 12;
+const METER_HIT_DEF = 6;
+const METER_BLOCK_ATT = 4;
+const METER_BLOCK_DEF = 8;
 const TAP_WIN = 0.28;
 const GRAV = 5100;
 const JUMP_V = 1760;
@@ -2240,6 +2244,8 @@ export class KitchenKombat {
       att.hasHit = true;
       def.flash = 0.1;
       def.hp = Math.max(0, def.hp - Math.max(1, Math.round(att.atk.dmg * 0.4)));
+      att.meter = Math.min(100, att.meter + METER_HIT_ATT);
+      def.meter = Math.min(100, def.meter + METER_HIT_DEF);
       sfxPlay.charDamage(def.id);
       if (def.hp <= 0) this.onKo(att, def);
       return;
@@ -2256,8 +2262,8 @@ export class KitchenKombat {
       def.stun = att.atk.blockstun;
       def.state = "block";
       def.pose = "block";
-      att.meter = Math.min(100, att.meter + 4);
-      def.meter = Math.min(100, def.meter + 8);
+      att.meter = Math.min(100, att.meter + METER_BLOCK_ATT);
+      def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
       this.trauma = Math.min(1, this.trauma + 0.18);
       this.spawnGuardSmoke(hb.x + hb.w / 2, hb.y + hb.h / 2, dir);
       rumble(attPad, 80, 0.25);
@@ -2292,7 +2298,8 @@ export class KitchenKombat {
     def.flash = 0.12;
     def.squash = 1.16;
     def.bleed = Math.min(1.4, def.bleed + (att.atk.id.startsWith("special") ? 1 : 0.55));
-    att.meter = Math.min(100, att.meter + 12);
+    att.meter = Math.min(100, att.meter + METER_HIT_ATT);
+    def.meter = Math.min(100, def.meter + METER_HIT_DEF);
     this.hitstop = att.atk.id.startsWith("special") ? 0.11 : 0.05;
     this.trauma = Math.min(1, this.trauma + (att.atk.id.startsWith("special") ? 0.55 : 0.34));
     if (this.comboSide === side) this.combo += 1;
@@ -2955,6 +2962,8 @@ export class KitchenKombat {
       if ((z.kind === "spit" || z.kind === "brush") && def.state === "block" && facingOk) {
         z.hit = true;
         def.vx = z.dir * 70;
+        def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
+        att.meter = Math.min(100, att.meter + METER_BLOCK_ATT);
         this.spawnGuardSmoke(def.x, GROUND - 180, z.dir);
         sfxPlay.block();
         continue;
@@ -2976,7 +2985,8 @@ export class KitchenKombat {
       def.state = "hurt";
       def.pose = "hurt";
       def.flash = 0.12;
-      att.meter = Math.min(100, att.meter + 12);
+      att.meter = Math.min(100, att.meter + METER_HIT_ATT);
+      def.meter = Math.min(100, def.meter + METER_HIT_DEF);
       this.hitstop = 0.09;
       this.trauma = Math.min(1, this.trauma + 0.4);
       this.callout = z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "brush" ? "Kefe dobás!" : CHARACTERS[att.id].special2;
@@ -3023,6 +3033,7 @@ export class KitchenKombat {
     def.hp = Math.max(0, def.hp - z.dmg);
     def.flash = 0.08;
     def.stun = Math.max(def.stun, 0.12);
+    def.meter = Math.min(100, def.meter + 2);
     if (def.state !== "hurt") {
       def.state = "hurt";
       def.pose = "hurt";
@@ -3050,8 +3061,8 @@ export class KitchenKombat {
     if (guarding) {
       def.vx = dir * 80;
       this.spawnGuardSmoke(def.x, GROUND - 50, dir);
-      att.meter = Math.min(100, att.meter + 4);
-      def.meter = Math.min(100, def.meter + 8);
+      att.meter = Math.min(100, att.meter + METER_BLOCK_ATT);
+      def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
       sfxPlay.block();
       return;
     }
@@ -3064,7 +3075,8 @@ export class KitchenKombat {
     def.pose = "hurt";
     def.flash = 0.1;
     def.bleed = Math.min(1.4, def.bleed + 0.35);
-    att.meter = Math.min(100, att.meter + 12);
+    att.meter = Math.min(100, att.meter + METER_HIT_ATT);
+    def.meter = Math.min(100, def.meter + METER_HIT_DEF);
     this.hitstop = 0.07;
     this.spawnFx(def.x, GROUND - 40, "burst", z.dmg);
     sfxPlay.heavy();

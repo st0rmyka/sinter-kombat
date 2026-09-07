@@ -18,6 +18,7 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
       "Super Dash saját hangeffekt",
       "Konyha pálya átmenetileg nem választható",
       "Sintertanya pálya új neve: Duranda",
+      "Hit/blokk: a védekező is kap egy kis energiát (Super Dash meneküléshez)",
     ],
   },
   {

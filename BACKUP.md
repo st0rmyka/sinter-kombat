@@ -1,11 +1,11 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-1239.zip`  
-**Időpont:** 2026-09-07 12:39 CEST  
+**Fájl:** `Sinter-Kombat-backup-2026-09-07-1318.zip`  
+**Időpont:** 2026-09-07 13:18 CEST  
 **Verzió:** v0.19  
-**Git tag:** `v0.19`
+**Git tag:** `v0.19.1`
 
-**Állapot:** Új főmenü + zene, Victory Screen, Golgota, Népszínház utca, Super Dash SFX, Konyha rejtve, Sintertanya → Duranda.
+**Állapot:** v0.19 + védő/hitelt játékos is kap metert (Super Dash menekülés).
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
@@ -21,4 +21,4 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory art, s
 2. `npm install`
 3. `npm run dev`
 
-Vagy: `git checkout v0.19`
+Vagy: `git checkout v0.19.1`
