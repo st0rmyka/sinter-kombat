@@ -1100,7 +1100,7 @@ export class KitchenKombat {
       "special2",
       "crouch",
     ];
-    const bust = "?v=64";
+    const bust = "?v=65";
     const ui = [
       "/ui/mainmenu.png?v=19",
       "/ui/selection.jpg",
