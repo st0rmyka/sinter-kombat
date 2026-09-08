@@ -405,7 +405,14 @@ export function GameView() {
     const onResize = () => game.resize();
     game.resize();
     window.addEventListener("resize", onResize);
+    game.loadPct = 0.02;
+    game.pushHud();
     void game.load().then(() => {
+      game.start();
+      game.resize();
+    }).catch((err) => {
+      console.error("load", err);
+      game.loadPct = 1;
       game.start();
       game.resize();
     });

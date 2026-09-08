@@ -1,6 +1,6 @@
 import { getHudScale } from "./settings";
 import { getPadCount, rumble, sampleP1, sampleP2, injectKeys, type Actions } from "./input";
-import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic, sfxPreloadList, musicPreloadList } from "./audio";
+import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic } from "./audio";
 import { packBits, unpackBits } from "./net";
 import { asset } from "./asset";
 
@@ -45,6 +45,8 @@ export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
 export const GAME_VERSION = "v0.2";
+/** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
+export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -1062,14 +1064,20 @@ export class KitchenKombat {
   }
 
   async load() {
+    this.loadPct = 0.01;
+    this.pushHud();
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
-        im.crossOrigin = "anonymous";
-        const done = () => res(im);
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          res(im);
+        };
         im.onload = done;
         im.onerror = done;
-        window.setTimeout(done, 12000);
+        window.setTimeout(done, 4000);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1109,11 +1117,12 @@ export class KitchenKombat {
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;
-    const total = spriteJobs + ui.length + STAGE_IDS.length + 2 + sfxPreloadList().length + musicPreloadList().length;
+    const total = spriteJobs + ui.length + STAGE_IDS.length + 2;
     let done = 0;
     const tick = () => {
       done += 1;
-      this.loadPct = Math.min(1, done / total);
+      this.loadPct = Math.min(0.97, done / Math.max(1, total));
+      this.hudKey = "";
       this.pushHud();
     };
     const loadTick = async (src: string) => {
@@ -1128,6 +1137,16 @@ export class KitchenKombat {
         return im;
       }
     };
+    const runPool = async (jobs: Array<() => Promise<void>>, n = 8) => {
+      let i = 0;
+      const worker = async () => {
+        while (i < jobs.length) {
+          const job = jobs[i++];
+          if (job) await job();
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(n, Math.max(1, jobs.length)) }, () => worker()));
+    };
     const bags = {
       renike: {} as Record<Pose, HTMLImageElement>,
       ricsi: {} as Record<Pose, HTMLImageElement>,
@@ -1141,45 +1160,60 @@ export class KitchenKombat {
     const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const stageImgs = {} as Record<StageId, HTMLImageElement>;
-    await Promise.all([
-      ...CHAR_IDS.flatMap((id) =>
-        poses.map(async (p) => {
+    const jobs: Array<() => Promise<void>> = [];
+    for (const id of CHAR_IDS) {
+      for (const p of poses) {
+        jobs.push(async () => {
           bags[id][p] = await loadTick(`/sprites/${id}/${poseFile(p)}.png${bust}`);
-        }),
-      ),
-      ...CHAR_IDS.flatMap((id) =>
-        ANIM_ATKS.map(async (atk) => {
-          anims[id][atk] = await Promise.all(
-            [0, 1, 2, 3].map((i) => loadTick(`/sprites/${id}/${atk}${i}.png${bust}`)),
-          );
-        }),
-      ),
-      ...CHAR_IDS.map(async (id) => {
+        });
+      }
+      for (const atk of ANIM_ATKS) {
+        jobs.push(async () => {
+          anims[id][atk] = await Promise.all([0, 1, 2, 3].map((i) => loadTick(`/sprites/${id}/${atk}${i}.png${bust}`)));
+        });
+      }
+      jobs.push(async () => {
         anims[id].special2 = await Promise.all(
           [0, 1, 2, 3, 4, 5].map((i) => loadTick(`/sprites/${id}/special2${i}.png${bust}`)),
         );
-      }),
-      ...ui.map((src) => loadTick(src)),
-      ...STAGE_IDS.map(async (id) => {
+      });
+    }
+    for (const src of ui) jobs.push(async () => { await loadTick(src); });
+    for (const id of STAGE_IDS) {
+      jobs.push(async () => {
         stageImgs[id] = await loadTick(STAGES[id].art);
-      }),
-      loadTick(`/fx/brush.png${bust}`).then((im) => {
-        this.brushImg = im;
-      }),
-      loadTick(`/fx/tornado.png${bust}`).then((im) => {
-        this.tornadoImg = im;
-      }),
-      preloadSfx(tick),
-    ]);
-    this.stageArts = stageImgs;
-    this.stage = stageImgs.sintertanya ?? stageImgs.kitchen;
-    this.images = { ...bags, anims, stage: this.stage };
-    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
-    for (const id of CHAR_IDS) {
-      for (const p of poses) this.boxes[id][p] = measureBox(this.images[id][p]);
+      });
+    }
+    jobs.push(async () => {
+      this.brushImg = await loadTick(`/fx/brush.png${bust}`);
+    });
+    jobs.push(async () => {
+      this.tornadoImg = await loadTick(`/fx/tornado.png${bust}`);
+    });
+    try {
+      await runPool(jobs, 6);
+      this.stageArts = stageImgs;
+      this.stage = stageImgs.sintertanya ?? stageImgs.kitchen;
+      this.images = { ...bags, anims, stage: this.stage };
+      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
+      let n = 0;
+      for (const id of CHAR_IDS) {
+        for (const p of poses) {
+          this.boxes[id][p] = measureBox(this.images[id][p]);
+          n += 1;
+          if (n % 16 === 0) await new Promise((r) => window.setTimeout(r, 0));
+        }
+      }
+    } catch (err) {
+      console.error("asset load", err);
+      this.stageArts = stageImgs;
+      this.stage = stageImgs.sintertanya ?? this.stage;
+      this.images = { ...bags, anims, stage: this.stage };
     }
     this.loadPct = 1;
+    this.hudKey = "";
     this.pushHud();
+    void preloadSfx();
   }
 
   start() {
@@ -1335,6 +1369,12 @@ export class KitchenKombat {
     stopStageMusic();
     startMenuMusic();
     this.pushHud();
+  }
+
+  specialCallout(text: string, t: number) {
+    if (!SHOW_SPECIAL_CALLOUTS) return;
+    this.callout = text;
+    this.calloutT = t;
   }
 
   beginMatch() {
@@ -2282,8 +2322,7 @@ export class KitchenKombat {
       def.flash = 0.12;
       this.spawnGuardSmoke(hb.x + hb.w / 2, hb.y + hb.h / 2, att.facing);
       sfxPlay.block();
-      this.callout = "SZENT AURA";
-      this.calloutT = 0.35;
+      this.specialCallout("SZENT AURA", 0.35);
       return;
     }
     if (def.state === "attack" && def.atk?.armor) {
@@ -2330,8 +2369,7 @@ export class KitchenKombat {
       att.comboTag = route.name;
       dmg += route.bonus;
       this.comboName = route.name;
-      this.callout = route.name;
-      this.calloutT = 0.7;
+      this.specialCallout(route.name, 0.7);
     }
     def.hp = Math.max(0, def.hp - dmg);
     if (att.atk.heal) att.hp = Math.min(MAX_HP, att.hp + att.atk.heal);
@@ -2363,12 +2401,10 @@ export class KitchenKombat {
     rumble(defPad, att.atk.id.startsWith("special") ? 220 : 110, 0.55);
     if (att.atk.id === "special") {
       sfxPlay.heavy();
-      this.callout = CHARACTERS[att.id].special;
-      this.calloutT = 0.85;
+      this.specialCallout(CHARACTERS[att.id].special, 0.85);
     } else if (att.atk.id === "special2") {
       sfxPlay.heavy();
-      this.callout = CHARACTERS[att.id].special2;
-      this.calloutT = 0.85;
+      this.specialCallout(CHARACTERS[att.id].special2, 0.85);
     } else sfxPlay.hit();
     sfxPlay.charDamage(def.id);
     if (def.hp <= 0) this.onKo(att, def);
@@ -2600,8 +2636,7 @@ export class KitchenKombat {
     if (f.atkT < f.atk.startup) return;
     if (!f.spec2Spawned) {
       f.spec2Spawned = true;
-      this.callout = CHARACTERS[f.id].special;
-      this.calloutT = 1.2;
+      this.specialCallout(CHARACTERS[f.id].special, 1.2);
     }
     f.spinAcc += dt;
     while (f.spinAcc >= 0.25) {
@@ -2656,15 +2691,13 @@ export class KitchenKombat {
     if (f.atk.shield) {
       f.spec2Spawned = true;
       f.shieldT = 5;
-      this.callout = CHARACTERS[f.id].special2;
-      this.calloutT = 0.8;
+      this.specialCallout(CHARACTERS[f.id].special2, 0.8);
       return;
     }
     if (f.atk.rage) {
       f.spec2Spawned = true;
       f.rageT = 5;
-      this.callout = CHARACTERS[f.id].special;
-      this.calloutT = 1.2;
+      this.specialCallout(CHARACTERS[f.id].special, 1.2);
       this.trauma = Math.min(1, this.trauma + 0.22);
       rumble(f === this.f1 ? 0 : 1, 160, 0.55);
       this.spawnGuardSmoke(f.x + f.facing * 24, GROUND - f.y - 210, f.facing);
@@ -2688,8 +2721,7 @@ export class KitchenKombat {
           def.pose = "walk0";
         }
       }
-      this.callout = CHARACTERS[f.id].special2;
-      this.calloutT = 1.2;
+      this.specialCallout(CHARACTERS[f.id].special2, 1.2);
       this.trauma = Math.min(1, this.trauma + 0.28);
       rumble(0, 180, 0.5);
       rumble(1, 180, 0.5);
@@ -2738,8 +2770,7 @@ export class KitchenKombat {
       pulseEvery: 0.25,
       pulseAcc: 0.25,
     });
-    this.callout = CHARACTERS[f.id].special;
-    this.calloutT = 0.9;
+    this.specialCallout(CHARACTERS[f.id].special, 0.9);
     this.trauma = Math.min(1, this.trauma + 0.25);
   }
 
@@ -2761,8 +2792,7 @@ export class KitchenKombat {
       arm: 0,
       jumped: false,
     });
-    this.callout = CHARACTERS[f.id].special2;
-    this.calloutT = 0.7;
+    this.specialCallout(CHARACTERS[f.id].special2, 0.7);
     this.trauma = Math.min(1, this.trauma + 0.2);
     sfxPlay.charSpecial2(f.id);
   }
@@ -3036,8 +3066,10 @@ export class KitchenKombat {
       def.meter = Math.min(100, def.meter + METER_HIT_DEF);
       this.hitstop = 0.09;
       this.trauma = Math.min(1, this.trauma + 0.4);
-      this.callout = z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "brush" ? "Kefe dobás!" : CHARACTERS[att.id].special2;
-      this.calloutT = 0.8;
+      this.specialCallout(
+        z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "brush" ? "Kefe dobás!" : CHARACTERS[att.id].special2,
+        0.8,
+      );
       const cx = z.x + z.w / 2;
       const cy = z.y + z.h / 2;
       this.spawnFx(cx, cy, "burst", z.dmg);
@@ -3068,8 +3100,7 @@ export class KitchenKombat {
         tint: Math.random() < 0.5 ? "#fff6c8" : "#ffe14a",
       });
     }
-    this.callout = CHARACTERS[att.id].special;
-    this.calloutT = 0.28;
+    this.specialCallout(CHARACTERS[att.id].special, 0.28);
     if (def.state === "ko" || def.invuln > 0) return;
     const hurt = this.hurtbox(def);
     if (!overlap({ x: z.x, y: z.y, w: z.w, h: z.h, foot: 0 }, hurt)) return;
@@ -3097,8 +3128,7 @@ export class KitchenKombat {
     rumble(att === this.f1 ? 0 : 1, 180, 0.7);
     rumble(att === this.f1 ? 1 : 0, 140, 0.45);
     this.trauma = Math.min(1, this.trauma + 0.22);
-    this.callout = CHARACTERS[att.id].special2;
-    this.calloutT = 0.55;
+    this.specialCallout(CHARACTERS[att.id].special2, 0.55);
     if (def.state === "ko" || def.invuln > 0) return;
     const hurt = this.hurtbox(def);
     if (!overlap({ x: z.x, y: z.y, w: z.w, h: z.h, foot: 0 }, hurt)) return;
@@ -3810,7 +3840,7 @@ export class KitchenKombat {
       p1Hist: this.p1Hist.slice(),
       p2Hist: this.p2Hist.slice(),
     };
-    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.round(h.loadPct * 100)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
+    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 200)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.onHud(h);
