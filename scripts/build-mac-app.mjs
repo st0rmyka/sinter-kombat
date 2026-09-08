@@ -20,8 +20,8 @@ import { pipeline } from "node:stream/promises";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ELECTRON_VER = "37.3.1";
-const OUT_DIR = path.join(tmpdir(), "Kitchen-Kombat-macOS");
-const ZIP_PATH = path.join(root, "Kitchen-Kombat-macOS.zip");
+const OUT_DIR = path.join(tmpdir(), "Sinter-Kombat-macOS");
+const ZIP_PATH = path.join(root, "release", "Sinter-Kombat-macOS-arm64.zip");
 const CACHE = path.join(tmpdir(), "kk-electron");
 
 function run(cmd, args, opts = {}) {
@@ -111,7 +111,7 @@ async function assemble(arch, label, icnsPath) {
   }
   if (!existsSync(srcApp)) throw new Error(`Electron.app missing in ${unpack}`);
   const destFolder = path.join(OUT_DIR, label);
-  const destApp = path.join(destFolder, "Kitchen Kombat.app");
+  const destApp = path.join(destFolder, "Sinter Kombat.app");
   rmSync(destFolder, { recursive: true, force: true });
   mkdirSync(destFolder, { recursive: true });
   await run("cp", ["-a", srcApp, destApp]);
@@ -123,33 +123,24 @@ async function assemble(arch, label, icnsPath) {
   cpSync(path.join(root, "desktop", "dist"), path.join(appDir, "dist"), { recursive: true });
   copyFileSync(icnsPath, path.join(res, "electron.icns"));
   patchPlist(path.join(destApp, "Contents", "Info.plist"), {
-    name: "Kitchen Kombat",
-    ident: "hu.kitchenkombat.app",
+    name: "Sinter Kombat",
+    ident: "hu.sinterkombat.app",
   });
   rmSync(path.join(res, "default_app.asar"), { force: true });
   console.log(`built ${destApp}`);
 }
 
-const README = `Kitchen Kombat — macOS
-========================
+const README = `Sinter Kombat — macOS (Apple Silicon)
+=====================================
 
-Apple Silicon (M1, M2, M3, M4):
-  nyisd meg:  Apple Silicon / Kitchen Kombat.app
+Nyisd meg:  Sinter Kombat.app
 
-Intel-es Mac:
-  nyisd meg:  Intel / Kitchen Kombat.app
+Ha a macOS azt írja, hogy sérült / nem ellenőrizhető:
+  1. jobb klikk a Sinter Kombat.app-on → Megnyitás
+  2. vagy a Terminálban:
+     xattr -cr "Sinter Kombat.app"
 
-Ha a macOS azt írja, hogy a fejlesztőt nem lehet ellenőrizni:
-  1. jobb klikk a Kitchen Kombat.app-on
-  2. Megnyitás
-  3. erősítsd meg újra a Megnyitást
-
-Irányítás
-  Billentyű: A/D séta, W ugrás, J/K ütés, N/M rúgás, L special, Shift block
-  Dupla előre / dupla hátra: szökkenés
-  DualSense: USB vagy Bluetooth, □ jobb ütés, △ bal ütés, ○ jobb rúgás, ✕ bal rúgás, R2 block
-
-Teljes képernyő: Control + Command + F  (vagy F11)
+Teljes képernyő: Control + Command + F
 Kilépés: Command + Q
 `;
 
@@ -164,11 +155,11 @@ async function main() {
     await run("python3", [path.join(root, "scripts", "make-mac-icon.py"), icnsPath]);
   }
   await assemble("arm64", "Apple Silicon", icnsPath);
-  await assemble("x64", "Intel", icnsPath);
-  writeFileSync(path.join(OUT_DIR, "OLVASSEL.txt"), README);
+  writeFileSync(path.join(OUT_DIR, "Apple Silicon", "OLVASSEL.txt"), README);
   rmSync(ZIP_PATH, { force: true });
+  mkdirSync(path.dirname(ZIP_PATH), { recursive: true });
   console.log("zipping...");
-  await zipDir(OUT_DIR, ZIP_PATH, "Kitchen-Kombat-macOS");
+  await zipDir(path.join(OUT_DIR, "Apple Silicon"), ZIP_PATH, "Sinter-Kombat-macOS");
   console.log(`done ${ZIP_PATH}`);
 }
 

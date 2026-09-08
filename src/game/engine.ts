@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.2";
+export const GAME_VERSION = "v0.21";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -657,6 +657,16 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   hoffer: "/ui/victory/Victory_Hoffer_Jozsi.png",
 };
 
+export const VS_ART: Partial<Record<CharId, string>> = {
+  renike: "/ui/vs/renike.png",
+  ricsi: "/ui/vs/ricsi.png",
+  cica: "/ui/vs/cica.png",
+  agi: "/ui/vs/agi.png",
+  cricsi: "/ui/vs/cricsi.png",
+  jezus: "/ui/vs/jezus.png",
+  hoffer: "/ui/vs/hoffer.png",
+};
+
 const W = 1280;
 const H = 720;
 const GROUND = 668;
@@ -1114,6 +1124,7 @@ export class KitchenKombat {
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
       ...CHAR_IDS.map((id) => VICTORY_ART[id]).filter((u): u is string => !!u),
+      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=21`),
     ];
     const spriteJobs =
       CHAR_IDS.length * poses.length + CHAR_IDS.length * ANIM_ATKS.length * 4 + CHAR_IDS.length * 6;
@@ -1388,7 +1399,7 @@ export class KitchenKombat {
     this.f1 = this.makeFighter(this.p1id, 340, 1);
     this.f2 = this.makeFighter(this.p2id, 940, -1);
     this.screen = "vs";
-    this.introT = 1.4;
+    this.introT = 3;
     startStageMusic(this.stageId);
     this.pushHud();
   }
@@ -1445,6 +1456,7 @@ export class KitchenKombat {
         if (this.netRole === "host" && this.introT <= 0 && this.netGoPulse >= 0.25) {
           this.netGoPulse = 0;
           this.netGoSent = true;
+          this.netGo = true;
           this.netSignalGo?.();
         }
         if (this.netGo) this.beginRound();
@@ -3789,7 +3801,7 @@ export class KitchenKombat {
     }
     ctx.fillStyle = "rgba(12,8,6,0.10)";
     ctx.fillRect(0, 0, W, H);
-    if (this.screen === "fight" || this.screen === "pause" || this.screen === "vs") {
+    if (this.screen === "fight" || this.screen === "pause") {
       this.drawShadow(this.f1);
       this.drawShadow(this.f2);
       if (this.f1.x <= this.f2.x) {

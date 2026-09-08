@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, VICTORY_ART, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, VICTORY_ART, VS_ART, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
@@ -8,6 +8,13 @@ import { NetPlay } from "./net";
 import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.21",
+    items: [
+      "Új VS képernyő: 3 mp, pályaháttér blurral, nagy karakterképek",
+      "Special-feliratok (Büdi stb.) kikapcsolva, K.O. és körkezdet marad",
+    ],
+  },
   {
     v: "v0.2",
     items: [
@@ -1229,13 +1236,44 @@ export function GameView() {
       )}
 
       {hud.screen === "vs" && (
-        <Overlay dim>
-          <div className="flex items-center gap-6">
-            <img src={asset(`/portraits/${hud.p1}.png?v=11`)} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
-            <div className="font-display text-gold text-4xl">VS</div>
-            <img src={asset(`/portraits/${hud.p2}.png?v=11`)} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
+        <div className="absolute inset-0 z-20 overflow-hidden">
+          <img
+            src={asset(STAGES[hud.stage]?.art ?? STAGES.sintertanya.art)}
+            alt=""
+            className="absolute inset-0 h-full w-full scale-110 object-cover"
+            style={{ filter: "blur(14px) saturate(0.85)", transform: "scale(1.12)" }}
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
+            <div className="flex h-full w-[40%] flex-col items-center justify-end">
+              <img
+                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=21`)}
+                alt=""
+                className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
+              />
+              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide sm:text-4xl">
+                {CHARACTERS[hud.p1].name}
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="font-display text-gold text-6xl tracking-[0.2em] drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] sm:text-8xl">
+                VS
+              </span>
+            </div>
+            <div className="flex h-full w-[40%] flex-col items-center justify-end">
+              <img
+                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=21`)}
+                alt=""
+                className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
+                style={{ transform: "scaleX(-1)" }}
+              />
+              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide sm:text-4xl">
+                {CHARACTERS[hud.p2].name}
+                {hud.versusCpu ? " (CPU)" : ""}
+              </div>
+            </div>
           </div>
-        </Overlay>
+        </div>
       )}
 
       {hud.screen === "pause" && (
