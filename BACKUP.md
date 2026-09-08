@@ -1,11 +1,11 @@
 # Sinter Kombat — biztonsági mentés
 
-**Fájl:** `Sinter-Kombat-backup-2026-09-07-1318.zip`  
-**Időpont:** 2026-09-07 13:18 CEST  
-**Verzió:** v0.19  
-**Git tag:** `v0.19.1`
+**Fájl:** `Sinter-Kombat-backup-2026-09-08-1532.zip`  
+**Időpont:** 2026-09-08 15:32 CEST  
+**Verzió:** v0.195  
+**Git tag:** `v0.195`
 
-**Állapot:** v0.19 + védő/hitelt játékos is kap metert (Super Dash menekülés).
+**Állapot:** v0.195 — tauntok, védő meter, Golgota, Népszínház, Duranda, Super Dash SFX.
 
 GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
@@ -13,7 +13,7 @@ GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
 
 Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory art, script-ek, Electron héj, feltöltött referenciaképek, dokumentáció.
 
-**Nincs benne:** `node_modules`, git, Vite cache, nyers generálási `artifacts`, screenshotok, korábbi zippek.
+**Nincs benne:** `node_modules`, git, Vite cache, nyers generálási `artifacts`, screenshotok, korábbi zippek, Electron packager kimenet.
 
 ## Visszaállítás
 
@@ -21,4 +21,4 @@ Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory art, s
 2. `npm install`
 3. `npm run dev`
 
-Vagy: `git checkout v0.19.1`
+Vagy: `git checkout v0.195`

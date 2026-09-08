@@ -1,21 +1,20 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-const root = dirname(fileURLToPath(import.meta.url));
-
 export default defineConfig({
-  root: resolve(root, "desktop"),
+  root: resolve("desktop"),
+  publicDir: resolve("public"),
   plugins: [tailwindcss(), viteReact()],
-  resolve: {
-    alias: { "@": resolve(root, "src") },
+  resolve: { tsconfigPaths: true },
+  base: "/",
+  server: {
+    fs: { allow: [resolve(".")] },
   },
-  base: "./",
-  publicDir: resolve(root, "public"),
   build: {
-    outDir: resolve(root, "desktop/dist"),
+    outDir: resolve("desktop/dist"),
     emptyOutDir: true,
+    assetsDir: "assets",
   },
 });

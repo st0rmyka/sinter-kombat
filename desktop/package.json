@@ -1,8 +1,11 @@
 {
   "name": "sinter-kombat",
   "productName": "Sinter Kombat",
-  "version": "1.0.0",
+  "version": "0.195.0",
   "private": true,
   "type": "module",
-  "main": "main.mjs"
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron ."
+  }
 }
