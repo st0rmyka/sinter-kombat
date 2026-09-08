@@ -7,5 +7,9 @@
   "main": "main.mjs",
   "scripts": {
     "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^37.10.3",
+    "electron-packager": "^17.1.2"
   }
 }

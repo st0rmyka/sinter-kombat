@@ -100,24 +100,54 @@ function sendPong(socket, payload) {
 
 export function createKitchenNet() {
   const clients = new Map();
+  const rooms = new Map();
   let nextId = 1;
-  let started = false;
+  const ROSTER = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 
-  const host = () => [...clients.values()].find((c) => c.role === "host");
-  const guest = () => [...clients.values()].find((c) => c.role === "guest");
+  function validChar(id) {
+    return ROSTER.includes(id) ? id : "renike";
+  }
+
+  function genCode() {
+    for (let i = 0; i < 80; i++) {
+      const c = String(1000 + Math.floor(Math.random() * 9000));
+      const r = rooms.get(c);
+      if (!r || r.clients.size === 0) {
+        if (r) rooms.delete(c);
+        return c;
+      }
+    }
+    return String(1000 + Math.floor(Math.random() * 9000));
+  }
+
+  function roomOf(c) {
+    return c?.code ? rooms.get(c.code) : null;
+  }
+
+  function hostOf(r) {
+    if (!r) return null;
+    return [...r.clients].find((x) => x.role === "host") ?? null;
+  }
+
+  function guestOf(r) {
+    if (!r) return null;
+    return [...r.clients].find((x) => x.role === "guest") ?? null;
+  }
 
   function pub(c) {
     if (!c) return null;
-    return { name: c.name, ready: c.ready, char: c.char, role: c.role };
+    return { name: c.name, ready: c.ready, char: c.char, role: c.role, locked: !!c.locked };
   }
 
-  function lobbyMsg() {
+  function lobbyMsg(r) {
     return {
       type: "lobby",
-      host: pub(host()),
-      guest: pub(guest()),
+      host: pub(hostOf(r)),
+      guest: pub(guestOf(r)),
+      code: r?.code ?? null,
       ips: localIPv4s(),
-      started,
+      started: !!r?.started,
+      phase: r?.phase ?? "lobby",
     };
   }
 
@@ -125,37 +155,33 @@ export function createKitchenNet() {
     sendText(c.socket, JSON.stringify(obj));
   }
 
-  function broadcast(obj) {
+  function broadcast(r, obj) {
+    if (!r) return;
     const raw = JSON.stringify(obj);
-    for (const c of clients.values()) sendText(c.socket, raw);
+    for (const c of r.clients) sendText(c.socket, raw);
   }
 
   function drop(id) {
     const c = clients.get(id);
     if (!c) return;
     clients.delete(id);
+    const r = roomOf(c);
     try {
       c.socket.end();
     } catch {
       /* ignore */
     }
-    if (c.role === "host" || c.role === "guest") {
-      started = false;
-      for (const o of clients.values()) {
+    if (r) {
+      r.clients.delete(c);
+      r.started = false;
+      r.phase = "lobby";
+      for (const o of r.clients) {
         o.ready = false;
+        o.locked = false;
         send(o, { type: "drop", reason: "disconnect" });
       }
-    }
-    broadcast(lobbyMsg());
-  }
-
-  function maybeStart() {
-    if (started) return;
-    const h = host();
-    const g = guest();
-    if (h?.ready && g?.ready) {
-      started = true;
-      broadcast({ type: "start", p1: h.char, p2: g.char, delay: 3 });
+      if (r.clients.size === 0) rooms.delete(r.code);
+      else broadcast(r, lobbyMsg(r));
     }
   }
 
@@ -168,44 +194,106 @@ export function createKitchenNet() {
     }
     if (msg.type === "hello") {
       const role = msg.role === "guest" ? "guest" : "host";
-      if (role === "host" && host() && host() !== c) {
-        send(c, { type: "error", msg: "Már van Host ezen a gépen." });
+      if (role === "host") {
+        const code = genCode();
+        const r = { code, clients: new Set([c]), started: false, phase: "lobby" };
+        rooms.set(code, r);
+        c.role = "host";
+        c.code = code;
+        c.name = String(msg.name ?? "HOST").slice(0, 18);
+        c.char = validChar(msg.char);
+        c.ready = false;
+        c.locked = false;
+        send(c, { type: "hello-ok", role: "host", code });
+        send(c, lobbyMsg(r));
         return;
       }
-      if (role === "guest" && !host()) {
-        send(c, { type: "error", msg: "Nincs Host. Előbb valaki Hostoljon." });
+      const code = String(msg.code ?? "").replace(/\D/g, "").slice(0, 4);
+      const r = rooms.get(code);
+      if (!code || code.length !== 4 || !r) {
+        send(c, { type: "error", msg: "Nincs ilyen kód." });
         return;
       }
-      if (role === "guest" && guest() && guest() !== c) {
-        send(c, { type: "error", msg: "A lobby tele van." });
+      if (!hostOf(r)) {
+        send(c, { type: "error", msg: "A szoba üres. A Host lépjen be előbb." });
         return;
       }
-      c.role = role;
-      c.name = String(msg.name ?? (role === "host" ? "HOST" : "JOIN")).slice(0, 18);
-      c.char = ["renike","ricsi","cica","agi","cricsi","jezus"].includes(msg.char) ? msg.char : "renike";
-      send(c, { type: "hello-ok", role: c.role });
-      broadcast(lobbyMsg());
+      if (guestOf(r)) {
+        send(c, { type: "error", msg: "A szoba tele van." });
+        return;
+      }
+      c.role = "guest";
+      c.code = code;
+      c.name = String(msg.name ?? "JOIN").slice(0, 18);
+      c.char = validChar(msg.char);
+      c.ready = false;
+      c.locked = false;
+      r.clients.add(c);
+      send(c, { type: "hello-ok", role: "guest", code });
+      broadcast(r, lobbyMsg(r));
       return;
     }
+    const r = roomOf(c);
+    if (!r) return;
     if (msg.type === "select") {
-      c.char = ["renike","ricsi","cica","agi","cricsi","jezus"].includes(msg.char) ? msg.char : "renike";
+      c.char = validChar(msg.char);
       c.ready = false;
-      broadcast(lobbyMsg());
+      c.locked = false;
+      broadcast(r, lobbyMsg(r));
+      return;
+    }
+    if (msg.type === "pick") {
+      c.char = validChar(msg.char);
+      c.locked = !!msg.locked;
+      broadcast(r, {
+        type: "pick",
+        role: c.role,
+        char: c.char,
+        locked: c.locked,
+      });
+      const h = hostOf(r);
+      const g = guestOf(r);
+      if (r.phase === "select" && h?.locked && g?.locked) {
+        r.phase = "stage";
+        broadcast(r, { type: "open-stage", p1: h.char, p2: g.char });
+      }
       return;
     }
     if (msg.type === "ready") {
       c.ready = !!msg.ready;
-      broadcast(lobbyMsg());
-      maybeStart();
+      broadcast(r, lobbyMsg(r));
+      const h = hostOf(r);
+      const g = guestOf(r);
+      if (r.phase === "lobby" && h?.ready && g?.ready) {
+        r.phase = "select";
+        h.locked = false;
+        g.locked = false;
+        broadcast(r, { type: "open-select" });
+      }
       return;
     }
-    if (msg.type === "input" && started) {
-      const other = [...clients.values()].find((x) => x !== c);
+    if (msg.type === "stage" && c.role === "host" && r.phase === "stage") {
+      const h = hostOf(r);
+      const g = guestOf(r);
+      if (!h || !g) return;
+      r.started = true;
+      r.phase = "fight";
+      broadcast(r, {
+        type: "start",
+        p1: h.char,
+        p2: g.char,
+        stage: String(msg.stage ?? "sintertanya"),
+        delay: 3,
+      });
+      return;
+    }
+    if (msg.type === "input" && r.started) {
+      const other = [...r.clients].find((x) => x !== c);
       if (other) send(other, { type: "input", frame: msg.frame | 0, bits: msg.bits | 0 });
       return;
     }
-    if (msg.type === "go" && c.role === "host" && started) {
-      broadcast({ type: "go" });
+    if (msg.type === "go" && c.role === "host" && r.started) {
+      broadcast(r, { type: "go" });
     }
   }
 
@@ -229,9 +317,11 @@ export function createKitchenNet() {
       id,
       socket,
       role: null,
+      code: null,
       name: "Player",
       char: "renike",
       ready: false,
+      locked: false,
       buf: Buffer.alloc(0),
     };
     clients.set(id, c);

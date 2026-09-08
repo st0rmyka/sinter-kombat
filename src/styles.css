@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "./**/*.tsx";
+@source "./**/*.ts";
 
 @theme {
   --color-bg: #120c0a;
@@ -18,7 +20,8 @@
 @layer base {
   html,
   body,
-  #app {
+  #app,
+  #root {
     min-height: 100%;
     height: 100%;
     background: var(--color-bg);

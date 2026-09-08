@@ -4,9 +4,17 @@ import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
-import { NetPlay, fetchNetInfo, joinWsUrl } from "./net";
+import { NetPlay } from "./net";
+import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.2",
+    items: [
+      "Online: HOST 4 jegyű kódot ad, CSATLAKOZÁS beírja",
+      "Mindkét Ready után karakterválasztó, majd pálya, aztán harc",
+    ],
+  },
   {
     v: "v0.195",
     items: [
@@ -196,7 +204,9 @@ export function GameView() {
   const [p2Lock, setP2Lock] = useState(false);
   const [touchPick, setTouchPick] = useState<{ slot: 1 | 2; id: CharId } | null>(null);
   const [stageCur, setStageCur] = useState<StageId>("sintertanya");
-  const [joinAddr, setJoinAddr] = useState("127.0.0.1");
+  const [joinCode, setJoinCode] = useState("");
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [onlineIdx, setOnlineIdx] = useState(0);
   const [hostIps, setHostIps] = useState<string[]>([]);
   const [hostPort, setHostPort] = useState(8080);
   const [netErr, setNetErr] = useState<string | null>(null);
@@ -243,6 +253,10 @@ export function GameView() {
   p2LockRef.current = p2Lock;
   const stageCurRef = useRef(stageCur);
   stageCurRef.current = stageCur;
+  const onlineIdxRef = useRef(onlineIdx);
+  onlineIdxRef.current = onlineIdx;
+  const joinCodeRef = useRef(joinCode);
+  joinCodeRef.current = joinCode;
   const titleStung = useRef(false);
   const gateUntil = useRef(0);
   const armGate = () => {
@@ -349,8 +363,34 @@ export function GameView() {
     net.setHandlers({
       onLobby: () => setLobbyTick((n) => n + 1),
       onError: (m) => setNetErr(m),
+      onHelloOk: (_role, code) => setRoomCode(code),
+      onOpenSelect: () => {
+        resetSelect(false);
+        game.chooseMode(false, diffRef.current);
+      },
+      onOpenStage: (p1, p2) => {
+        setP1Cur(p1);
+        setP2Cur(p2);
+        setP1Lock(true);
+        setP2Lock(true);
+        game.goStage(p1, p2);
+      },
+      onPick: (role, char, locked) => {
+        if (role === net.role) return;
+        if (role === "host") {
+          setP1Cur(char);
+          setP1Lock(locked);
+        } else {
+          setP2Cur(char);
+          setP2Lock(locked);
+        }
+      },
       onStart: (s) => {
         const role = net.role ?? "host";
+        const st = (STAGE_IDS as string[]).includes(String(s.stage)) ? (s.stage as StageId) : "sintertanya";
+        game.stageId = st;
+        game.stage = game.stageArts[st] ?? game.stage;
+        setStageCur(st);
         game.beginOnline(s.p1, s.p2, role, (frame, bits) => net.input(frame, bits), () => net.go());
       },
       onDrop: () => {
@@ -552,12 +592,104 @@ export function GameView() {
             g.chooseMode(true, diffRef.current);
           }
         }
+      } else if (h.screen === "online") {
+        const m = sampleMenu();
+        const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
+        if (m.upP || m.downP) setOnlineIdx((i) => (i === 0 ? 1 : 0));
+        if (!gated() && m.kickRP) {
+          armGate();
+          g.screen = "title";
+          setMenu("root");
+          g.pushHud();
+        }
+        if (ok) {
+          armGate();
+          boot();
+          setNetErr(null);
+          if (onlineIdxRef.current === 0) {
+            netRef.current.connect({ role: "host", name: "HOST", char: "renike" });
+            g.openLobby();
+          } else {
+            const code = joinCodeRef.current.replace(/\D/g, "").slice(0, 4);
+            if (code.length !== 4) {
+              setNetErr("Írj be egy 4 jegyű kódot.");
+            } else {
+              netRef.current.connect({ role: "guest", name: "JOIN", char: "ricsi", code });
+              g.openLobby();
+            }
+          }
+        }
+      } else if (h.screen === "lobby") {
+        const m = sampleMenu();
+        const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
+        const me = netRef.current.me;
+        if (ok && me) {
+          armGate();
+          netRef.current.ready(!me.ready);
+        }
+        if (!gated() && m.kickRP) {
+          armGate();
+          netRef.current.disconnect();
+          g.endOnline();
+        }
       } else if (h.screen === "select") {
-        const dual = !h.versusCpu && getPadCount() >= 2;
+        const net = netRef.current;
+        const online = !!net.role;
+        const dual = !online && !h.versusCpu && getPadCount() >= 2;
         const okOf = (a: { kickLP: boolean; punchLP: boolean; startP: boolean }) =>
           !gated() && (a.kickLP || a.punchLP || a.startP);
         const backOf = (a: { kickRP: boolean }) => !gated() && a.kickRP;
-        if (dual) {
+        if (online) {
+          const a = sampleMenu();
+          const host = net.role === "host";
+          if (host) {
+            if (!p1LockRef.current) {
+              if (a.leftP) {
+                const n = cycle(p1CurRef.current, -1);
+                setP1Cur(n);
+                net.pick(n, false);
+              }
+              if (a.rightP) {
+                const n = cycle(p1CurRef.current, 1);
+                setP1Cur(n);
+                net.pick(n, false);
+              }
+              if (okOf(a)) {
+                setP1Lock(true);
+                net.pick(p1CurRef.current, true);
+                sfxPlay.charName(p1CurRef.current);
+                armGate();
+              }
+            } else if (backOf(a)) {
+              setP1Lock(false);
+              net.pick(p1CurRef.current, false);
+              armGate();
+            }
+          } else {
+            if (!p2LockRef.current) {
+              if (a.leftP) {
+                const n = cycle(p2CurRef.current, -1);
+                setP2Cur(n);
+                net.pick(n, false);
+              }
+              if (a.rightP) {
+                const n = cycle(p2CurRef.current, 1);
+                setP2Cur(n);
+                net.pick(n, false);
+              }
+              if (okOf(a)) {
+                setP2Lock(true);
+                net.pick(p2CurRef.current, true);
+                sfxPlay.charName(p2CurRef.current);
+                armGate();
+              }
+            } else if (backOf(a)) {
+              setP2Lock(false);
+              net.pick(p2CurRef.current, false);
+              armGate();
+            }
+          }
+        } else if (dual) {
           const a1 = sampleP1();
           const a2 = sampleP2();
           let p1L = p1LockRef.current;
@@ -628,16 +760,23 @@ export function GameView() {
         }
       } else if (h.screen === "stage") {
         const m = sampleMenu();
+        const net = netRef.current;
         if (m.leftP) setStageCur((s) => cycleStage(s, -1));
         if (m.rightP) setStageCur((s) => cycleStage(s, 1));
         if (!gated() && m.kickRP) {
           armGate();
-          setP1Lock(false);
-          setP2Lock(false);
-          g.screen = "select";
-          g.pushHud();
+          if (!net.role) {
+            setP1Lock(false);
+            setP2Lock(false);
+            g.screen = "select";
+            g.pushHud();
+          }
         }
-        if (!gated() && (m.kickLP || m.punchLP || m.startP)) g.confirmStage(stageCurRef.current);
+        if (!gated() && (m.kickLP || m.punchLP || m.startP)) {
+          armGate();
+          if (net.role === "host") net.stage(stageCurRef.current);
+          else if (!net.role) g.confirmStage(stageCurRef.current);
+        }
       } else if (h.screen === "result" || h.screen === "pause") {
         const m = sampleMenu();
         const c = confirmRef.current;
@@ -722,6 +861,39 @@ export function GameView() {
 
   const pickSelectChar = (id: CharId) => {
     if (gated()) return;
+    const net = netRef.current;
+    if (net.role) {
+      if (net.role === "host") {
+        if (p1Lock) return;
+        if (touchUi && !(touchPick && touchPick.slot === 1 && touchPick.id === id)) {
+          setTouchPick({ slot: 1, id });
+          setP1Cur(id);
+          net.pick(id, false);
+          return;
+        }
+        setTouchPick(null);
+        setP1Cur(id);
+        setP1Lock(true);
+        net.pick(id, true);
+        sfxPlay.charName(id);
+        armGate();
+      } else {
+        if (p2Lock) return;
+        if (touchUi && !(touchPick && touchPick.slot === 2 && touchPick.id === id)) {
+          setTouchPick({ slot: 2, id });
+          setP2Cur(id);
+          net.pick(id, false);
+          return;
+        }
+        setTouchPick(null);
+        setP2Cur(id);
+        setP2Lock(true);
+        net.pick(id, true);
+        sfxPlay.charName(id);
+        armGate();
+      }
+      return;
+    }
     const dual = !hud.versusCpu && hud.pads >= 2;
     const slot: 1 | 2 = !p1Lock ? 1 : 2;
     if (p1Lock && p2Lock) return;
@@ -794,7 +966,7 @@ export function GameView() {
         <div
           className="absolute inset-0 z-10 flex flex-col"
           style={{
-            backgroundImage: "url(/ui/mainmenu.png?v=19)",
+            backgroundImage: `url(${asset("/ui/mainmenu.png?v=19")})`,
             backgroundSize: "cover",
             backgroundPosition: "center top",
           }}
@@ -893,8 +1065,8 @@ export function GameView() {
         <Overlay>
           <h2 className="font-display text-3xl">ONLINE</h2>
           <p className="text-muted max-w-md text-center text-sm">
-            Host nyit lobbyt ezen a gépen. Join: írd be a Host LAN IP-jét (ugyanaz a Wi‑Fi). Internetes IP ritkán megy
-            tűzfal miatt.
+            A Host kap egy 4 jegyű kódot. A másik játékos ugyanazon a webes címen írja be. (itch.io-n a kódos online
+            csak akkor megy, ha mindketten ugyanahhoz a szerverhez csatlakoznak — a Grok/webes hoston működik.)
           </p>
           {netErr && <p className="text-gold text-sm">{netErr}</p>}
           <div className="mt-2 flex flex-col gap-3 sm:flex-row">
@@ -902,35 +1074,39 @@ export function GameView() {
               onClick={() => {
                 boot();
                 setNetErr(null);
-                void fetchNetInfo().then((info) => {
-                  setHostIps(info.ips);
-                  setHostPort(info.port);
-                });
+                setOnlineIdx(0);
                 netRef.current.connect({ role: "host", name: "HOST", char: "renike" });
                 gameRef.current?.openLobby();
               }}
             >
-              Host
+              {onlineIdx === 0 ? "▸ HOST" : "HOST"}
             </MenuBtn>
             <MenuBtn
               onClick={() => {
                 boot();
                 setNetErr(null);
-                const url = joinWsUrl(joinAddr);
-                netRef.current.connect({ role: "guest", url, name: "JOIN", char: "ricsi" });
+                setOnlineIdx(1);
+                const code = joinCode.replace(/\D/g, "").slice(0, 4);
+                if (code.length !== 4) {
+                  setNetErr("Írj be egy 4 jegyű kódot.");
+                  return;
+                }
+                netRef.current.connect({ role: "guest", name: "JOIN", char: "ricsi", code });
                 gameRef.current?.openLobby();
               }}
             >
-              Join
+              {onlineIdx === 1 ? "▸ CSATLAKOZÁS" : "CSATLAKOZÁS"}
             </MenuBtn>
           </div>
           <label className="text-muted mt-3 flex w-full max-w-sm flex-col gap-1 text-sm">
-            Join IP
+            Csatlakozás kódja
             <input
-              value={joinAddr}
-              onChange={(e) => setJoinAddr(e.target.value)}
-              placeholder="192.168.0.12 vagy 192.168.0.12:8080"
-              className="border-border bg-surface min-h-11 rounded-md border px-3 text-fg"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="pl. 4821"
+              className="border-border bg-surface min-h-11 rounded-md border px-3 text-center font-mono text-2xl tracking-[0.4em] text-fg"
             />
           </label>
           <MenuBtn
@@ -966,7 +1142,7 @@ export function GameView() {
       {hud.screen === "select" && (
         <div
           className="absolute inset-0 z-10 bg-cover bg-center"
-          style={{ backgroundImage: "url(/ui/selection.jpg)" }}
+          style={{ backgroundImage: `url(${asset("/ui/selection.jpg")})` }}
         >
           <button
             type="button"
@@ -985,11 +1161,11 @@ export function GameView() {
             id={p2Cur}
             locked={p2Lock}
             tone="p2"
-            visible={!hud.versusCpu && hud.pads >= 2 ? true : p1Lock}
+            visible={!hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role) ? true : p1Lock}
           />
           <div className="absolute bottom-[3%] left-1/2 z-10 flex max-w-[72%] -translate-x-1/2 flex-wrap justify-center gap-1.5">
             {ids.map((id) => {
-              const dual = !hud.versusCpu && hud.pads >= 2;
+              const dual = !hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role);
               const p1on = p1Cur === id && (dual || !p1Lock);
               const p2on = p2Cur === id && (dual || p1Lock);
               return (
@@ -1004,7 +1180,7 @@ export function GameView() {
                       .join(", "),
                   }}
                 >
-                  <img src={`/portraits/${id}-icon.png?v=10`} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                  <img src={asset(`/portraits/${id}-icon.png?v=10`)} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
                 </button>
               );
             })}
@@ -1015,6 +1191,9 @@ export function GameView() {
       {hud.screen === "stage" && (
         <Overlay>
           <h2 className="font-display text-3xl">VÁLASSZ PÁLYÁT</h2>
+          {netRef.current.role === "guest" && (
+            <p className="text-muted text-sm">A host választ pályát…</p>
+          )}
           <div className="mt-4 flex flex-wrap justify-center gap-4">
             {STAGE_IDS.map((id) => {
               const s = STAGES[id];
@@ -1025,13 +1204,15 @@ export function GameView() {
                   type="button"
                   onClick={() => {
                     setStageCur(id);
-                    gameRef.current?.confirmStage(id);
+                    const net = netRef.current;
+                    if (net.role === "host") net.stage(id);
+                    else if (!net.role) gameRef.current?.confirmStage(id);
                   }}
                   className={`w-56 rounded-lg border p-3 text-left sm:w-72 ${
                     on ? "border-gold bg-surface" : "border-border bg-bg/70"
                   }`}
                 >
-                  <img src={s.art} alt="" className="mb-2 h-28 w-full rounded object-cover sm:h-36" />
+                  <img src={asset(s.art)} alt="" className="mb-2 h-28 w-full rounded object-cover sm:h-36" />
                   <div className="font-display text-xl">{s.nameHu}</div>
                 </button>
               );
@@ -1043,9 +1224,9 @@ export function GameView() {
       {hud.screen === "vs" && (
         <Overlay dim>
           <div className="flex items-center gap-6">
-            <img src={`/portraits/${hud.p1}.png?v=11`} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
+            <img src={asset(`/portraits/${hud.p1}.png?v=11`)} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
             <div className="font-display text-gold text-4xl">VS</div>
-            <img src={`/portraits/${hud.p2}.png?v=11`} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
+            <img src={asset(`/portraits/${hud.p2}.png?v=11`)} alt="" className="size-28 rounded-md object-cover object-top sm:size-40" />
           </div>
         </Overlay>
       )}
@@ -1140,7 +1321,7 @@ export function GameView() {
         <div className="absolute inset-0 z-10">
           {hud.winner && VICTORY_ART[hud.winner] && (
             <img
-              src={`${VICTORY_ART[hud.winner]}?v=1`}
+              src={asset(`${VICTORY_ART[hud.winner]}?v=1`)}
               alt=""
               className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
@@ -1222,7 +1403,7 @@ export function GameView() {
       {hud.screen === "fight" && hud.netWait && (
         <div className="pointer-events-none absolute inset-x-0 top-20 z-20 text-center">
           <span className="border-border bg-surface/90 rounded-md border px-3 py-1 text-sm">
-            Várakozás a hálózatra…
+            Szinkronizálás…
           </span>
         </div>
       )}
@@ -1288,31 +1469,30 @@ function LobbyView({
   onBack: () => void;
 }) {
   void tick;
+  void ips;
+  void port;
   const L = net.lobby;
   const me = net.me;
-  const shownIps = L.ips.length ? L.ips : ips;
+  const code = net.roomCode || L.code;
   const waiting = !L.guest;
   return (
     <Overlay>
-      <h2 className="font-display text-3xl">VÁRAKOZÓ LOBBY</h2>
-      <p className="text-muted text-sm">
-        {waiting ? "Várakozás a Join játékosra…" : "Ha mindketten Ready, indul a harc."}
-      </p>
-      {net.role === "host" && (
-        <div className="border-border bg-surface mt-1 max-w-md rounded-md border px-4 py-2 text-center text-sm">
-          <div className="text-muted">A te címeid (add oda a Joinnak)</div>
-          {shownIps.map((ip) => (
-            <div key={ip} className="text-gold font-mono text-base">
-              {ip}:{port}
-            </div>
-          ))}
+      <h2 className="font-display text-3xl">SZOBA</h2>
+      {code && (
+        <div className="border-gold bg-surface mt-1 rounded-md border px-8 py-4 text-center">
+          <div className="text-muted text-xs uppercase tracking-widest">Kód</div>
+          <div className="text-gold font-mono text-6xl font-bold tracking-[0.25em]">{code}</div>
         </div>
       )}
+      <p className="text-muted max-w-md text-center text-sm">
+        {waiting
+          ? "Add oda a kódot a másik játékosnak. Ő CSATLAKOZÁS-nál írja be."
+          : "Ha mindketten Ready, jön a karakterválasztó."}
+      </p>
       {err && <p className="text-gold text-sm">{err}</p>}
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         {(["host", "guest"] as const).map((slot) => {
           const p = slot === "host" ? L.host : L.guest;
-          const mine = net.role === slot;
           return (
             <div
               key={slot}
@@ -1320,37 +1500,16 @@ function LobbyView({
                 p ? "border-gold bg-surface" : "border-border bg-bg/70"
               }`}
             >
-              <div className="text-muted text-xs uppercase">{slot === "host" ? "Host • 1P" : "Join • 2P"}</div>
+              <div className="text-muted text-xs uppercase">{slot === "host" ? "Host • 1P" : "Csatlakozás • 2P"}</div>
               {p ? (
                 <>
-                  <img
-                    src={`/portraits/${p.char}.png?v=11`}
-                    alt=""
-                    className="my-2 h-28 w-full rounded object-cover object-top"
-                  />
-                  <div className="font-display text-xl">{CHARACTERS[p.char].name}</div>
+                  <div className="font-display mt-2 text-xl">{p.name}</div>
                   <div className={p.ready ? "text-gold text-sm" : "text-muted text-sm"}>
                     {p.ready ? "READY" : "nem ready"}
                   </div>
-                  {mine && (
-                    <div className="mt-2 flex gap-1">
-                      {CHAR_IDS.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => net.select(id)}
-                          className={`min-h-11 flex-1 rounded-md border px-2 text-xs uppercase ${
-                            p.char === id ? "border-gold bg-gold text-bg" : "border-border"
-                          }`}
-                        >
-                          {CHARACTERS[id].name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </>
               ) : (
-                <p className="text-muted mt-6 text-sm">üres slot</p>
+                <p className="text-muted mt-6 text-sm">várakozás…</p>
               )}
             </div>
           );
@@ -1385,7 +1544,7 @@ function SelectPanel({
         <>
           <div className="flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden">
             <img
-              src={`/sprites/${id}/idle.png?v=63`}
+              src={asset(`/sprites/${id}/idle.png?v=63`)}
               alt=""
               className={`max-h-full max-w-full object-contain object-bottom ${side === "right" ? "-scale-x-100" : ""}`}
             />
@@ -1873,7 +2032,7 @@ function PadCustomizer({
         ref={boxRef}
         className="relative min-h-0 flex-1"
         style={{
-          backgroundImage: "url(/stages/sintertanya.jpg?v=30)",
+          backgroundImage: `url(${asset("/stages/sintertanya.jpg?v=30")})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

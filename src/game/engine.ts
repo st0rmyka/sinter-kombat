@@ -2,6 +2,7 @@ import { getHudScale } from "./settings";
 import { getPadCount, rumble, sampleP1, sampleP2, injectKeys, type Actions } from "./input";
 import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic, sfxPreloadList, musicPreloadList } from "./audio";
 import { packBits, unpackBits } from "./net";
+import { asset } from "./asset";
 
 declare global {
   interface Window {
@@ -43,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.195";
+export const GAME_VERSION = "v0.2";
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
 export type DummyMode = "idle" | "cpu" | "p2";
 export type TrainPress = { id: number; k: string };
@@ -906,7 +907,7 @@ export class KitchenKombat {
     pulseAcc?: number;
   }[] = [];
   netRole: "host" | "guest" | null = null;
-  netDelay = 3;
+  netDelay = 8;
   netFrame = 0;
   netLocal = new Map<number, number>();
   netRemote = new Map<number, number>();
@@ -917,6 +918,10 @@ export class KitchenKombat {
   netWaiting = false;
   netGo = false;
   netGoSent = false;
+  netWaitAt = 0;
+  netMiss = 0;
+  netOk = 0;
+  netGoPulse = 0;
 
   constructor(canvas: HTMLCanvasElement, onHud: (h: Hud) => void) {
     this.canvas = canvas;
@@ -1065,7 +1070,7 @@ export class KitchenKombat {
         im.onload = done;
         im.onerror = done;
         window.setTimeout(done, 12000);
-        im.src = src;
+        im.src = asset(src);
       });
     const poses: Pose[] = [
       "idle",
@@ -1119,7 +1124,7 @@ export class KitchenKombat {
       } catch {
         tick();
         const im = new Image();
-        im.src = src;
+        im.src = asset(src);
         return im;
       }
     };
@@ -1185,8 +1190,10 @@ export class KitchenKombat {
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.acc += dt;
+      if (this.acc > 0.12) this.acc = 0.12;
       while (this.acc >= STEP) {
         this.step(STEP);
+        if (this.netRole && this.netWaiting) break;
         this.acc -= STEP;
       }
       this.draw();
@@ -1278,7 +1285,7 @@ export class KitchenKombat {
     this.versusCpu = false;
     this.p1id = p1;
     this.p2id = p2;
-    this.netDelay = 3;
+    this.netDelay = 8;
     this.netFrame = 0;
     this.netLocal.clear();
     this.netRemote.clear();
@@ -1289,6 +1296,10 @@ export class KitchenKombat {
     this.netWaiting = false;
     this.netGo = false;
     this.netGoSent = false;
+    this.netWaitAt = 0;
+    this.netMiss = 0;
+    this.netOk = 0;
+    this.netGoPulse = 0;
     for (let i = 0; i < this.netDelay; i++) {
       this.netLocal.set(i, 0);
       this.netRemote.set(i, 0);
@@ -1390,7 +1401,9 @@ export class KitchenKombat {
     if (this.screen === "vs") {
       this.introT -= dt;
       if (this.netRole) {
-        if (this.netRole === "host" && this.introT <= 0 && !this.netGoSent) {
+        this.netGoPulse += dt;
+        if (this.netRole === "host" && this.introT <= 0 && this.netGoPulse >= 0.25) {
+          this.netGoPulse = 0;
           this.netGoSent = true;
           this.netSignalGo?.();
         }
@@ -1404,6 +1417,25 @@ export class KitchenKombat {
       this.hitstop -= dt;
       this.draw();
       return;
+    }
+    if (this.netRole && (this.phase === "fight" || this.phase === "intro")) {
+      const bits = packBits(sampleP1());
+      const sendAt = this.netFrame + this.netDelay;
+      if (!this.netLocal.has(sendAt)) {
+        this.netLocal.set(sendAt, bits);
+        this.netSend?.(sendAt, bits);
+      }
+      if (this.netLocal.get(this.netFrame) === undefined || this.netRemote.get(this.netFrame) === undefined) {
+        if (!this.netWaiting) this.netWaitAt = performance.now();
+        this.netWaiting = true;
+        this.netMiss += 1;
+        if (this.netMiss > 10 && this.netDelay < 12) {
+          this.netDelay += 1;
+          this.netMiss = 0;
+        }
+        if (performance.now() - this.netWaitAt > 200) this.pushHud();
+        return;
+      }
     }
     this.time += dt;
     this.trauma = Math.max(0, this.trauma - dt * 2.4);
@@ -1453,10 +1485,6 @@ export class KitchenKombat {
       this.pushHud();
       return;
     }
-    if (this.phase === "fight" && !this.training) {
-      this.timer = Math.max(0, this.timer - dt);
-      if (this.timer <= 0) this.timeOver();
-    }
     const p1 = sampleP1();
     if (p1.startP && !this.netRole) {
       this.pauseToggle();
@@ -1491,11 +1519,24 @@ export class KitchenKombat {
       const L = this.netLocal.get(this.netFrame);
       const R = this.netRemote.get(this.netFrame);
       if (L === undefined || R === undefined) {
+        if (!this.netWaiting) this.netWaitAt = performance.now();
         this.netWaiting = true;
-        this.pushHud();
+        this.netMiss += 1;
+        if (this.netMiss > 10 && this.netDelay < 12) {
+          this.netDelay += 1;
+          this.netMiss = 0;
+        }
+        if (performance.now() - this.netWaitAt > 200) this.pushHud();
         return;
       }
+      const wasWait = this.netWaiting;
       this.netWaiting = false;
+      this.netMiss = 0;
+      this.netOk += 1;
+      if (this.netOk > 240 && this.netDelay > 5) {
+        this.netDelay -= 1;
+        this.netOk = 0;
+      }
       const hostBits = this.netRole === "host" ? L : R;
       const guestBits = this.netRole === "host" ? R : L;
       a1 = unpackBits(hostBits, this.netPrevHost);
@@ -1505,9 +1546,14 @@ export class KitchenKombat {
       this.netFrame += 1;
       if (this.netFrame % 90 === 0) {
         for (const m of [this.netLocal, this.netRemote]) {
-          for (const k of m.keys()) if (k < this.netFrame - 8) m.delete(k);
+          for (const k of m.keys()) if (k < this.netFrame - 16) m.delete(k);
         }
       }
+      if (wasWait) this.pushHud();
+    }
+    if (this.phase === "fight" && !this.training) {
+      this.timer = Math.max(0, this.timer - dt);
+      if (this.timer <= 0) this.timeOver();
     }
     this.control(this.f1, a1, dt);
     this.control(this.f2, a2, dt);
@@ -3757,7 +3803,7 @@ export class KitchenKombat {
       loadPct: this.loadPct,
       pads: getPadCount(),
       stage: this.stageId,
-      netWait: this.netWaiting,
+      netWait: this.netWaiting && this.netWaitAt > 0 && performance.now() - this.netWaitAt > 220,
       training: this.training,
       dummy: this.dummy,
       trainMeter: this.trainMeter,

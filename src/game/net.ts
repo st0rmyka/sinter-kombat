@@ -13,9 +13,11 @@ export type LobbyState = {
   guest: LobbyPlayer | null;
   ips: string[];
   started: boolean;
+  code: string | null;
+  phase: "lobby" | "select" | "stage" | "fight";
 };
 
-type StartMsg = { type: "start"; p1: NetChar; p2: NetChar; delay: number };
+type StartMsg = { type: "start"; p1: NetChar; p2: NetChar; delay: number; stage?: string };
 
 export type NetHandlers = {
   onLobby?: (s: LobbyState) => void;
@@ -25,6 +27,10 @@ export type NetHandlers = {
   onDrop?: (reason: string) => void;
   onError?: (msg: string) => void;
   onStatus?: (s: string) => void;
+  onHelloOk?: (role: NetRole, code: string) => void;
+  onOpenSelect?: () => void;
+  onOpenStage?: (p1: NetChar, p2: NetChar) => void;
+  onPick?: (role: NetRole, char: NetChar, locked: boolean) => void;
 };
 
 export function packBits(a: {
@@ -153,7 +159,8 @@ export function joinWsUrl(input: string): string {
 export class NetPlay {
   ws: WebSocket | null = null;
   role: NetRole | null = null;
-  lobby: LobbyState = { host: null, guest: null, ips: [], started: false };
+  roomCode: string | null = null;
+  lobby: LobbyState = { host: null, guest: null, ips: [], started: false, code: null, phase: "lobby" };
   handlers: NetHandlers = {};
   status = "offline";
 
@@ -169,7 +176,7 @@ export class NetPlay {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(obj));
   }
 
-  connect(opts: { role: NetRole; url?: string; name?: string; char?: NetChar }) {
+  connect(opts: { role: NetRole; url?: string; name?: string; char?: NetChar; code?: string }) {
     this.disconnect();
     this.role = opts.role;
     const url =
@@ -187,11 +194,12 @@ export class NetPlay {
         role: opts.role,
         name: opts.name ?? (opts.role === "host" ? "HOST" : "JOIN"),
         char: opts.char ?? (opts.role === "host" ? "renike" : "ricsi"),
+        code: opts.code,
       });
     };
     ws.onerror = () => {
       this.status = "error";
-      this.handlers.onError?.("Nem sikerült csatlakozni. Nézd az IP-t és a tűzfalat.");
+      this.handlers.onError?.("Nem sikerült csatlakozni. Ugyanazon a webes címen kell mindkettőtöknek lenni.");
     };
     ws.onclose = (e) => {
       this.status = "closed";
@@ -207,14 +215,29 @@ export class NetPlay {
       }
       const t = msg.type;
       if (t === "error") this.handlers.onError?.(String(msg.msg ?? "hiba"));
+      if (t === "hello-ok") {
+        this.role = (msg.role === "guest" ? "guest" : "host") as NetRole;
+        this.roomCode = String(msg.code ?? "");
+        this.handlers.onHelloOk?.(this.role, this.roomCode);
+      }
       if (t === "lobby") {
         this.lobby = {
           host: (msg.host as LobbyPlayer) ?? null,
           guest: (msg.guest as LobbyPlayer) ?? null,
           ips: (msg.ips as string[]) ?? [],
           started: !!msg.started,
+          code: (msg.code as string) ?? this.roomCode,
+          phase: (msg.phase as LobbyState["phase"]) ?? "lobby",
         };
+        if (this.lobby.code) this.roomCode = this.lobby.code;
         this.handlers.onLobby?.(this.lobby);
+      }
+      if (t === "open-select") this.handlers.onOpenSelect?.();
+      if (t === "open-stage") {
+        this.handlers.onOpenStage?.(msg.p1 as NetChar, msg.p2 as NetChar);
+      }
+      if (t === "pick") {
+        this.handlers.onPick?.(msg.role as NetRole, msg.char as NetChar, !!msg.locked);
       }
       if (t === "start") this.handlers.onStart?.(msg as StartMsg);
       if (t === "go") this.handlers.onGo?.();
@@ -226,6 +249,9 @@ export class NetPlay {
   select(char: NetChar) {
     this.send({ type: "select", char });
   }
+  pick(char: NetChar, locked: boolean) {
+    this.send({ type: "pick", char, locked });
+  }
   ready(v: boolean) {
     this.send({ type: "ready", ready: v });
   }
@@ -235,6 +261,9 @@ export class NetPlay {
   go() {
     this.send({ type: "go" });
   }
+  stage(id: string) {
+    this.send({ type: "stage", stage: id });
+  }
   disconnect() {
     try {
       this.ws?.close();
@@ -243,7 +272,8 @@ export class NetPlay {
     }
     this.ws = null;
     this.role = null;
-    this.lobby = { host: null, guest: null, ips: [], started: false };
+    this.roomCode = null;
+    this.lobby = { host: null, guest: null, ips: [], started: false, code: null, phase: "lobby" };
     this.status = "offline";
   }
 }

@@ -1,4 +1,5 @@
 import { getSettings } from "./settings";
+import { asset } from "./asset";
 
 let ctx: AudioContext | null = null;
 let muted = false;
@@ -342,7 +343,7 @@ function beep(freq: number, dur: number, type: OscillatorType, vol: number, slid
 
 async function decodeUrl(url: string) {
   const c = ac();
-  const res = await fetch(url);
+  const res = await fetch(asset(url));
   if (!res.ok) throw new Error(url);
   const raw = await res.arrayBuffer();
   return await c.decodeAudioData(raw.slice(0));
@@ -416,7 +417,7 @@ export async function preloadSfx(onItem?: () => void) {
   await Promise.all(
     [MENU_FILE, ...Object.values(MUSIC_FILES)].map(async (url) => {
       try {
-        const res = await fetch(url);
+        const res = await fetch(asset(url));
         if (res.ok) {
           const blob = await res.blob();
           MUSIC_BLOBS[url] = URL.createObjectURL(blob);
@@ -694,7 +695,7 @@ export function stopKitchenDrone() {
 }
 
 function ensureMusicEl(url: string, kind: "menu" | "stage") {
-  const resolved = MUSIC_BLOBS[url] ?? url;
+  const resolved = MUSIC_BLOBS[url] ?? asset(url);
   if (!musicEl) {
     musicEl = new Audio(resolved);
     musicEl.loop = true;

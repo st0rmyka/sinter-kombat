@@ -8,7 +8,7 @@ export default defineConfig({
   publicDir: resolve("public"),
   plugins: [tailwindcss(), viteReact()],
   resolve: { tsconfigPaths: true },
-  base: "/",
+  base: "./",
   server: {
     fs: { allow: [resolve(".")] },
   },
