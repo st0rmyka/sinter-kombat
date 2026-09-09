@@ -3,11 +3,19 @@ import { Volume2, VolumeX } from "lucide-react";
 import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, VICTORY_ART, VS_ART, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
-import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, PAD_BTNS, patchPadBtn, resetPadLayout } from "./settings";
+import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, type KeyAction, PAD_BTNS, KEY_ACTIONS, DEFAULT_KEYS, codeLabel, patchPadBtn, resetPadLayout, patchKey, resetKeys } from "./settings";
 import { NetPlay } from "./net";
 import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.22",
+    items: [
+      "Xbox kontroller: akciógombok harcban is (1P-nél minden csatlakoztatott pad)",
+      "Billentyűzet: WASD, Ctrl superdash, Space blokk, U/H ütés, J/B rúgás, I/O special",
+      "Beállítások: billentyűzet kiosztás testreszabható",
+    ],
+  },
   {
     v: "v0.21",
     items: [
@@ -88,7 +96,7 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
       "Gyakorló szünet: Karakterválasztás, végtelen energia",
       "Beállítások: hang, HUD, virtuális kontroller",
       "Kilépés a játékból",
-      "Lázár János átmenetileg nem elérhető, a karaktert reworkolni kell.",
+      "Lázár János sprite-jai törölve (méret).",
     ],
   },
   {
@@ -175,7 +183,7 @@ const emptyHud = (): Hud => ({
   pads: 0,
   stage: "sintertanya",
   netWait: false,
-  loadPct: 0,
+  loadPct: 0.02,
   training: false,
   dummy: "idle",
   trainMeter: false,
@@ -194,6 +202,9 @@ export function GameView() {
   const [settings, setSettings] = useState(false);
   const [padEdit, setPadEdit] = useState(false);
   const [padSel, setPadSel] = useState<PadBtnId>("l2");
+  const [keyEdit, setKeyEdit] = useState(false);
+  const [keySel, setKeySel] = useState<KeyAction>("up");
+  const [keyWait, setKeyWait] = useState(false);
   const [setIdx, setSetIdx] = useState(0);
   const [opt, setOpt] = useState<GameSettings>(getSettings);
   const [exited, setExited] = useState(false);
@@ -232,6 +243,12 @@ export function GameView() {
   padEditRef.current = padEdit;
   const padSelRef = useRef(padSel);
   padSelRef.current = padSel;
+  const keyEditRef = useRef(keyEdit);
+  keyEditRef.current = keyEdit;
+  const keyWaitRef = useRef(keyWait);
+  keyWaitRef.current = keyWait;
+  const keySelRef = useRef(keySel);
+  keySelRef.current = keySel;
   const setIdxRef = useRef(setIdx);
   setIdxRef.current = setIdx;
   const patchIdxRef = useRef(patchIdx);
@@ -462,6 +479,23 @@ export function GameView() {
   }, []);
 
   useEffect(() => {
+    if (!keyWait) return;
+    const onBind = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return;
+      if (e.code === "Escape") {
+        setKeyWait(false);
+        return;
+      }
+      patchKey(keySelRef.current, e.code);
+      setKeyWait(false);
+    };
+    window.addEventListener("keydown", onBind, true);
+    return () => window.removeEventListener("keydown", onBind, true);
+  }, [keyWait]);
+
+  useEffect(() => {
     if (hud.screen === "result") {
       setResultIdx(0);
       setConfirm(null);
@@ -483,6 +517,32 @@ export function GameView() {
         return;
       }
       if (h.loading) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (keyEditRef.current) {
+        const m = sampleMenu();
+        if (keyWaitRef.current) {
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+        if (m.upP) {
+          const i = KEY_ACTIONS.findIndex((x) => x.id === keySelRef.current);
+          setKeySel(KEY_ACTIONS[(i + KEY_ACTIONS.length - 1) % KEY_ACTIONS.length]!.id);
+        }
+        if (m.downP) {
+          const i = KEY_ACTIONS.findIndex((x) => x.id === keySelRef.current);
+          setKeySel(KEY_ACTIONS[(i + 1) % KEY_ACTIONS.length]!.id);
+        }
+        if (!gated() && (m.kickLP || m.punchLP || m.startP)) {
+          armGate();
+          setKeyWait(true);
+        }
+        if (!gated() && m.kickRP) {
+          armGate();
+          setKeyEdit(false);
+          setKeyWait(false);
+        }
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -516,7 +576,7 @@ export function GameView() {
           if (m.downP) setPatchIdx((i) => Math.min(PATCH_NOTES.length - 1, i + 1));
         }
         if (settingsRef.current) {
-          const rows = 8;
+          const rows = 9;
           if (m.upP) setSetIdx((i) => (i + rows - 1) % rows);
           if (m.downP) setSetIdx((i) => (i + 1) % rows);
           if (m.leftP || m.rightP) {
@@ -527,6 +587,11 @@ export function GameView() {
             armGate();
             setPadSel("l2");
             setPadEdit(true);
+          }
+          if (!gated() && (m.kickLP || m.punchLP || m.startP) && setIdxRef.current === 8) {
+            armGate();
+            setKeySel("up");
+            setKeyEdit(true);
           }
         }
         if (!gated() && (m.kickRP || (settingsRef.current ? false : m.kickLP) || m.startP)) {
@@ -1431,6 +1496,26 @@ export function GameView() {
             setPadSel("l2");
             setPadEdit(true);
           }}
+          onKeys={() => {
+            setKeySel("up");
+            setKeyEdit(true);
+          }}
+        />
+      )}
+      {keyEdit && (
+        <KeyMapPanel
+          opt={opt}
+          sel={keySel}
+          waiting={keyWait}
+          onSel={(id) => {
+            setKeySel(id);
+            setKeyWait(true);
+          }}
+          onReset={() => resetKeys()}
+          onClose={() => {
+            setKeyEdit(false);
+            setKeyWait(false);
+          }}
         />
       )}
       {padEdit && (
@@ -1750,15 +1835,22 @@ function Help({ p1, p2, onClose }: { p1: CharId; p2: CharId; onClose: () => void
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/90 px-4">
       <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
         <h3 className="font-display text-2xl">Irányítás</h3>
-        <p className="text-muted mt-2 text-sm">PS5 DualSense / DualShock</p>
+        <p className="text-muted mt-2 text-sm">Xbox / DualSense</p>
         <ul className="mt-3 space-y-1 text-sm">
           <li>D-pad / bot — mozgás</li>
           <li>Dupla előre / dupla hátra — dash</li>
-          <li>△ Triangle — bal ütés · □ Square — jobb ütés</li>
-          <li>✕ Cross — bal rúgás · ○ Circle — jobb rúgás</li>
-          <li>R2 — védekezés. Guggolva + blokk = low védés</li>
-          <li>L2 — Super Dash (40 energia): gyorsabb dash, sérthetetlen, átmegy az ellenfélen</li>
-          <li>Options — szünet</li>
+          <li>Y / △ — bal ütés · X / □ — jobb ütés</li>
+          <li>A / ✕ — bal rúgás · B / ○ — jobb rúgás</li>
+          <li>RT / R2 — védekezés. Guggolva + blokk = low védés</li>
+          <li>LT / L2 — Super Dash (40 energia)</li>
+          <li>LB / L1 special 1 · RB / R1 special 2</li>
+          <li>Start / Options — szünet</li>
+        </ul>
+        <p className="text-muted mt-3 text-sm">Billentyűzet (alap, Beállításokban cserélhető)</p>
+        <ul className="mt-1 space-y-1 text-sm">
+          <li>WASD — mozgás / ugrás / guggolás</li>
+          <li>U / H — ütések · J / B — rúgások · I / O — specialek</li>
+          <li>Bal Ctrl — Super Dash · Space — blokk · Enter — szünet</li>
         </ul>
         <div className="mt-4 space-y-3 text-sm">
           <div>
@@ -1788,12 +1880,14 @@ function SettingsPanel({
   onClose,
   onPick,
   onCustomize,
+  onKeys,
 }: {
   sel: number;
   opt: GameSettings;
   onClose: () => void;
   onPick: (i: number) => void;
   onCustomize: () => void;
+  onKeys: () => void;
 }) {
   const row = (i: number, label: string, value: string, extra?: React.ReactNode) => (
     <button
@@ -1803,6 +1897,7 @@ function SettingsPanel({
         onPick(i);
         if (i === 0) nudgeSetting(0, 1);
         if (i === 7) onCustomize();
+        if (i === 8) onKeys();
       }}
       className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm ${
         sel === i ? "border-gold bg-gold/10" : "border-border"
@@ -1900,8 +1995,58 @@ function SettingsPanel({
             className="w-full"
           />
           {row(7, "Virtuális kontroller testreszabása", "▶")}
+          {row(8, "Billentyűzet kiosztás", "▶")}
         </div>
         <div className="mt-4">
+          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyMapPanel({
+  opt,
+  sel,
+  waiting,
+  onSel,
+  onReset,
+  onClose,
+}: {
+  opt: GameSettings;
+  sel: KeyAction;
+  waiting: boolean;
+  onSel: (id: KeyAction) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-bg/90 px-4">
+      <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
+        <h3 className="font-display text-2xl">Billentyűzet</h3>
+        <p className="text-muted mt-1 text-sm">
+          Kattints egy sorra, majd nyomd meg az új gombot. Esc: mégsem.
+        </p>
+        {waiting && (
+          <p className="text-gold font-display mt-3 text-lg">Nyomj egy gombot… ({KEY_ACTIONS.find((x) => x.id === sel)?.label})</p>
+        )}
+        <div className="mt-3 space-y-1">
+          {KEY_ACTIONS.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => onSel(row.id)}
+              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm ${
+                sel === row.id ? "border-gold bg-gold/10" : "border-border"
+              }`}
+            >
+              <span>{row.label}</span>
+              <span className="text-gold font-display">{codeLabel(opt.keys[row.id] ?? DEFAULT_KEYS[row.id])}</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <MenuBtn onClick={onReset}>Alaphelyzet</MenuBtn>
           <MenuBtn onClick={onClose}>Vissza</MenuBtn>
         </div>
       </div>
@@ -2017,7 +2162,7 @@ function PadKey({
         opacity: masterAlpha * layout.alpha,
         touchAction: "none",
       }}
-      {...hold(def.code)}
+      {...hold(getSettings().keys[def.action] ?? DEFAULT_KEYS[def.action])}
     >
       {def.label}
     </button>

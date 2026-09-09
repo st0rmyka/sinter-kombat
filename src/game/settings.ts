@@ -25,20 +25,112 @@ export type PadBtnLayout = {
 
 export type PadLayout = Record<PadBtnId, PadBtnLayout>;
 
-export const PAD_BTNS: { id: PadBtnId; code: string; label: string; kind: "round" | "mini" }[] = [
-  { id: "l2", code: "ControlLeft", label: "L2", kind: "mini" },
-  { id: "r2", code: "ShiftLeft", label: "R2", kind: "mini" },
-  { id: "up", code: "ArrowUp", label: "↑", kind: "round" },
-  { id: "left", code: "ArrowLeft", label: "←", kind: "round" },
-  { id: "down", code: "ArrowDown", label: "↓", kind: "round" },
-  { id: "right", code: "ArrowRight", label: "→", kind: "round" },
-  { id: "l1", code: "KeyL", label: "L1", kind: "mini" },
-  { id: "r1", code: "Semicolon", label: "R1", kind: "mini" },
-  { id: "pause", code: "Enter", label: "Pause", kind: "mini" },
-  { id: "punchL", code: "KeyJ", label: "△", kind: "round" },
-  { id: "kickL", code: "KeyN", label: "✕", kind: "round" },
-  { id: "punchR", code: "KeyK", label: "□", kind: "round" },
-  { id: "kickR", code: "KeyM", label: "○", kind: "round" },
+export type KeyAction =
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "punchL"
+  | "punchR"
+  | "kickL"
+  | "kickR"
+  | "special"
+  | "special2"
+  | "superDash"
+  | "block"
+  | "start";
+
+export const KEY_ACTIONS: { id: KeyAction; label: string }[] = [
+  { id: "up", label: "Fel / ugrás" },
+  { id: "down", label: "Le / guggolás" },
+  { id: "left", label: "Balra" },
+  { id: "right", label: "Jobbra" },
+  { id: "punchL", label: "Bal ütés (△)" },
+  { id: "punchR", label: "Jobb ütés (□)" },
+  { id: "kickL", label: "Bal rúgás (✕)" },
+  { id: "kickR", label: "Jobb rúgás (○)" },
+  { id: "special", label: "Special 1 (L1)" },
+  { id: "special2", label: "Special 2 (R1)" },
+  { id: "superDash", label: "Super Dash (L2)" },
+  { id: "block", label: "Blokk (R2)" },
+  { id: "start", label: "Szünet" },
+];
+
+export const DEFAULT_KEYS: Record<KeyAction, string> = {
+  left: "KeyA",
+  right: "KeyD",
+  up: "KeyW",
+  down: "KeyS",
+  punchL: "KeyU",
+  punchR: "KeyH",
+  kickL: "KeyJ",
+  kickR: "KeyB",
+  special: "KeyI",
+  special2: "KeyO",
+  superDash: "ControlLeft",
+  block: "Space",
+  start: "Enter",
+};
+
+export function codeLabel(code: string) {
+  const map: Record<string, string> = {
+    Space: "Space",
+    ControlLeft: "Bal Ctrl",
+    ControlRight: "Jobb Ctrl",
+    ShiftLeft: "Bal Shift",
+    ShiftRight: "Jobb Shift",
+    AltLeft: "Bal Alt",
+    AltRight: "Jobb Alt",
+    ArrowUp: "↑",
+    ArrowDown: "↓",
+    ArrowLeft: "←",
+    ArrowRight: "→",
+    Enter: "Enter",
+    Escape: "Esc",
+    Backspace: "Backspace",
+    Tab: "Tab",
+    Semicolon: ";",
+    Quote: "'",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Minus: "-",
+    Equal: "=",
+    Comma: ",",
+    Period: ".",
+    Slash: "/",
+  };
+  if (map[code]) return map[code];
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  if (code.startsWith("Numpad")) return "Num " + code.slice(6);
+  return code;
+}
+
+function mergeKeys(raw: unknown): Record<KeyAction, string> {
+  const out = { ...DEFAULT_KEYS };
+  if (!raw || typeof raw !== "object") return out;
+  const src = raw as Partial<Record<KeyAction, string>>;
+  for (const { id } of KEY_ACTIONS) {
+    const v = src[id];
+    if (typeof v === "string" && v.length > 0) out[id] = v;
+  }
+  return out;
+}
+
+export const PAD_BTNS: { id: PadBtnId; action: KeyAction; label: string; kind: "round" | "mini" }[] = [
+  { id: "l2", action: "superDash", label: "L2", kind: "mini" },
+  { id: "r2", action: "block", label: "R2", kind: "mini" },
+  { id: "up", action: "up", label: "↑", kind: "round" },
+  { id: "left", action: "left", label: "←", kind: "round" },
+  { id: "down", action: "down", label: "↓", kind: "round" },
+  { id: "right", action: "right", label: "→", kind: "round" },
+  { id: "l1", action: "special", label: "L1", kind: "mini" },
+  { id: "r1", action: "special2", label: "R1", kind: "mini" },
+  { id: "pause", action: "start", label: "Pause", kind: "mini" },
+  { id: "punchL", action: "punchL", label: "△", kind: "round" },
+  { id: "kickL", action: "kickL", label: "✕", kind: "round" },
+  { id: "punchR", action: "punchR", label: "□", kind: "round" },
+  { id: "kickR", action: "kickR", label: "○", kind: "round" },
 ];
 
 export function defaultPadLayout(): PadLayout {
@@ -90,6 +182,7 @@ export type GameSettings = {
   touchAlpha: number;
   pad: PadLayout;
   padRev: number;
+  keys: Record<KeyAction, string>;
 };
 
 const DEF: GameSettings = {
@@ -102,9 +195,10 @@ const DEF: GameSettings = {
   touchAlpha: 0.75,
   pad: defaultPadLayout(),
   padRev: PAD_REV,
+  keys: { ...DEFAULT_KEYS },
 };
 
-let cur: GameSettings = { ...DEF, pad: defaultPadLayout() };
+let cur: GameSettings = { ...DEF, pad: defaultPadLayout(), keys: { ...DEFAULT_KEYS } };
 const listeners = new Set<() => void>();
 
 function load() {
@@ -123,9 +217,10 @@ function load() {
       touchAlpha: clamp(Number(p.touchAlpha ?? 0.75), 0.25, 1),
       pad: freshPad ? defaultPadLayout() : mergePad(p.pad),
       padRev: PAD_REV,
+      keys: mergeKeys(p.keys),
     };
   } catch {
-    cur = { ...DEF, pad: defaultPadLayout() };
+    cur = { ...DEF, pad: defaultPadLayout(), keys: { ...DEFAULT_KEYS } };
   }
 }
 
@@ -141,7 +236,7 @@ function save() {
 }
 
 export function getSettings() {
-  return { ...cur, pad: { ...cur.pad } };
+  return { ...cur, pad: { ...cur.pad }, keys: { ...cur.keys } };
 }
 
 export function subscribeSettings(fn: () => void) {
@@ -163,6 +258,7 @@ export function patchSettings(p: Partial<GameSettings>) {
     cur.pad = mergePad(p.pad);
     cur.padRev = PAD_REV;
   }
+  if (p.keys !== undefined) cur.keys = mergeKeys(p.keys);
   save();
 }
 
@@ -181,6 +277,20 @@ export function resetPadLayout() {
   cur.pad = defaultPadLayout();
   cur.padRev = PAD_REV;
   save();
+}
+
+export function patchKey(action: KeyAction, code: string) {
+  cur.keys = { ...cur.keys, [action]: code };
+  save();
+}
+
+export function resetKeys() {
+  cur.keys = { ...DEFAULT_KEYS };
+  save();
+}
+
+export function getKeys() {
+  return { ...cur.keys };
 }
 
 export function getHudScale() {

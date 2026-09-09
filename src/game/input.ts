@@ -1,3 +1,5 @@
+import { getKeys, type KeyAction } from "./settings";
+
 export type Actions = {
   left: boolean;
   right: boolean;
@@ -63,13 +65,23 @@ let prevMenu = empty();
 export function installInput() {
   const onDown = (e: KeyboardEvent) => {
     down.add(e.code);
-    if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+    if (
+      ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code) ||
+      e.code.startsWith("Numpad")
+    ) {
+      e.preventDefault();
+    }
   };
   const onUp = (e: KeyboardEvent) => down.delete(e.code);
   const clear = () => down.clear();
+  const onPad = () => {
+    void navigator.getGamepads?.();
+  };
   window.addEventListener("keydown", onDown);
   window.addEventListener("keyup", onUp);
   window.addEventListener("blur", clear);
+  window.addEventListener("gamepadconnected", onPad);
+  window.addEventListener("gamepaddisconnected", onPad);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) clear();
   });
@@ -77,6 +89,8 @@ export function installInput() {
     window.removeEventListener("keydown", onDown);
     window.removeEventListener("keyup", onUp);
     window.removeEventListener("blur", clear);
+    window.removeEventListener("gamepadconnected", onPad);
+    window.removeEventListener("gamepaddisconnected", onPad);
   };
 }
 
@@ -91,7 +105,9 @@ export function releaseVirtual(code: string) {
 
 function connectedPads() {
   if (typeof navigator === "undefined" || !navigator.getGamepads) return [] as Gamepad[];
-  return [...navigator.getGamepads()].filter((g): g is Gamepad => !!g);
+  return [...navigator.getGamepads()]
+    .filter((g): g is Gamepad => !!g && g.buttons.length >= 4)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
 export function getPadCount() {
@@ -110,37 +126,51 @@ export function rumble(index: number, ms: number, mag: number) {
   }
 }
 
-function pressed(pad: Gamepad | undefined, i: number) {
-  return !!pad?.buttons[i]?.pressed;
-}
-
-function trigger(pad: Gamepad | undefined, i: number) {
-  const b = pad?.buttons[i];
+function btn(pad: Gamepad, i: number) {
+  const b = pad.buttons[i];
   if (!b) return false;
-  return b.pressed || b.value > 0.45;
+  return b.pressed || b.value > 0.35;
 }
 
-function stick(pad: Gamepad | undefined, axis: number, sign: 1 | -1) {
-  const v = pad?.axes[axis] ?? 0;
+function stick(pad: Gamepad, axis: number, sign: 1 | -1) {
+  const v = pad.axes[axis] ?? 0;
   return sign < 0 ? v < -0.38 : v > 0.38;
+}
+
+function analogTrigger(pad: Gamepad, ...axes: number[]) {
+  for (const i of axes) {
+    const v = pad.axes[i];
+    if (v == null) continue;
+    if (v > 0.45) return true;
+    if (v < -0.55) return true;
+  }
+  return false;
 }
 
 function fromPad(pad: Gamepad | undefined): Actions {
   const a = empty();
   if (!pad) return a;
-  a.left = pressed(pad, 14) || stick(pad, 0, -1);
-  a.right = pressed(pad, 15) || stick(pad, 0, 1);
-  a.up = pressed(pad, 12) || stick(pad, 1, -1);
-  a.down = pressed(pad, 13) || stick(pad, 1, 1);
-  a.kickL = pressed(pad, 0);
-  a.kickR = pressed(pad, 1);
-  a.punchR = pressed(pad, 2);
-  a.punchL = pressed(pad, 3);
-  a.special = pressed(pad, 4);
-  a.special2 = pressed(pad, 5);
-  a.superDash = trigger(pad, 6);
-  a.block = trigger(pad, 7);
-  a.start = pressed(pad, 9) || pressed(pad, 8);
+  a.left = btn(pad, 14) || stick(pad, 0, -1);
+  a.right = btn(pad, 15) || stick(pad, 0, 1);
+  if (pad.axes[6] != null) {
+    if (pad.axes[6] < -0.5) a.left = true;
+    if (pad.axes[6] > 0.5) a.right = true;
+  }
+  a.up = btn(pad, 12) || stick(pad, 1, -1);
+  a.down = btn(pad, 13) || stick(pad, 1, 1);
+  if (pad.axes[7] != null) {
+    if (pad.axes[7] < -0.5) a.up = true;
+    if (pad.axes[7] > 0.5) a.down = true;
+  }
+  a.kickL = btn(pad, 0);
+  a.kickR = btn(pad, 1);
+  a.punchR = btn(pad, 2);
+  a.punchL = btn(pad, 3);
+  a.special = btn(pad, 4);
+  a.special2 = btn(pad, 5);
+  a.superDash = btn(pad, 6) || analogTrigger(pad, 4);
+  a.block = btn(pad, 7) || analogTrigger(pad, 5);
+  a.start = btn(pad, 9) || btn(pad, 8) || btn(pad, 11) || btn(pad, 16);
   return a;
 }
 
@@ -168,25 +198,45 @@ function edges(a: Actions, prev: Actions): Actions {
   return a;
 }
 
+function held(code: string) {
+  return down.has(code);
+}
+
+function fromKeyMap(map: Record<KeyAction, string>, extra?: Partial<Record<KeyAction, string[]>>): Actions {
+  const a = empty();
+  const hit = (id: KeyAction) => held(map[id]) || !!(extra?.[id]?.some((c) => held(c)));
+  a.left = hit("left");
+  a.right = hit("right");
+  a.up = hit("up");
+  a.down = hit("down");
+  a.punchL = hit("punchL");
+  a.punchR = hit("punchR");
+  a.kickL = hit("kickL");
+  a.kickR = hit("kickR");
+  a.special = hit("special");
+  a.special2 = hit("special2");
+  a.superDash = hit("superDash");
+  a.block = hit("block");
+  a.start = hit("start");
+  return a;
+}
+
 export function sampleP1(): Actions {
   const pads = connectedPads();
-  const keys: Actions = {
-    ...empty(),
-    left: down.has("KeyA") || down.has("ArrowLeft"),
-    right: down.has("KeyD") || down.has("ArrowRight"),
-    up: down.has("KeyW") || down.has("ArrowUp") || down.has("Space"),
-    down: down.has("KeyS") || down.has("ArrowDown"),
-    punchL: down.has("KeyJ"),
-    punchR: down.has("KeyK"),
-    kickL: down.has("KeyN"),
-    kickR: down.has("KeyM"),
-    special: down.has("KeyL"),
-    special2: down.has("Semicolon") || down.has("KeyQuote"),
-    superDash: down.has("ControlLeft"),
-    block: down.has("ShiftLeft") || down.has("ShiftRight"),
-    start: down.has("Enter") || down.has("Escape"),
-  };
-  const a = edges(merge(keys, fromPad(pads[0])), prevP1);
+  const keys = fromKeyMap(getKeys(), {
+    left: ["ArrowLeft"],
+    right: ["ArrowRight"],
+    up: ["ArrowUp"],
+    down: ["ArrowDown"],
+    start: ["Escape"],
+  });
+  let merged = keys;
+  if (pads.length <= 1) {
+    for (const p of pads) merged = merge(merged, fromPad(p));
+  } else {
+    merged = merge(merged, fromPad(pads[0]));
+  }
+  const a = edges(merged, prevP1);
   prevP1 = { ...a };
   return a;
 }
@@ -195,19 +245,19 @@ export function sampleP2(): Actions {
   const pads = connectedPads();
   const keys: Actions = {
     ...empty(),
-    left: down.has("KeyF"),
-    right: down.has("KeyH"),
-    up: down.has("KeyT"),
-    down: down.has("KeyG"),
-    punchL: down.has("KeyU"),
-    punchR: down.has("KeyI"),
-    kickL: down.has("KeyO"),
-    kickR: down.has("KeyP"),
-    special: down.has("BracketLeft"),
-    special2: down.has("BracketRight"),
-    superDash: down.has("ControlRight") || down.has("Minus"),
-    block: down.has("Slash"),
-    start: down.has("Digit0"),
+    left: held("Numpad4"),
+    right: held("Numpad6"),
+    up: held("Numpad8"),
+    down: held("Numpad5"),
+    punchL: held("Numpad7"),
+    punchR: held("Numpad9"),
+    kickL: held("Numpad1"),
+    kickR: held("Numpad3"),
+    special: held("Numpad0"),
+    special2: held("NumpadDecimal"),
+    superDash: held("ControlRight"),
+    block: held("NumpadAdd"),
+    start: held("NumpadEnter"),
   };
   const pad = pads.length >= 2 ? pads[1] : undefined;
   const a = edges(merge(keys, fromPad(pad)), prevP2);
@@ -217,18 +267,17 @@ export function sampleP2(): Actions {
 
 export function sampleMenu(): Actions {
   const pads = connectedPads();
-  const keys: Actions = {
-    ...empty(),
-    left: down.has("KeyA") || down.has("ArrowLeft"),
-    right: down.has("KeyD") || down.has("ArrowRight"),
-    up: down.has("KeyW") || down.has("ArrowUp"),
-    down: down.has("KeyS") || down.has("ArrowDown"),
-    start: down.has("Enter") || down.has("Space"),
-    punchL: down.has("Enter") || down.has("Space") || down.has("KeyJ"),
-    punchR: down.has("KeyK"),
-    kickL: down.has("KeyN") || down.has("Enter") || down.has("Space"),
-    kickR: down.has("KeyM") || down.has("Escape") || down.has("Backspace"),
-  };
+  const k = getKeys();
+  const keys = fromKeyMap(k, {
+    left: ["ArrowLeft", "KeyA"],
+    right: ["ArrowRight", "KeyD"],
+    up: ["ArrowUp", "KeyW"],
+    down: ["ArrowDown", "KeyS"],
+    start: ["Enter", "Space", k.start],
+    punchL: ["Enter", "Space", k.punchL, k.kickL],
+    kickL: ["Enter", "Space", k.kickL],
+    kickR: ["Escape", "Backspace", k.kickR],
+  });
   let merged = keys;
   for (const pad of pads) merged = merge(merged, fromPad(pad));
   const a = edges(merged, prevMenu);

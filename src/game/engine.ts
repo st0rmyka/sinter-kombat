@@ -40,11 +40,11 @@ declare global {
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "lazar" | "hoffer";
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer";
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.21";
+export const GAME_VERSION = "v0.22";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -473,7 +473,6 @@ function special1For(id: CharId): Atk {
   if (id === "agi") return SPECIAL_SPIT;
   if (id === "cricsi") return SPECIAL_SUPERMAN;
   if (id === "jezus") return SPECIAL_PILLAR;
-  if (id === "lazar") return SPECIAL_SPIN;
   if (id === "hoffer") return SPECIAL_RAGE;
   return SPECIAL;
 }
@@ -483,7 +482,6 @@ function special2For(id: CharId): Atk {
   if (id === "cica") return SPECIAL2_QUAKE;
   if (id === "cricsi") return SPECIAL2_KI;
   if (id === "jezus") return SPECIAL2_AURA;
-  if (id === "lazar") return SPECIAL_THROW;
   if (id === "hoffer") return SPECIAL_PULL;
   return SPECIAL2_VAMP;
 }
@@ -577,13 +575,6 @@ export const CHARACTERS: Record<
     special2: "SZENT AURA",
     fatality: "ÁLDÁS FATALITY",
   },
-  lazar: {
-    name: "LÁZÁR JÁNOS",
-    title: "A WC Kefés",
-    special: "KEFE FORGÓSZÉL",
-    special2: "KEFE DOBÁS",
-    fatality: "KEFE FATALITY",
-  },
   hoffer: {
     name: "HOFFER JÓZSI",
     title: "Az Idegbeteg",
@@ -618,10 +609,6 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Fényoszlop — 5 mp-ig az ellenfél pozícióján sebez, Jézust gyógyítja.",
     s2: "R1 Szent Aura — 5 mp védőgömb: elnyeli a sebzést, nem támadhat, átmegy az ellenfélen (pl. sarokból a másik térfélre).",
   },
-  lazar: {
-    s1: "L1 Kefe forgószél — 2 mp pörgés WC kefével, 0,25 mp-enként sebez, +30% mozgás. Nem szakítható meg, de blokkolható.",
-    s2: "R1 Kefe dobás — eldobja a WC kefét az ellenfél felé, projectile, blokkolható.",
-  },
   hoffer: {
     s1: "L1 Dühroham — 5 mp: +30% mozgás és támadási sebesség, vörös tónus, a hatás alatt max 13% önsebzés.",
     s2: "R1 GYERE IDE! — az ellenfél 3 mp-ig elveszti az irányítást és lassan Hoffer felé sétál.",
@@ -643,7 +630,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", lazar: "Lázár János", hoffer: "Hoffer Józsi" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -760,7 +747,6 @@ type ImgBag = {
   agi: Record<Pose, HTMLImageElement>;
   cricsi: Record<Pose, HTMLImageElement>;
   jezus: Record<Pose, HTMLImageElement>;
-  lazar: Record<Pose, HTMLImageElement>;
   hoffer: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
@@ -1074,8 +1060,17 @@ export class KitchenKombat {
   }
 
   async load() {
-    this.loadPct = 0.01;
+    this.loadPct = 0.04;
+    this.hudKey = "";
     this.pushHud();
+    const watchdog = window.setTimeout(() => {
+      if (this.loadPct < 1) {
+        console.warn("load watchdog");
+        this.loadPct = 1;
+        this.hudKey = "";
+        this.pushHud();
+      }
+    }, 14000);
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
@@ -1087,7 +1082,7 @@ export class KitchenKombat {
         };
         im.onload = done;
         im.onerror = done;
-        window.setTimeout(done, 4000);
+        window.setTimeout(done, 1800);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1118,7 +1113,7 @@ export class KitchenKombat {
       "special2",
       "crouch",
     ];
-    const bust = "?v=65";
+    const bust = "?v=66";
     const ui = [
       "/ui/mainmenu.png?v=19",
       "/ui/selection.jpg",
@@ -1165,10 +1160,9 @@ export class KitchenKombat {
       agi: {} as Record<Pose, HTMLImageElement>,
       cricsi: {} as Record<Pose, HTMLImageElement>,
       jezus: {} as Record<Pose, HTMLImageElement>,
-      lazar: {} as Record<Pose, HTMLImageElement>,
       hoffer: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {} };
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const stageImgs = {} as Record<StageId, HTMLImageElement>;
     const jobs: Array<() => Promise<void>> = [];
@@ -1206,7 +1200,7 @@ export class KitchenKombat {
       this.stageArts = stageImgs;
       this.stage = stageImgs.sintertanya ?? stageImgs.kitchen;
       this.images = { ...bags, anims, stage: this.stage };
-      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, lazar: {}, hoffer: {} };
+      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {} };
       let n = 0;
       for (const id of CHAR_IDS) {
         for (const p of poses) {
@@ -1224,6 +1218,7 @@ export class KitchenKombat {
     this.loadPct = 1;
     this.hudKey = "";
     this.pushHud();
+    window.clearTimeout(watchdog);
     void preloadSfx();
   }
 
@@ -3273,7 +3268,6 @@ export class KitchenKombat {
       if (f.id === "agi" && (f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
-      if (f.id === "lazar" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "hoffer" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.state === "crouch" || (f.state === "block" && f.crouchGuard)) return 0.8;
       return 1;
@@ -3341,9 +3335,6 @@ export class KitchenKombat {
     }
     ctx.filter = "none";
     ctx.restore();
-    if (f.id === "lazar" && f.state === "attack" && f.atk?.zone === "spin" && f.atkT >= f.atk.startup) {
-      this.drawTornado(f);
-    }
     if (f.shieldT > 0) {
       const ctx2 = this.ctx;
       const pulse = 0.45 + Math.sin(this.time * 8) * 0.12;
