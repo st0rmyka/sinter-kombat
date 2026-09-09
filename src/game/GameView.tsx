@@ -369,8 +369,13 @@ export function GameView() {
     const net = netRef.current;
     net.setHandlers({
       onLobby: () => setLobbyTick((n) => n + 1),
+      onStatus: () => setLobbyTick((n) => n + 1),
       onError: (m) => setNetErr(m),
-      onHelloOk: (_role, code) => setRoomCode(code),
+      onHelloOk: (_role, code) => {
+        setRoomCode(code);
+        setNetErr(null);
+        game.openLobby();
+      },
       onOpenSelect: () => {
         resetSelect(false);
         game.chooseMode(false, diffRef.current);
@@ -402,7 +407,7 @@ export function GameView() {
       },
       onDrop: () => {
         setNetErr("A másik játékos kilépett.");
-        game.endOnline();
+        game.endOnline("online");
         net.disconnect();
       },
       onGo: () => game.onlineGo(),
@@ -610,28 +615,26 @@ export function GameView() {
         const m = sampleMenu();
         const ok = !gated() && (m.kickLP || m.punchLP || m.startP);
         if (m.upP || m.downP) setOnlineIdx((i) => (i === 0 ? 1 : 0));
-        if (!gated() && m.kickRP) {
-          armGate();
-          g.screen = "title";
-          setMenu("root");
-          g.pushHud();
-        }
         if (ok) {
           armGate();
           boot();
           setNetErr(null);
           if (onlineIdxRef.current === 0) {
             netRef.current.connect({ role: "host", name: "HOST", char: "renike" });
-            g.openLobby();
           } else {
             const code = joinCodeRef.current.replace(/\D/g, "").slice(0, 4);
             if (code.length !== 4) {
               setNetErr("Írj be egy 4 jegyű kódot.");
             } else {
               netRef.current.connect({ role: "guest", name: "JOIN", char: "ricsi", code });
-              g.openLobby();
             }
           }
+        } else if (!gated() && m.kickRP) {
+          armGate();
+          netRef.current.disconnect();
+          g.screen = "title";
+          setMenu("root");
+          g.pushHud();
         }
       } else if (h.screen === "lobby") {
         const m = sampleMenu();
@@ -644,7 +647,7 @@ export function GameView() {
         if (!gated() && m.kickRP) {
           armGate();
           netRef.current.disconnect();
-          g.endOnline();
+          g.endOnline("online");
         }
       } else if (h.screen === "select") {
         const net = netRef.current;
@@ -1083,6 +1086,9 @@ export function GameView() {
             csak akkor megy, ha mindketten ugyanahhoz a szerverhez csatlakoznak — a Grok/webes hoston működik.)
           </p>
           {netErr && <p className="text-gold text-sm">{netErr}</p>}
+          {netRef.current.status === "connecting" && (
+            <p className="text-muted text-sm">Kapcsolódás a szerverhez…</p>
+          )}
           <div className="mt-2 flex flex-col gap-3 sm:flex-row">
             <MenuBtn
               onClick={() => {
@@ -1090,7 +1096,6 @@ export function GameView() {
                 setNetErr(null);
                 setOnlineIdx(0);
                 netRef.current.connect({ role: "host", name: "HOST", char: "renike" });
-                gameRef.current?.openLobby();
               }}
             >
               {onlineIdx === 0 ? "▸ HOST" : "HOST"}
@@ -1106,7 +1111,6 @@ export function GameView() {
                   return;
                 }
                 netRef.current.connect({ role: "guest", name: "JOIN", char: "ricsi", code });
-                gameRef.current?.openLobby();
               }}
             >
               {onlineIdx === 1 ? "▸ CSATLAKOZÁS" : "CSATLAKOZÁS"}
@@ -1148,7 +1152,7 @@ export function GameView() {
           err={netErr}
           onBack={() => {
             netRef.current.disconnect();
-            gameRef.current?.endOnline();
+            gameRef.current?.endOnline("online");
           }}
         />
       )}

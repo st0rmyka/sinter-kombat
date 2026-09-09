@@ -44,7 +44,7 @@ function writeIcns() {}
 async function zipDir(srcDir, zipPath, topName) {
   await run("python3", [
     "-c",
-    r"""
+    String.raw`
 import os, stat, sys, zipfile
 from pathlib import Path
 src, dest, top = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
@@ -71,7 +71,7 @@ def add(zf, path, arc):
 with zipfile.ZipFile(dest, "w", allowZip64=True) as zf:
     add(zf, src, top)
 print("zip", dest, dest.stat().st_size)
-""",
+`,
     srcDir,
     zipPath,
     topName,
@@ -79,21 +79,41 @@ print("zip", dest, dest.stat().st_size)
 }
 
 function patchPlist(plistPath, { name, ident }) {
-  let xml = readFileSync(plistPath, "utf8");
-  const setStr = (key, value) => {
-    const re = new RegExp(`(<key>${key}<\\/key>\\s*<string>)[^<]*(<\\/string>)`);
-    if (re.test(xml)) xml = xml.replace(re, `$1${value}$2`);
-    else xml = xml.replace("</dict>\n</plist>", `	<key>${key}</key>\n	<string>${value}</string>\n</dict>\n</plist>`);
-  };
-  setStr("CFBundleDisplayName", name);
-  setStr("CFBundleName", name);
-  setStr("CFBundleIdentifier", ident);
-  setStr("CFBundleIconFile", "electron.icns");
-  setStr("LSApplicationCategoryType", "public.app-category.games");
-  xml = xml.replace(
-    /<key>ElectronAsarIntegrity<\/key>\s*<dict>[\s\S]*?<\/dict>/,
-    "",
-  );
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>${name}</string>
+	<key>CFBundleExecutable</key>
+	<string>Electron</string>
+	<key>CFBundleIconFile</key>
+	<string>electron.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>${ident}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>${name}</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.21</string>
+	<key>CFBundleVersion</key>
+	<string>0.21</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.games</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>AtomApplication</string>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+</dict>
+</plist>
+`;
   writeFileSync(plistPath, xml);
 }
 
@@ -120,6 +140,7 @@ async function assemble(arch, label, icnsPath) {
   mkdirSync(appDir, { recursive: true });
   copyFileSync(path.join(root, "desktop", "package.json"), path.join(appDir, "package.json"));
   copyFileSync(path.join(root, "desktop", "main.mjs"), path.join(appDir, "main.mjs"));
+  copyFileSync(path.join(root, "desktop", "kk-net-server.mjs"), path.join(appDir, "kk-net-server.mjs"));
   cpSync(path.join(root, "desktop", "dist"), path.join(appDir, "dist"), { recursive: true });
   copyFileSync(icnsPath, path.join(res, "electron.icns"));
   patchPlist(path.join(destApp, "Contents", "Info.plist"), {

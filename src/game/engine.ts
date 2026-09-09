@@ -1367,7 +1367,7 @@ export class KitchenKombat {
     if (this.screen === "vs") this.beginRound();
   }
 
-  endOnline() {
+  endOnline(back: "title" | "online" = "title") {
     this.netRole = null;
     this.netSend = null;
     this.netLocal.clear();
@@ -1376,7 +1376,7 @@ export class KitchenKombat {
     this.paused = false;
     this.training = false;
     this.trainMeter = false;
-    this.screen = "title";
+    this.screen = back;
     stopStageMusic();
     startMenuMusic();
     this.pushHud();

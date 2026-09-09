@@ -160,6 +160,7 @@ export class NetPlay {
   ws: WebSocket | null = null;
   role: NetRole | null = null;
   roomCode: string | null = null;
+  helloOk = false;
   lobby: LobbyState = { host: null, guest: null, ips: [], started: false, code: null, phase: "lobby" };
   handlers: NetHandlers = {};
   status = "offline";
@@ -179,14 +180,24 @@ export class NetPlay {
   connect(opts: { role: NetRole; url?: string; name?: string; char?: NetChar; code?: string }) {
     this.disconnect();
     this.role = opts.role;
+    this.helloOk = false;
+    this.roomCode = opts.code ?? null;
     const url =
       opts.url ??
       `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/kk-net`;
     this.status = "connecting";
     this.handlers.onStatus?.(this.status);
-    const ws = new WebSocket(url);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      this.status = "error";
+      this.handlers.onError?.("Nem sikerült csatlakozni. Mindketten ugyanazon a linken legyetek.");
+      return;
+    }
     this.ws = ws;
     ws.onopen = () => {
+      if (this.ws !== ws) return;
       this.status = "open";
       this.handlers.onStatus?.(this.status);
       this.send({
@@ -198,15 +209,27 @@ export class NetPlay {
       });
     };
     ws.onerror = () => {
+      if (this.ws !== ws) return;
       this.status = "error";
-      this.handlers.onError?.("Nem sikerült csatlakozni. Ugyanazon a webes címen kell mindkettőtöknek lenni.");
+      this.handlers.onError?.(
+        "Nincs online szerver ezen a linken. A kódos módhoz mindkét játékosnak ugyanazon a Grok/webes címen kell lennie (itch.io egymagában nem elég).",
+      );
     };
     ws.onclose = (e) => {
+      if (this.ws !== ws) return;
       this.status = "closed";
       this.handlers.onStatus?.(this.status);
+      if (!this.helloOk) {
+        if (e.code === 1000) return;
+        this.handlers.onError?.(
+          "Nem sikerült csatlakozni a szerverhez. Ugyanazt a webes címet nyissátok meg mindketten.",
+        );
+        return;
+      }
       if (e.code !== 1000) this.handlers.onDrop?.(`close ${e.code}`);
     };
     ws.onmessage = (ev) => {
+      if (this.ws !== ws) return;
       let msg: Record<string, unknown>;
       try {
         msg = JSON.parse(String(ev.data));
@@ -218,6 +241,7 @@ export class NetPlay {
       if (t === "hello-ok") {
         this.role = (msg.role === "guest" ? "guest" : "host") as NetRole;
         this.roomCode = String(msg.code ?? "");
+        this.helloOk = true;
         this.handlers.onHelloOk?.(this.role, this.roomCode);
       }
       if (t === "lobby") {
@@ -265,6 +289,7 @@ export class NetPlay {
     this.send({ type: "stage", stage: id });
   }
   disconnect() {
+    this.helloOk = false;
     try {
       this.ws?.close();
     } catch {
