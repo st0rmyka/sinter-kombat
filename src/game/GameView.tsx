@@ -1096,7 +1096,7 @@ export function GameView() {
         <div
           className="absolute inset-0 z-10 flex flex-col"
           style={{
-            backgroundImage: `url(${asset("/ui/mainmenu.png?v=20")})`,
+            backgroundImage: `url(${asset("/ui/mainmenu.png?v=21")})`,
             backgroundSize: "cover",
             backgroundPosition: "center top",
           }}

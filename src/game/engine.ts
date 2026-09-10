@@ -1196,7 +1196,7 @@ export class KitchenKombat {
       });
     const bust = "?v=82";
     const ui = [
-      "/ui/mainmenu.png?v=20",
+      "/ui/mainmenu.png?v=21",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
       ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=255`),
@@ -3580,7 +3580,7 @@ export class KitchenKombat {
         scale *= Math.sqrt(closeUp);
       }
       if (f.id === "ricsi") scale *= 1.16;
-      if (f.id === "farajo") scale *= 0.9;
+      if (f.id === "farajo") scale *= 0.82;
     }
     if (f.id === "cica" && f.pose.startsWith("low")) scale *= 0.6;
     if (f.id === "cica" && (f.pose === "special" || (f.state === "attack" && f.atk?.pounce))) scale *= 0.68;
