@@ -103,11 +103,101 @@ export function releaseVirtual(code: string) {
   down.delete(code);
 }
 
-function connectedPads() {
+function normalizePadId(id: string) {
+  return (id || "")
+    .toLowerCase()
+    .replace(/\(standard gamepad[^)]*\)/g, "")
+    .replace(/extended gamepad/g, "")
+    .replace(/vendor:\s*[0-9a-f]+/g, "")
+    .replace(/product:\s*[0-9a-f]+/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function vendorProduct(id: string) {
+  const m = (id || "").toLowerCase().match(/vendor:\s*([0-9a-f]+).*product:\s*([0-9a-f]+)/);
+  return m ? `${m[1]}:${m[2]}` : "";
+}
+
+function padIdle(g: Gamepad) {
+  for (let i = 0; i < Math.min(g.buttons.length, 16); i++) {
+    if ((g.buttons[i]?.value ?? 0) > 0.35 || g.buttons[i]?.pressed) return false;
+  }
+  for (let i = 0; i < Math.min(g.axes.length, 4); i++) {
+    if (Math.abs(g.axes[i] ?? 0) > 0.28) return false;
+  }
+  return true;
+}
+
+function padStateSame(a: Gamepad, b: Gamepad) {
+  const bn = Math.min(a.buttons.length, b.buttons.length, 16);
+  for (let i = 0; i < bn; i++) {
+    const va = a.buttons[i]?.value ?? 0;
+    const vb = b.buttons[i]?.value ?? 0;
+    if (Math.abs(va - vb) > 0.2) return false;
+  }
+  const an = Math.min(a.axes.length, b.axes.length, 4);
+  for (let i = 0; i < an; i++) {
+    if (Math.abs((a.axes[i] ?? 0) - (b.axes[i] ?? 0)) > 0.18) return false;
+  }
+  return true;
+}
+
+function rawPads() {
   if (typeof navigator === "undefined" || !navigator.getGamepads) return [] as Gamepad[];
-  return [...navigator.getGamepads()]
-    .filter((g): g is Gamepad => !!g && g.buttons.length >= 4)
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  return [...navigator.getGamepads()].filter((g): g is Gamepad => !!g && g.buttons.length >= 4);
+}
+
+/** One entry per physical controller. Mac/Steam often expose the same pad twice. */
+function connectedPads() {
+  const raw = rawPads().sort((a, b) => a.index - b.index);
+  const byFamily = new Map<string, Gamepad[]>();
+  for (const g of raw) {
+    const vp = vendorProduct(g.id);
+    const key = vp || normalizePadId(g.id) || `idx:${g.index}`;
+    const list = byFamily.get(key) ?? [];
+    list.push(g);
+    byFamily.set(key, list);
+  }
+  const candidates: Gamepad[] = [];
+  for (const group of byFamily.values()) {
+    const std = group.filter((g) => g.mapping === "standard");
+    const pick = (std.length ? std : group).sort((a, b) => a.index - b.index);
+    candidates.push(...pick);
+  }
+  candidates.sort((a, b) => a.index - b.index);
+  const unique: Gamepad[] = [];
+  for (const g of candidates) {
+    const twin = unique.find((u) => {
+      if (u.index === g.index) return true;
+      const sameFamily =
+        (vendorProduct(u.id) && vendorProduct(u.id) === vendorProduct(g.id)) ||
+        normalizePadId(u.id) === normalizePadId(g.id);
+      if (sameFamily && u.mapping !== g.mapping) return true;
+      if (padIdle(g) || padIdle(u)) return false;
+      return padStateSame(u, g);
+    });
+    if (twin) continue;
+    unique.push(g);
+  }
+  return unique;
+}
+
+let lockP1 = -1;
+let lockP2 = -1;
+
+function assignedPads() {
+  const pads = connectedPads();
+  const live = new Set(pads.map((p) => p.index));
+  if (lockP1 >= 0 && !live.has(lockP1)) lockP1 = -1;
+  if (lockP2 >= 0 && !live.has(lockP2)) lockP2 = -1;
+  for (const p of pads) {
+    if (lockP1 < 0 && p.index !== lockP2) lockP1 = p.index;
+    else if (lockP2 < 0 && p.index !== lockP1) lockP2 = p.index;
+  }
+  const p1 = pads.find((p) => p.index === lockP1);
+  const p2 = pads.find((p) => p.index === lockP2);
+  return { p1, p2, pads };
 }
 
 export function getPadCount() {
@@ -115,7 +205,8 @@ export function getPadCount() {
 }
 
 export function rumble(index: number, ms: number, mag: number) {
-  const pad = connectedPads()[index];
+  const { p1, p2 } = assignedPads();
+  const pad = index === 0 ? p1 : p2;
   const act = pad?.vibrationActuator as GamepadHapticActuator | undefined;
   if (act && "playEffect" in act) {
     void act.playEffect("dual-rumble", {
@@ -222,7 +313,7 @@ function fromKeyMap(map: Record<KeyAction, string>, extra?: Partial<Record<KeyAc
 }
 
 export function sampleP1(): Actions {
-  const pads = connectedPads();
+  const { p1 } = assignedPads();
   const keys = fromKeyMap(getKeys(), {
     left: ["ArrowLeft"],
     right: ["ArrowRight"],
@@ -230,19 +321,13 @@ export function sampleP1(): Actions {
     down: ["ArrowDown"],
     start: ["Escape"],
   });
-  let merged = keys;
-  if (pads.length <= 1) {
-    for (const p of pads) merged = merge(merged, fromPad(p));
-  } else {
-    merged = merge(merged, fromPad(pads[0]));
-  }
-  const a = edges(merged, prevP1);
+  const a = edges(merge(keys, fromPad(p1)), prevP1);
   prevP1 = { ...a };
   return a;
 }
 
 export function sampleP2(): Actions {
-  const pads = connectedPads();
+  const { p2 } = assignedPads();
   const keys: Actions = {
     ...empty(),
     left: held("Numpad4"),
@@ -259,14 +344,13 @@ export function sampleP2(): Actions {
     block: held("NumpadAdd"),
     start: held("NumpadEnter"),
   };
-  const pad = pads.length >= 2 ? pads[1] : undefined;
-  const a = edges(merge(keys, fromPad(pad)), prevP2);
+  const a = edges(merge(keys, fromPad(p2)), prevP2);
   prevP2 = { ...a };
   return a;
 }
 
 export function sampleMenu(): Actions {
-  const pads = connectedPads();
+  const { pads } = assignedPads();
   const k = getKeys();
   const keys = fromKeyMap(k, {
     left: ["ArrowLeft", "KeyA"],

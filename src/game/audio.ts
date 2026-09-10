@@ -123,6 +123,8 @@ const HOFFER_DAMAGE: VoicePool = {
 const HOFFER_DEFEAT = "/sfx/hofferjozsi_defeat.mp3";
 const HOFFER_DUHROHAM = "/sfx/hofferjozsi_special_duhroham.mp3";
 const HOFFER_GYEREIDE = "/sfx/hofferjozsi_special_gyereide.mp3";
+const FARAJO_TROMBITA = "/sfx/farajo_special_trombita.mp3";
+const FARAJO_GITAR = "/sfx/farajo_special_gitar.mp3";
 const RENIKE_FING = "/sfx/renike_fing.mp3";
 const RICSI_HANYAS = "/sfx/ricsi_hanyas.mp3";
 const CICA_QUAKE = "/sfx/cica_quake.mp3";
@@ -137,6 +139,7 @@ const CHAR_NAME: Record<string, string> = {
   cricsi: "/sfx/name_ciganyricsi.mp3",
   jezus: "/sfx/name_jezus.mp3",
   hoffer: "/sfx/name_hofferjozsi.mp3",
+  farajo: "/sfx/name_farajo.mp3",
 };
 const CHAR_WIN: Record<string, string> = {
   ricsi: "/sfx/ricsiwins.mp3",
@@ -146,6 +149,7 @@ const CHAR_WIN: Record<string, string> = {
   cricsi: "/sfx/ciganyricsiwins.mp3",
   jezus: "/sfx/jezuswins.mp3",
   hoffer: "/sfx/hofferjozsiwins.mp3",
+  farajo: "/sfx/farajowins.mp3",
 };
 const CHAR_TAUNT: Record<string, string> = {
   ricsi: "/sfx/ricsi_taunt.mp3",
@@ -155,13 +159,14 @@ const CHAR_TAUNT: Record<string, string> = {
   cricsi: "/sfx/ciganyricsi_taunt.mp3",
   jezus: "/sfx/jezus_taunt.mp3",
   hoffer: "/sfx/hofferjozsi_taunt.mp3",
+  farajo: "/sfx/farajo_taunt.mp3",
 };
 
 const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK };
 const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE };
 const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT };
-const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM };
-const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE };
+const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM, farajo: FARAJO_TROMBITA };
+const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE, farajo: FARAJO_GITAR };
 
 const voices = new Map<string, AudioBufferSourceNode>();
 
@@ -350,58 +355,58 @@ async function decodeUrl(url: string) {
 }
 
 export function sfxPreloadList(): string[] {
-  return [
-    ...Object.values(ROUND_FILES),
-    ...HIT_FILES,
-    ...RICSI_ATTACK.files,
-    ...RICSI_DAMAGE.files,
-    RICSI_DEFEAT,
-    ...RENIKE_ATTACK.files,
-    ...RENIKE_DAMAGE.files,
-    RENIKE_DEFEAT,
-    ...CICA_ATTACK.files,
-    ...CICA_DAMAGE.files,
-    CICA_DEFEAT,
-    ...AGI_ATTACK.files,
-    ...AGI_DAMAGE.files,
-    AGI_DEFEAT,
-    AGI_KOPES,
-    AGI_VERSZIVAS,
-    CRICSI_DEFEAT,
-    ...CRICSI_ATTACK.files,
-    ...CRICSI_DAMAGE.files,
-    CRICSI_KIBLAST,
-    ...JEZUS_ATTACK.files,
-    ...JEZUS_DAMAGE.files,
-    JEZUS_DEFEAT,
-    JEZUS_OSZLOP,
-    JEZUS_VEDOGOMB,
-    HOFFER_DEFEAT,
-    ...HOFFER_ATTACK.files,
-    ...HOFFER_DAMAGE.files,
-    HOFFER_DUHROHAM,
-    HOFFER_GYEREIDE,
-    RENIKE_FING,
-    RICSI_HANYAS,
-    CICA_QUAKE,
-    TITLE_FILE,
-    KO_FILE,
-    SUPER_DASH_FILE,
-    ...Object.values(CHAR_NAME),
-    ...Object.values(CHAR_WIN),
-    ...Object.values(CHAR_TAUNT),
-  ];
+  return [...sfxMenuList(), ...sfxFightList(Object.keys(CHAR_NAME))];
+}
+
+export function sfxMenuList(): string[] {
+  return [TITLE_FILE, ...Object.values(CHAR_NAME)];
+}
+
+export function sfxFightList(ids: string[]): string[] {
+  const extra: string[] = [...Object.values(ROUND_FILES), ...HIT_FILES, KO_FILE, SUPER_DASH_FILE];
+  const seen = new Set<string>(extra);
+  const add = (url?: string) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    extra.push(url);
+  };
+  for (const id of ids) {
+    for (const f of CHAR_ATTACK[id]?.files ?? []) add(f);
+    for (const f of CHAR_DAMAGE[id]?.files ?? []) add(f);
+    add(CHAR_DEFEAT[id]);
+    add(CHAR_SPECIAL1[id]);
+    add(CHAR_SPECIAL2[id]);
+    add(CHAR_WIN[id]);
+    add(CHAR_TAUNT[id]);
+    if (id === "cica") add(CICA_QUAKE);
+    if (id === "renike") add(RENIKE_FING);
+    if (id === "ricsi") add(RICSI_HANYAS);
+    if (id === "farajo") {
+      add(FARAJO_TROMBITA);
+      add(FARAJO_GITAR);
+    }
+  }
+  return extra;
 }
 
 export function musicPreloadList(): string[] {
   return [MENU_FILE, ...Object.values(MUSIC_FILES)];
 }
 
-export async function preloadSfx(onItem?: () => void) {
+export function musicMenuList(): string[] {
+  return [MENU_FILE];
+}
+
+export function musicFightList(stage?: string): string[] {
+  if (stage && MUSIC_FILES[stage]) return [MUSIC_FILES[stage]!];
+  return Object.values(MUSIC_FILES);
+}
+
+export async function preloadSfx(onItem?: () => void, urls?: string[], musicUrls?: string[]) {
   ac();
-  const urls = sfxPreloadList();
+  const list = urls ?? sfxPreloadList();
   await Promise.all(
-    urls.map(async (url) => {
+    list.map(async (url) => {
       if (buffers.has(url)) {
         onItem?.();
         return;
@@ -414,8 +419,13 @@ export async function preloadSfx(onItem?: () => void) {
       onItem?.();
     }),
   );
+  const music = musicUrls ?? musicPreloadList();
   await Promise.all(
-    [MENU_FILE, ...Object.values(MUSIC_FILES)].map(async (url) => {
+    music.map(async (url) => {
+      if (MUSIC_BLOBS[url]) {
+        onItem?.();
+        return;
+      }
       try {
         const res = await fetch(asset(url));
         if (res.ok) {
@@ -562,6 +572,136 @@ function voiceVol(id: string, base: number) {
   return base;
 }
 
+type FarajoMode = "trumpet" | "guitar";
+type FarajoBed = {
+  src: AudioBufferSourceNode | null;
+  gain: GainNode | null;
+  mode: FarajoMode | null;
+  want: FarajoMode | null;
+  startedAt: number;
+  startOffset: number;
+  resume: number;
+};
+const farajoBeds: Record<string, FarajoBed> = {
+  p1: { src: null, gain: null, mode: null, want: null, startedAt: 0, startOffset: 0, resume: 0 },
+  p2: { src: null, gain: null, mode: null, want: null, startedAt: 0, startOffset: 0, resume: 0 },
+};
+
+function farajoUrl(mode: FarajoMode) {
+  return mode === "guitar" ? FARAJO_GITAR : FARAJO_TROMBITA;
+}
+
+function stopFarajoBed(side: string, save: boolean) {
+  const b = farajoBeds[side];
+  if (!b) return;
+  const c = ctx;
+  if (save && b.mode === "guitar" && b.src && c) {
+    const buf = buffers.get(FARAJO_GITAR);
+    const dur = buf?.duration ?? 0;
+    if (dur > 0.05) b.resume = (b.startOffset + Math.max(0, c.currentTime - b.startedAt)) % dur;
+  }
+  if (b.src) {
+    b.src.onended = null;
+    try {
+      b.src.stop();
+    } catch {
+      /* already ended */
+    }
+    try {
+      b.src.disconnect();
+      b.gain?.disconnect();
+    } catch {
+      /* ignore */
+    }
+  }
+  b.src = null;
+  b.gain = null;
+  b.mode = null;
+}
+
+function startFarajoBed(side: string, mode: FarajoMode) {
+  const b = farajoBeds[side] ?? (farajoBeds[side] = { src: null, gain: null, mode: null, want: null, startedAt: 0, startOffset: 0, resume: 0 });
+  if (b.mode === mode && b.src) return;
+  stopFarajoBed(side, true);
+  if (mix().sfx <= 0) return;
+  const url = farajoUrl(mode);
+  const play = (buf: AudioBuffer) => {
+    const c = ac();
+    if (c.state === "suspended") void c.resume();
+    const src = c.createBufferSource();
+    const g = c.createGain();
+    const dur = Math.max(0.05, buf.duration);
+    const offset = mode === "guitar" ? ((b.resume % dur) + dur) % dur : 0;
+    src.buffer = buf;
+    src.loop = mode === "guitar";
+    g.gain.value = 1;
+    src.connect(g).connect(dest());
+    src.onended = () => {
+      if (b.src === src) {
+        b.src = null;
+        b.gain = null;
+        b.mode = null;
+        if (b.want === "guitar") {
+          b.resume = 0;
+          startFarajoBed(side, "guitar");
+          return;
+        }
+      }
+      try {
+        src.disconnect();
+        g.disconnect();
+      } catch {
+        /* ignore */
+      }
+    };
+    try {
+      src.start(0, Math.min(offset, Math.max(0, dur - 0.01)));
+    } catch {
+      src.start(0);
+    }
+    b.src = src;
+    b.gain = g;
+    b.mode = mode;
+    b.startedAt = c.currentTime;
+    b.startOffset = offset;
+  };
+  const buf = buffers.get(url);
+  if (buf) {
+    play(buf);
+    return;
+  }
+  void decodeUrl(url)
+    .then((decoded) => {
+      buffers.set(url, decoded);
+      if (farajoBeds[side]?.want !== mode) return;
+      if (farajoBeds[side]?.mode === mode && farajoBeds[side]?.src) return;
+      play(decoded);
+    })
+    .catch(() => {
+      /* clip missing */
+    });
+}
+
+function syncFarajoBed(side: string, mode: FarajoMode | null) {
+  const b = farajoBeds[side] ?? (farajoBeds[side] = { src: null, gain: null, mode: null, want: null, startedAt: 0, startOffset: 0, resume: 0 });
+  b.want = mode;
+  if (!mode) {
+    stopFarajoBed(side, true);
+    return;
+  }
+  startFarajoBed(side, mode);
+}
+
+function resetFarajoBeds() {
+  for (const side of ["p1", "p2"]) {
+    stopFarajoBed(side, false);
+    if (farajoBeds[side]) {
+      farajoBeds[side].resume = 0;
+      farajoBeds[side].want = null;
+    }
+  }
+}
+
 export const sfxPlay = {
   hit: () => playHit(0.92),
   heavy: () => playHit(1),
@@ -603,6 +743,7 @@ export const sfxPlay = {
     playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial1: (id: string) => {
+    if (id === "farajo") return;
     const url = CHAR_SPECIAL1[id];
     if (!url) {
       sfxPlay.charAttack(id);
@@ -614,6 +755,7 @@ export const sfxPlay = {
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial2: (id: string) => {
+    if (id === "farajo") return;
     const url = CHAR_SPECIAL2[id];
     if (!url) return;
     if (id === "jezus") playOneShot(url, 2.4, 1);
@@ -678,6 +820,8 @@ export const sfxPlay = {
         /* announcer missing */
       });
   },
+  farajoBed: (side: string, mode: FarajoMode | null) => syncFarajoBed(side, mode),
+  farajoReset: () => resetFarajoBeds(),
 };
 
 export function startKitchenDrone() {

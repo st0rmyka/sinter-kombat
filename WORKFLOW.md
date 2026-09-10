@@ -1,39 +1,36 @@
-# SINTER KOMBAT — ChatGPT / Grok munkamegosztás
+# SINTER KOMBAT — grafika + kód (Grok)
 
-**Érvényes:** 2026-09-07-től. Alapértelmezett workflow. Nem opcionális.
+**Érvényes:** 2026-09-09-től. A user visszaadta a sprite-generálást Groknak
+(ChatGPT-s pipeline felülírva).
 
 ## Szerepek
 
 | Ki | Mit csinál |
 |---|---|
-| **ChatGPT** | Minden grafikai asset: sprite, anim frame, portrait, ikon, pálya/menü háttér, FX art |
-| **Grok** | Implementáció: engine, logika, roster, hang bekötés, mapping, bugfix, CPU, UI flow |
-| **User** | Közvetítő: ChatGPT-től letölti a PNG-ket, átadja Groknak |
+| **Grok** | Sprite / anim / portrait / ikon generálás referencia alapján (`imagine_*`), chroma, bekötés, engine, hang, UI, bugfix |
+| **User** | Brief, referenciafotó / sheet feltöltés, jóváhagyás, hangok |
 
-## Grok: mit NE
+## Karakter-sprite (a régi módszer)
 
-- Ne generálj sprite-ot, portrét, ikont, stage/UI hátteret, effect artot (`imagine_*` TILOS ehhez a projekthez, hacsak a user **külön** nem kéri hogy Grok csinálja).
-- Ne találj ki „helyettesítő” kinézetet a referencia helyett.
-- Ne nyúlj más sprite-okhoz, ha csak egy pose-t kértek.
-- Vegyes promptnál: bontsd szét. Grafika = várakozás. Kód = te, amikor megjöttek a fájlok.
+1. A user feltölti a referenciát (sheet / fotó, több nézet ha van).
+2. Grok **ebből** generál, nem „érzésre”. Konzisztencia: arc, haj, ruha, testarány — minden frame-en ugyanaz a karakter.
+3. Nyers sprite **jobbra** néz. Tükrözés az engine dolga. Ne fordítsd el, hacsak a user nem kéri.
+4. Egy pose javítása ≠ teljes karakter-újragenerálás. Csak azt a fájlt cseréld.
+5. `spec2.png` ≠ `special2.png` ≠ `special20–25.png`.
+6. Háttér: szürke/chroma kikerül, ne legyen lyukas a karakter (ne túl agresszív a szűrés).
+7. Walk: valódi lépés (bal-jobb láb), ne 1 frame rezgés.
+8. Crouch / low attack: ne nőjön meg a sprite, ne legyen idétlenül kicsi.
+9. Bekötés ugyanabba a mappába: `public/sprites/{charId}/`, portrait, icon.
 
-## Ha új karakter / sprite / háttér jön
+## Ha új karakter jön
 
-1. Nyugtázd a tervet (név, specialok, mappa, CHAR_ID).
-2. Listázd, milyen PNG-kre van szükség (`public/sprites/{id}/…`, portrait, icon).
-3. **Állj.** Ne generálj képet.
-4. Amikor a user átadja a ChatGPT-s asseteket: tedd a helyükre, chroma ha kell, kösd be, cache bust.
+Minden, ami a meglévőknek van: idle, walk0–3, crouch, jump, block, dash, hurt,
+punch/kick + 4 frame, jump/low attackok, special, spec2, special2 0–5,
+portré, arcközeli ikon, CHAR_ID, engine specialok, announcer később.
 
-## Ha CSAK kód / bug / hang / AI / menü
+## Változatlan
 
-Dolgozz azonnal. Nincs várakozás.
-
-## Változatlan projekt-szabályok
-
-- Karakterkonzisztencia a referencia + idle.png alapján.
-- Nyers sprite **jobbra** néz; a tükrözés az engine dolga.
-- `spec2.png` ≠ `special2.png` ≠ `special20–25.png`.
 - Lázár János nem megy vissza a rosterbe kérés nélkül.
-- Ha a user csak képet kér (és ChatGPT csinálja), Grok a kódhoz nem nyúl.
+- Kód-only promptnál ne generálj képet.
 
-Részletek: `SINTER_KOMBAT_CHATGPT_DOKUMENTACIO.txt`
+Részletek a fájlnevekről: `SINTER_KOMBAT_CHATGPT_DOKUMENTACIO.txt`

@@ -98,9 +98,9 @@ function patchPlist(plistPath, { name, ident }) {
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.21</string>
+	<string>0.24</string>
 	<key>CFBundleVersion</key>
-	<string>0.21</string>
+	<string>0.24</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.games</string>
 	<key>LSMinimumSystemVersion</key>
@@ -181,7 +181,11 @@ async function main() {
   mkdirSync(path.dirname(ZIP_PATH), { recursive: true });
   console.log("zipping...");
   await zipDir(path.join(OUT_DIR, "Apple Silicon"), ZIP_PATH, "Sinter-Kombat-macOS");
+  const tarPath = path.join(root, "release", "Sinter-Kombat-macOS-arm64.tar.gz");
+  rmSync(tarPath, { force: true });
+  await run("tar", ["-czf", tarPath, "-C", path.join(OUT_DIR, "Apple Silicon"), "Sinter Kombat.app", "OLVASSEL.txt"]);
   console.log(`done ${ZIP_PATH}`);
+  console.log(`done ${tarPath}`);
 }
 
 main().catch((err) => {

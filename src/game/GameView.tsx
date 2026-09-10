@@ -9,6 +9,52 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.265",
+    items: [
+      "Új főmenü háttérkép (Fárajóval a rosteren)",
+      "Fárajó: trombita + gitár special hangok (gitár megszakításnál folytatódik, loop)",
+      "Fárajó taunt a győztes képernyőn",
+      "Fárajó sima jump kisebb",
+    ],
+  },
+  {
+    v: "v0.26",
+    items: [
+      "Fárajó: jump nagyobb, gitárszóló klasszikus gitár mindkét frame-en, trombita 25%-kal rövidebb és megszakítható",
+      "Fárajó announcer: név és győzelem",
+      "Special sebzés nem tölti az energy métert (minden karakter)",
+      "Betöltés: menü/karakterválasztó az első loadingon, harci assetek a VS képernyőn",
+    ],
+  },
+  {
+    v: "v0.255",
+    items: [
+      "Farajo: új Victory és VS képek (transzparens háttér)",
+    ],
+  },
+  {
+    v: "v0.25",
+    items: [
+      "Betöltő képernyő: sprite-ok, pályák, FX és hangok előre betöltődnek a menü előtt",
+      "Farajo: gitárszóló végén nincs basszusgitáros frame",
+      "VS képernyő rövidebb (1,6 mp)",
+    ],
+  },
+  {
+    v: "v0.24",
+    items: [
+      "Farajo: jump attack méret a többiekhez igazítva",
+      "Farajo L1 Trombita: 3 mp helyben, teljes alakos fújás, hangjegyek szinuszban, blokkolható",
+      "Farajo R1 Gitárszóló: amíg nyomva tartod és van energia, gyógyítja Farajót",
+    ],
+  },
+  {
+    v: "v0.23",
+    items: [
+      "Új karakter: Farajo — Trombita + Gitárszóló",
+    ],
+  },
+  {
     v: "v0.22",
     items: [
       "Xbox kontroller: akciógombok harcban is (1P-nél minden csatlakoztatott pad)",
@@ -184,6 +230,8 @@ const emptyHud = (): Hud => ({
   stage: "sintertanya",
   netWait: false,
   loadPct: 0.02,
+  vsLoading: false,
+  vsLoadPct: 0,
   training: false,
   dummy: "idle",
   trainMeter: false,
@@ -1018,7 +1066,7 @@ export function GameView() {
       <div className="relative aspect-video h-auto max-h-full w-full max-w-full">
       <canvas ref={canvasRef} className="block h-full w-full touch-none bg-bg" />
 
-      {hud.loading && (
+      {hud.loading && hud.loadPct < 0.995 && (
         <Overlay>
           <h2 className="font-display text-4xl">SINTER KOMBAT</h2>
           <p className="text-muted tracking-widest">BETÖLTÉS</p>
@@ -1048,7 +1096,7 @@ export function GameView() {
         <div
           className="absolute inset-0 z-10 flex flex-col"
           style={{
-            backgroundImage: `url(${asset("/ui/mainmenu.png?v=19")})`,
+            backgroundImage: `url(${asset("/ui/mainmenu.png?v=20")})`,
             backgroundSize: "cover",
             backgroundPosition: "center top",
           }}
@@ -1316,7 +1364,7 @@ export function GameView() {
           <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=21`)}
+                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=255`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
               />
@@ -1331,7 +1379,7 @@ export function GameView() {
             </div>
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=21`)}
+                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=255`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
                 style={{ transform: "scaleX(-1)" }}
@@ -1342,6 +1390,14 @@ export function GameView() {
               </div>
             </div>
           </div>
+          {hud.vsLoading && (
+            <div className="absolute bottom-4 left-1/2 z-20 w-72 max-w-[80vw] -translate-x-1/2 text-center">
+              <p className="text-muted mb-1 text-xs tracking-widest">BETÖLTÉS</p>
+              <div className="h-2 overflow-hidden rounded-sm border border-gold bg-bg">
+                <div className="bg-gold h-full" style={{ width: `${Math.round(hud.vsLoadPct * 100)}%` }} />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1435,7 +1491,7 @@ export function GameView() {
         <div className="absolute inset-0 z-10">
           {hud.winner && VICTORY_ART[hud.winner] && (
             <img
-              src={asset(`${VICTORY_ART[hud.winner]}?v=1`)}
+              src={asset(`${VICTORY_ART[hud.winner]}?v=255`)}
               alt=""
               className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
@@ -1678,7 +1734,7 @@ function SelectPanel({
         <>
           <div className="flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden">
             <img
-              src={asset(`/sprites/${id}/idle.png?v=63`)}
+              src={asset(`/sprites/${id}/idle.png?v=82`)}
               alt=""
               className={`max-h-full max-w-full object-contain object-bottom ${side === "right" ? "-scale-x-100" : ""}`}
             />
