@@ -1415,7 +1415,7 @@ export function GameView() {
           <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=270`)}
+                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=29`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
               />
@@ -1430,7 +1430,7 @@ export function GameView() {
             </div>
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=270`)}
+                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=29`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
                 style={{ transform: "scaleX(-1)" }}

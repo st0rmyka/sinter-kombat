@@ -749,15 +749,15 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
-  renike: "/ui/vs/renike.png",
-  ricsi: "/ui/vs/ricsi.png",
-  cica: "/ui/vs/cica.png",
-  agi: "/ui/vs/agi.png",
-  cricsi: "/ui/vs/cricsi.png",
-  jezus: "/ui/vs/jezus.png",
-  hoffer: "/ui/vs/hoffer.png",
-  farajo: "/ui/vs/farajo.png",
-  gabi: "/ui/vs/gabi.png",
+  renike: "/ui/vs/renike.jpg",
+  ricsi: "/ui/vs/ricsi.jpg",
+  cica: "/ui/vs/cica.jpg",
+  agi: "/ui/vs/agi.jpg",
+  cricsi: "/ui/vs/cricsi.jpg",
+  jezus: "/ui/vs/jezus.jpg",
+  hoffer: "/ui/vs/hoffer.jpg",
+  farajo: "/ui/vs/farajo.jpg",
+  gabi: "/ui/vs/gabi.jpg",
 };
 
 const W = 1280;
@@ -1232,7 +1232,7 @@ export class KitchenKombat {
       this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
-    }, 18000);
+    }, 8000);
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
@@ -1244,15 +1244,16 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 20000);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 6000);
         im.src = asset(src);
       });
-    const bust = "?v=83";
+    const bust = "?v=84";
     const ui = [
       "/ui/mainmenu-v265.jpg",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
-      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=270`),
+      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=29`),
+      ...STAGE_IDS.map((id) => STAGES[id].art),
     ];
     const jobs: Array<() => Promise<void>> = [];
     jobs.push(async () => {
@@ -1260,7 +1261,15 @@ export class KitchenKombat {
     });
     for (const src of ui) {
       if (src.includes("mainmenu")) continue;
-      jobs.push(async () => { await loadTick(src); });
+      jobs.push(async () => {
+        const im = await loadTick(src);
+        for (const id of STAGE_IDS) {
+          if (src === STAGES[id].art) {
+            this.stageArts[id] = im;
+            this.loadedStages.add(id);
+          }
+        }
+      });
     }
     for (const id of CHAR_IDS) {
       jobs.push(async () => {
@@ -1298,8 +1307,11 @@ export class KitchenKombat {
     };
     try {
       await Promise.all([
-        runPool(jobs, 12),
-        preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
+        runPool(jobs, 8),
+        Promise.race([
+          preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
+          new Promise<void>((r) => window.setTimeout(r, 5000)),
+        ]),
       ]);
       reveal();
     } catch (err) {
@@ -1356,7 +1368,7 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 20000);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 6000);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1364,7 +1376,7 @@ export class KitchenKombat {
       "punchL","punchR","kickL","kickR","block","dash","jumpPunchL","jumpPunchR",
       "jumpKickL","jumpKickR","lowPunchL","lowPunchR","lowKickL","lowKickR","special2","crouch",
     ];
-    const bust = "?v=83";
+    const bust = "?v=84";
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
@@ -1438,8 +1450,13 @@ export class KitchenKombat {
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
     try {
-      await runPool(jobs, 10);
-      await preloadSfx(tick, sfxFightList(ids), musicFightList(stageId));
+      await Promise.all([
+        runPool(jobs, 8),
+        Promise.race([
+          preloadSfx(tick, sfxFightList(ids), musicFightList(stageId)).catch(() => undefined),
+          new Promise<void>((r) => window.setTimeout(r, 8000)),
+        ]),
+      ]);
     } catch (err) {
       console.error("fight load", err);
     }
@@ -3772,8 +3789,10 @@ export class KitchenKombat {
   drawFighter(f: Fighter) {
     if (!this.images || !this.boxes) return;
     const anim = f.state === "attack" ? this.attackFrame(f) : null;
-    const img = anim ?? this.images[f.id]?.[f.pose] ?? this.images[f.id]?.idle;
-    if (!img || !(img.naturalWidth || img.width)) return;
+    const pick = (im: HTMLImageElement | null | undefined) =>
+      im && (im.naturalWidth || im.width) > 8 ? im : null;
+    const img = pick(anim) ?? pick(this.images[f.id]?.[f.pose]) ?? pick(this.images[f.id]?.idle);
+    if (!img) return;
     const idle0 = this.boxes[f.id]?.idle;
     const idle =
       idle0 && idle0.h > 8

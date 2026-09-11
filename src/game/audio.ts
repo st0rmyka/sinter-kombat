@@ -359,10 +359,19 @@ function beep(freq: number, dur: number, type: OscillatorType, vol: number, slid
 
 async function decodeUrl(url: string) {
   const c = ac();
-  const res = await fetch(asset(url));
-  if (!res.ok) throw new Error(url);
-  const raw = await res.arrayBuffer();
-  return await c.decodeAudioData(raw.slice(0));
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = window.setTimeout(() => ctrl?.abort(), 4000);
+  try {
+    const res = await fetch(asset(url), ctrl ? { signal: ctrl.signal } : undefined);
+    if (!res.ok) throw new Error(url);
+    const raw = await res.arrayBuffer();
+    return await Promise.race([
+      c.decodeAudioData(raw.slice(0)),
+      new Promise<AudioBuffer>((_, rej) => window.setTimeout(() => rej(new Error("decode timeout")), 4000)),
+    ]);
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export function sfxPreloadList(): string[] {
