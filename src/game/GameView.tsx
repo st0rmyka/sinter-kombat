@@ -9,6 +9,15 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.3",
+    items: [
+      "Új pályák: Salgótarján, Nagybátony – Vasút",
+      "Gabi voice + pisztoly SFX, baseball 5 csapás arányos sebzéssel",
+      "Fárajó gitár alatt a pályazene szünetel, utána onnan folytatódik",
+      "VS képek JPG, fehér keret; boot preload a menü/választó/pályákhoz",
+    ],
+  },
+  {
     v: "v0.28",
     items: [
       "Új karakter: Gabi az Idegbeteg — baseballütő (5 csapás, közel, knockback) + agyonlövés (fejmagasság, guggolva kikerülhető)",

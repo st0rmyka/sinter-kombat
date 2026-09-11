@@ -42,9 +42,9 @@ declare global {
 
 export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi";
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi"];
-export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
-export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.28";
+export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony";
+export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony"];
+export const GAME_VERSION = "v0.3";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -512,7 +512,7 @@ const SPECIAL_BAT: Atk = {
   startup: 0.08,
   active: 0.72,
   recover: 0.2,
-  dmg: 12,
+  dmg: 7,
   hitstun: 0.16,
   blockstun: 0.1,
   knock: 210,
@@ -712,7 +712,7 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s2: "R1 Gitárszóló — amíg nyomva tartod és van energia, gyógyítja Fárajót.",
   },
   gabi: {
-    s1: "L1 Baseballütő — három erős csapás baseballütővel, blokkolható.",
+    s1: "L1 Baseballütő — öt közel csapás baseballütővel, knockback, blokkolható.",
     s2: "R1 Agyonlövés — pisztollyal céloz a fejre, majd lő. Blokkolható projectile.",
   },
 };
@@ -723,6 +723,8 @@ export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string
   kisterenye: { id: "kisterenye", name: "KISTERENYE", nameHu: "Kisterenye", art: "/stages/kisterenye.jpg?v=31" },
   golgota: { id: "golgota", name: "GOLGOTA", nameHu: "Golgota", art: "/stages/golgota.jpg?v=19" },
   nepszinhaz: { id: "nepszinhaz", name: "NEPSZINHAZ", nameHu: "Népszínház utca", art: "/stages/nepszinhaz.jpg?v=19" },
+  salgotarjan: { id: "salgotarjan", name: "SALGOTARJAN", nameHu: "Salgótarján", art: "/stages/salgotarjan.jpg?v=29" },
+  nagybatony: { id: "nagybatony", name: "NAGYBATONY", nameHu: "Nagybátony - Vasút", art: "/stages/nagybatony.jpg?v=29" },
 };
 
 export const ROUND_CALL: Record<number, string> = {
@@ -1232,7 +1234,7 @@ export class KitchenKombat {
       this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
-    }, 8000);
+    }, 5000);
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
@@ -1244,7 +1246,7 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 6000);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 3500);
         im.src = asset(src);
       });
     const bust = "?v=84";
@@ -1306,12 +1308,10 @@ export class KitchenKombat {
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
     try {
-      await Promise.all([
-        runPool(jobs, 8),
-        Promise.race([
-          preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
-          new Promise<void>((r) => window.setTimeout(r, 5000)),
-        ]),
+      await runPool(jobs, 8);
+      await Promise.race([
+        preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
+        new Promise<void>((r) => window.setTimeout(r, 2500)),
       ]);
       reveal();
     } catch (err) {
@@ -1368,7 +1368,7 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 6000);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 3500);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1450,12 +1450,10 @@ export class KitchenKombat {
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
     try {
-      await Promise.all([
-        runPool(jobs, 8),
-        Promise.race([
-          preloadSfx(tick, sfxFightList(ids), musicFightList(stageId)).catch(() => undefined),
-          new Promise<void>((r) => window.setTimeout(r, 8000)),
-        ]),
+      await runPool(jobs, 8);
+      await Promise.race([
+        preloadSfx(tick, sfxFightList(ids), musicFightList(stageId)).catch(() => undefined),
+        new Promise<void>((r) => window.setTimeout(r, 4000)),
       ]);
     } catch (err) {
       console.error("fight load", err);
@@ -2647,6 +2645,7 @@ export class KitchenKombat {
     };
     sfxPlay.farajoBed("p1", live(this.f1));
     sfxPlay.farajoBed("p2", live(this.f2));
+    sfxPlay.stageHoldForGuitar(live(this.f1) === "guitar" || live(this.f2) === "guitar");
   }
 
   tickBody(f: Fighter, dt: number) {
@@ -3268,7 +3267,6 @@ export class KitchenKombat {
     });
     this.specialCallout(CHARACTERS[f.id].special2, 0.8);
     this.trauma = Math.min(1, this.trauma + 0.18);
-    sfxPlay.charSpecial2(f.id);
     const n = this.reduced ? 4 : 8;
     for (let i = 0; i < n; i++) {
       this.particles.push({

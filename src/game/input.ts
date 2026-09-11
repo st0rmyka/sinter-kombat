@@ -159,27 +159,28 @@ function connectedPads() {
     list.push(g);
     byFamily.set(key, list);
   }
-  const candidates: Gamepad[] = [];
+  const unique: Gamepad[] = [];
   for (const group of byFamily.values()) {
     const std = group.filter((g) => g.mapping === "standard");
-    const pick = (std.length ? std : group).sort((a, b) => a.index - b.index);
-    candidates.push(...pick);
+    const pool = (std.length ? std : group).sort((a, b) => a.index - b.index);
+    const kept: Gamepad[] = [];
+    for (const g of pool) {
+      const twin = kept.find((u) => {
+        if (u.index === g.index) return true;
+        if (u.mapping !== g.mapping) return true;
+        if (padIdle(u) && padIdle(g)) return true;
+        if (!padIdle(u) && !padIdle(g) && padStateSame(u, g)) return true;
+        return false;
+      });
+      if (twin) {
+        if (padIdle(twin) && !padIdle(g)) kept[kept.indexOf(twin)] = g;
+        continue;
+      }
+      kept.push(g);
+    }
+    unique.push(...kept);
   }
-  candidates.sort((a, b) => a.index - b.index);
-  const unique: Gamepad[] = [];
-  for (const g of candidates) {
-    const twin = unique.find((u) => {
-      if (u.index === g.index) return true;
-      const sameFamily =
-        (vendorProduct(u.id) && vendorProduct(u.id) === vendorProduct(g.id)) ||
-        normalizePadId(u.id) === normalizePadId(g.id);
-      if (sameFamily && u.mapping !== g.mapping) return true;
-      if (padIdle(g) || padIdle(u)) return false;
-      return padStateSame(u, g);
-    });
-    if (twin) continue;
-    unique.push(g);
-  }
+  unique.sort((a, b) => a.index - b.index);
   return unique;
 }
 
@@ -191,9 +192,15 @@ function assignedPads() {
   const live = new Set(pads.map((p) => p.index));
   if (lockP1 >= 0 && !live.has(lockP1)) lockP1 = -1;
   if (lockP2 >= 0 && !live.has(lockP2)) lockP2 = -1;
+  if (pads.length < 2) lockP2 = -1;
+  const p1Idle = lockP1 >= 0 ? pads.find((p) => p.index === lockP1) : undefined;
+  if (p1Idle && padIdle(p1Idle)) {
+    const active = pads.find((p) => p.index !== lockP2 && p.index !== lockP1 && !padIdle(p));
+    if (active) lockP1 = active.index;
+  }
   for (const p of pads) {
     if (lockP1 < 0 && p.index !== lockP2) lockP1 = p.index;
-    else if (lockP2 < 0 && p.index !== lockP1) lockP2 = p.index;
+    else if (pads.length >= 2 && lockP2 < 0 && p.index !== lockP1) lockP2 = p.index;
   }
   const p1 = pads.find((p) => p.index === lockP1);
   const p2 = pads.find((p) => p.index === lockP2);
@@ -313,7 +320,7 @@ function fromKeyMap(map: Record<KeyAction, string>, extra?: Partial<Record<KeyAc
 }
 
 export function sampleP1(): Actions {
-  const { p1 } = assignedPads();
+  const { p1, p2, pads } = assignedPads();
   const keys = fromKeyMap(getKeys(), {
     left: ["ArrowLeft"],
     right: ["ArrowRight"],
@@ -321,7 +328,11 @@ export function sampleP1(): Actions {
     down: ["ArrowDown"],
     start: ["Escape"],
   });
-  const a = edges(merge(keys, fromPad(p1)), prevP1);
+  let extra = empty();
+  if (!p2 || pads.length < 2) {
+    for (const pad of pads) extra = merge(extra, fromPad(pad));
+  } else extra = fromPad(p1);
+  const a = edges(merge(keys, extra), prevP1);
   prevP1 = { ...a };
   return a;
 }

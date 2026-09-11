@@ -1,7 +1,7 @@
 {
   "name": "sinter-kombat",
   "productName": "Sinter Kombat",
-  "version": "0.26.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "main.mjs",

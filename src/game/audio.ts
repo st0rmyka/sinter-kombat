@@ -24,10 +24,13 @@ const MUSIC_FILES: Record<string, string> = {
   kisterenye: "/music/kisterenye.mp3",
   golgota: "/music/golgota.mp3",
   nepszinhaz: "/music/nepszinhaz.mp3",
+  salgotarjan: "/music/salgotarjan.mp3",
+  nagybatony: "/music/nagybatony.mp3",
 };
 const MUSIC_VOL = 0.48;
 
 const buffers = new Map<string, AudioBuffer>();
+const rawCache = new Map<string, ArrayBuffer>();
 export let lastRoundSfx = 0;
 
 const ROUND_FILES: Record<number, string> = {
@@ -134,6 +137,18 @@ const FARAJO_DAMAGE: VoicePool = {
 const FARAJO_DEFEAT = "/sfx/farajo_defeat.mp3";
 const FARAJO_TROMBITA = "/sfx/farajo_special_trombita.mp3";
 const FARAJO_GITAR = "/sfx/farajo_special_gitar.mp3";
+const GABI_ATTACK: VoicePool = {
+  files: ["/sfx/gabi_attack1.mp3", "/sfx/gabi_attack2.mp3", "/sfx/gabi_attack3.mp3"],
+  last: -1,
+};
+const GABI_DAMAGE: VoicePool = {
+  files: ["/sfx/gabi_damage1.mp3", "/sfx/gabi_damage2.mp3", "/sfx/gabi_damage3.mp3"],
+  last: -1,
+};
+const GABI_DEFEAT = "/sfx/gabi_defeat.mp3";
+const GABI_BAT = "/sfx/gabi_special_baseballuto.mp3";
+const GABI_SHOT = "/sfx/gabi_special_agyonloves.mp3";
+const GABI_PISTOL = "/sfx/gabi_pisztoly.mp3";
 const RENIKE_FING = "/sfx/renike_fing.mp3";
 const RICSI_HANYAS = "/sfx/ricsi_hanyas.mp3";
 const CICA_QUAKE = "/sfx/cica_quake.mp3";
@@ -171,13 +186,14 @@ const CHAR_TAUNT: Record<string, string> = {
   jezus: "/sfx/jezus_taunt.mp3",
   hoffer: "/sfx/hofferjozsi_taunt.mp3",
   farajo: "/sfx/farajo_taunt.mp3",
+  gabi: "/sfx/gabi_taunt.mp3",
 };
 
-const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK, farajo: FARAJO_ATTACK };
-const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE, farajo: FARAJO_DAMAGE };
-const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT, farajo: FARAJO_DEFEAT };
-const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM, farajo: FARAJO_TROMBITA };
-const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE, farajo: FARAJO_GITAR };
+const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK, farajo: FARAJO_ATTACK, gabi: GABI_ATTACK };
+const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE, farajo: FARAJO_DAMAGE, gabi: GABI_DAMAGE };
+const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT, farajo: FARAJO_DEFEAT, gabi: GABI_DEFEAT };
+const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM, farajo: FARAJO_TROMBITA, gabi: GABI_BAT };
+const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE, farajo: FARAJO_GITAR, gabi: GABI_SHOT };
 
 const voices = new Map<string, AudioBufferSourceNode>();
 
@@ -358,20 +374,28 @@ function beep(freq: number, dur: number, type: OscillatorType, vol: number, slid
 }
 
 async function decodeUrl(url: string) {
+  const hit = buffers.get(url);
+  if (hit) return hit;
   const c = ac();
-  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = window.setTimeout(() => ctrl?.abort(), 4000);
-  try {
-    const res = await fetch(asset(url), ctrl ? { signal: ctrl.signal } : undefined);
-    if (!res.ok) throw new Error(url);
-    const raw = await res.arrayBuffer();
-    return await Promise.race([
-      c.decodeAudioData(raw.slice(0)),
-      new Promise<AudioBuffer>((_, rej) => window.setTimeout(() => rej(new Error("decode timeout")), 4000)),
-    ]);
-  } finally {
-    window.clearTimeout(timer);
+  let raw = rawCache.get(url);
+  if (!raw) {
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = window.setTimeout(() => ctrl?.abort(), 3500);
+    try {
+      const res = await fetch(asset(url), ctrl ? { signal: ctrl.signal } : undefined);
+      if (!res.ok) throw new Error(url);
+      raw = await res.arrayBuffer();
+      rawCache.set(url, raw);
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
+  const buf = await Promise.race([
+    c.decodeAudioData(raw.slice(0)),
+    new Promise<AudioBuffer>((_, rej) => window.setTimeout(() => rej(new Error("decode timeout")), 2500)),
+  ]);
+  buffers.set(url, buf);
+  return buf;
 }
 
 export function sfxPreloadList(): string[] {
@@ -405,6 +429,7 @@ export function sfxFightList(ids: string[]): string[] {
       add(FARAJO_TROMBITA);
       add(FARAJO_GITAR);
     }
+    if (id === "gabi") add(GABI_PISTOL);
   }
   return extra;
 }
@@ -427,12 +452,16 @@ export async function preloadSfx(onItem?: () => void, urls?: string[], musicUrls
   const list = urls ?? sfxPreloadList();
   await Promise.all(
     list.map(async (url) => {
-      if (buffers.has(url)) {
+      if (buffers.has(url) || rawCache.has(url)) {
         onItem?.();
         return;
       }
       try {
-        buffers.set(url, await decodeUrl(url));
+        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const t = window.setTimeout(() => ctrl?.abort(), 2500);
+        const res = await fetch(asset(url), ctrl ? { signal: ctrl.signal } : undefined);
+        window.clearTimeout(t);
+        if (res.ok) rawCache.set(url, await res.arrayBuffer());
       } catch {
         /* missing clip must not block the match */
       }
@@ -447,7 +476,10 @@ export async function preloadSfx(onItem?: () => void, urls?: string[], musicUrls
         return;
       }
       try {
-        const res = await fetch(asset(url));
+        const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const t = window.setTimeout(() => ctrl?.abort(), 4000);
+        const res = await fetch(asset(url), ctrl ? { signal: ctrl.signal } : undefined);
+        window.clearTimeout(t);
         if (res.ok) {
           const blob = await res.blob();
           MUSIC_BLOBS[url] = URL.createObjectURL(blob);
@@ -772,6 +804,7 @@ export const sfxPlay = {
     if (id === "jezus") playOneShot(url, 2.4, 1);
     else if (id === "agi") playOneShot(url, 1, 1);
     else if (id === "hoffer") playOneShot(url, voiceVol(id, 1), 1);
+    else if (id === "gabi") playOneShot(url, 1, 1);
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial2: (id: string) => {
@@ -781,7 +814,10 @@ export const sfxPlay = {
     if (id === "jezus") playOneShot(url, 2.4, 1);
     else if (id === "agi" || id === "cricsi") playOneShot(url, 1, 1);
     else if (id === "hoffer") playOneShot(url, voiceVol(id, 1), 1);
-    else playVoice(id, url, voiceVol(id, 1), 1);
+    else if (id === "gabi") {
+      playOneShot(url, 1, 1);
+      playOneShot(GABI_PISTOL, 1, 1);
+    } else playVoice(id, url, voiceVol(id, 1), 1);
   },
   quake: () => playOneShot(CICA_QUAKE, voiceVol("cica", 0.95), 0.96 + Math.random() * 0.08),
   charName: (id: string) => {
@@ -842,6 +878,7 @@ export const sfxPlay = {
   },
   farajoBed: (side: string, mode: FarajoMode | null) => syncFarajoBed(side, mode),
   farajoReset: () => resetFarajoBeds(),
+  stageHoldForGuitar: (on: boolean) => setGuitarStageHold(on),
 };
 
 export function startKitchenDrone() {
@@ -909,9 +946,26 @@ export function startMenuMusic() {
   });
 }
 
+let guitarHold = false;
+
+function setGuitarStageHold(on: boolean) {
+  if (on === guitarHold) return;
+  guitarHold = on;
+  if (!musicEl || musicKind !== "stage") return;
+  if (on) {
+    if (!musicEl.paused) musicEl.pause();
+    return;
+  }
+  musicEl.muted = mix().music <= 0;
+  void musicEl.play().catch(() => {
+    /* autoplay */
+  });
+}
+
 export function startStageMusic(stage: string) {
   const url = MUSIC_FILES[stage] ?? MUSIC_FILES.kitchen;
   if (!url) return;
+  guitarHold = false;
   const c = ac();
   if (c.state === "suspended") void c.resume();
   const el = ensureMusicEl(url, "stage");
@@ -930,6 +984,7 @@ export function startStageMusic(stage: string) {
 }
 
 export function stopStageMusic() {
+  guitarHold = false;
   if (!musicEl) return;
   musicEl.pause();
   try {

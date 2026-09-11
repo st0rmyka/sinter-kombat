@@ -98,9 +98,9 @@ function patchPlist(plistPath, { name, ident }) {
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.24</string>
+	<string>0.3</string>
 	<key>CFBundleVersion</key>
-	<string>0.24</string>
+	<string>0.3</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.games</string>
 	<key>LSMinimumSystemVersion</key>
