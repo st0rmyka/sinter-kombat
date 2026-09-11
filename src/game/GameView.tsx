@@ -9,6 +9,16 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.27",
+    items: [
+      "Jézus Szent oszlop: csak akkor gyógyít, ha Jézus bent áll",
+      "Fárajó trombita +5% sebzés, Ági vérszívás azonnal indul és hitstunból is kimegy",
+      "Mobil: fektetett teljes kijelző, csak landscape, főmenü háttér kitölti a képernyőt",
+      "Főmenü: kisebb szöveg, Frissítések bal fent, Beállítások jobb lent",
+      "Betöltés 2%-os beragadás javítva",
+    ],
+  },
+  {
     v: "v0.266",
     items: [
       "Fárajó harci hangok (ütés, sebzés, KO)",
@@ -1065,7 +1075,7 @@ export function GameView() {
   return (
     <div
       ref={wrapRef}
-      className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-bg text-fg"
+      className="relative flex h-[100dvh] w-[100dvw] max-w-none items-center justify-center overflow-hidden bg-bg text-fg"
       onPointerDown={() => {
         boot();
         if (!titleStung.current && hudRef.current.screen === "title" && !hudRef.current.loading) {
@@ -1074,7 +1084,7 @@ export function GameView() {
         }
       }}
     >
-      <div className="relative aspect-video h-auto max-h-full w-full max-w-full">
+      <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="block h-full w-full touch-none bg-bg" />
 
       {hud.loading && hud.loadPct < 0.995 && (
@@ -1104,14 +1114,19 @@ export function GameView() {
       )}
 
       {hud.screen === "title" && !hud.loading && (
-        <div className="absolute inset-0 z-10 flex flex-col overflow-hidden bg-[#1a1210]">
+        <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
             src={asset("/ui/mainmenu-v265.jpg")}
             alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
+            className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
+            style={{ objectPosition: "center 18%" }}
             draggable={false}
           />
-          <div className="from-bg/90 relative z-[1] mt-auto flex flex-col items-center gap-1 bg-gradient-to-t to-transparent px-4 pb-10 pt-16">
+          <div
+            className={`relative z-[1] mt-auto flex flex-col items-center bg-gradient-to-t from-black/75 via-black/35 to-transparent px-4 ${
+              touchUi ? "gap-1 pb-3 pt-3" : "gap-1 pb-10 pt-16"
+            }`}
+          >
             {confirm && hud.screen === "title" ? (
               <ConfirmBox q={confirm.q} choice={confirmChoice} onYes={confirm.yes} onNo={() => setConfirm(null)} />
             ) : menu === "root"
@@ -1142,8 +1157,12 @@ export function GameView() {
                         gameRef.current?.chooseMode(true, diff, true);
                       } else ask("Biztos ki akarsz lépni a játékból?", goExit);
                     }}
-                    className={`font-display min-h-11 min-w-64 px-6 text-center text-2xl tracking-wide transition-colors sm:text-3xl ${
-                      titleIdx === item.i ? "text-gold" : "text-fg/70 hover:text-fg"
+                    className={`font-display min-w-48 text-center tracking-wide transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] ${
+                      touchUi
+                        ? "min-h-0 px-3 py-0.5 text-[clamp(15px,4.2vh,20px)] leading-tight"
+                        : "min-h-11 min-w-64 px-6 text-2xl sm:text-3xl"
+                    } ${
+                      titleIdx === item.i ? "text-gold" : "text-white/90 hover:text-fg"
                     }`}
                   >
                     {titleIdx === item.i ? `▸ ${item.label}` : item.label}
@@ -1159,9 +1178,15 @@ export function GameView() {
                       resetSelect(true);
                       gameRef.current?.chooseMode(true, d);
                     }}
-                    className={`font-display min-h-11 min-w-64 px-6 text-center tracking-wide transition-colors ${
-                      d === "szopni" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
-                    } ${diff === d ? "text-gold" : "text-fg/70 hover:text-fg"}`}
+                    className={`font-display min-w-48 text-center tracking-wide transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] ${
+                      d === "szopni"
+                        ? touchUi
+                          ? "min-h-0 px-3 py-0.5 text-[clamp(14px,3.8vh,18px)] leading-tight"
+                          : "min-h-11 min-w-64 px-6 text-xl sm:text-2xl"
+                        : touchUi
+                          ? "min-h-0 px-3 py-0.5 text-[clamp(15px,4.2vh,20px)] leading-tight"
+                          : "min-h-11 min-w-64 px-6 text-2xl sm:text-3xl"
+                    } ${diff === d ? "text-gold" : "text-white/90 hover:text-fg"}`}
                   >
                     {diff === d ? "▸ " : ""}
                     {difficultyLabel(d)}
@@ -1169,20 +1194,8 @@ export function GameView() {
                 ))}
           </div>
           {menu === "root" && (
-            <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setTitleIdx(5);
-                  setSetIdx(0);
-                  setSettings(true);
-                }}
-                className={`font-display min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
-                  titleIdx === 5 ? "text-gold" : "text-fg/70 hover:text-fg"
-                }`}
-              >
-                {titleIdx === 5 ? "▸ Beállítások" : "Beállítások"}
-              </button>
+            <>
+            <div className={`absolute left-3 z-10 flex flex-col items-start ${touchUi ? "top-2 gap-1" : "top-4 gap-1"}`}>
               <button
                 type="button"
                 onClick={() => {
@@ -1190,13 +1203,33 @@ export function GameView() {
                   setPatchIdx(0);
                   setUpdates(true);
                 }}
-                className={`font-display min-h-11 px-4 text-right text-lg tracking-wide sm:text-xl ${
-                  titleIdx === 6 ? "text-gold" : "text-fg/70 hover:text-fg"
+                className={`font-display text-left tracking-wide [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] ${
+                  touchUi ? "min-h-0 px-2 py-0.5 text-[clamp(12px,3.4vh,16px)] leading-tight" : "min-h-11 px-4 text-lg sm:text-xl"
+                } ${
+                  titleIdx === 6 ? "text-gold" : "text-white/90 hover:text-fg"
                 }`}
               >
                 {titleIdx === 6 ? "▸ Frissítések" : "Frissítések"}
               </button>
             </div>
+            <div className={`absolute right-3 z-10 flex flex-col items-end ${touchUi ? "bottom-2 gap-1" : "bottom-4 gap-1"}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTitleIdx(5);
+                  setSetIdx(0);
+                  setSettings(true);
+                }}
+                className={`font-display text-right tracking-wide [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] ${
+                  touchUi ? "min-h-0 px-2 py-0.5 text-[clamp(12px,3.4vh,16px)] leading-tight" : "min-h-11 px-4 text-lg sm:text-xl"
+                } ${
+                  titleIdx === 5 ? "text-gold" : "text-white/90 hover:text-fg"
+                }`}
+              >
+                {titleIdx === 5 ? "▸ Beállítások" : "Beállítások"}
+              </button>
+            </div>
+            </>
           )}
         </div>
       )}
@@ -1619,6 +1652,8 @@ export function GameView() {
         </div>
       )}
 
+      {touchUi && !landscape && <RotateHint />}
+
       <div
         className="pointer-events-none absolute bottom-2 left-3 z-30 font-display text-[11px] tracking-[0.18em] text-white/75"
         style={{ textShadow: "0 1px 2px #000" }}
@@ -1802,10 +1837,13 @@ function useLandscape() {
 
 function RotateHint() {
   return (
-    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+    <div
+      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-bg px-6 text-center"
+      onPointerDown={() => goLandscape()}
+    >
       <div className="border-gold text-gold font-display rotate-90 rounded-md border px-4 py-6 text-4xl">▭</div>
       <h2 className="font-display text-3xl">FORDÍTSD EL</h2>
-      <p className="text-muted max-w-sm text-lg">A játék fektetett módban megy. Forgasd el a telefont vízszintesre.</p>
+      <p className="text-muted max-w-sm text-lg">A játék csak fektetett módban megy. Forgasd el a telefont vízszintesre.</p>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.266";
+export const GAME_VERSION = "v0.27";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -300,7 +300,7 @@ const SPECIAL_SPIT: Atk = {
 const SPECIAL2_VAMP: Atk = {
   id: "special2",
   pose: "special2",
-  startup: 0.16,
+  startup: 0,
   active: 0.26,
   recover: 0.34,
   dmg: 16,
@@ -474,7 +474,7 @@ const SPECIAL_TRUMPET: Atk = {
   startup: 0.18,
   active: 2.25,
   recover: 0.28,
-  dmg: 5,
+  dmg: 5.25,
   hitstun: 0.38,
   blockstun: 0.16,
   knock: 140,
@@ -1176,7 +1176,7 @@ export class KitchenKombat {
       this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
-    }, 20000);
+    }, 8000);
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
@@ -1186,13 +1186,9 @@ export class KitchenKombat {
           settled = true;
           res(im);
         };
-        im.onload = () => {
-          const dec = typeof im.decode === "function" ? im.decode() : null;
-          if (dec) dec.then(done, done);
-          else done();
-        };
+        im.onload = done;
         im.onerror = done;
-        window.setTimeout(done, 12000);
+        window.setTimeout(done, 4000);
         im.src = asset(src);
       });
     const bust = "?v=82";
@@ -1245,8 +1241,10 @@ export class KitchenKombat {
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
     try {
-      await runPool(jobs, 10);
-      await preloadSfx(tick, sfxMenuList(), musicMenuList());
+      await Promise.all([
+        runPool(jobs, 12),
+        preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
+      ]);
       reveal();
     } catch (err) {
       console.error("asset load", err);
@@ -1300,13 +1298,9 @@ export class KitchenKombat {
           settled = true;
           res(im);
         };
-        im.onload = () => {
-          const dec = typeof im.decode === "function" ? im.decode() : null;
-          if (dec) dec.then(done, done);
-          else done();
-        };
+        im.onload = done;
         im.onerror = done;
-        window.setTimeout(done, 12000);
+        window.setTimeout(done, 4000);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -2216,6 +2210,18 @@ export class KitchenKombat {
     if (f.pullT > 0) f.pullT = Math.max(0, f.pullT - dt);
 
     if (f.state === "hurt") {
+      if (
+        f.id === "agi" &&
+        f.hp > 0 &&
+        f.y <= 4 &&
+        f.bufSpecial2 > 0 &&
+        f.meter >= SPECIAL2_VAMP.cost &&
+        this.phase === "fight"
+      ) {
+        f.stun = 0;
+        this.startAttack(f, SPECIAL2_VAMP, false, false, false);
+        return;
+      }
       f.atk = null;
       f.spec2Spawned = false;
       f.stun -= dt;
@@ -3136,7 +3142,7 @@ export class KitchenKombat {
       w: 64,
       h: 64,
       life,
-      dmg: f.atk?.dmg ?? 5,
+      dmg: f.atk?.dmg ?? 5.25,
       dir,
       hit: false,
       arm: 0,
@@ -3446,8 +3452,9 @@ export class KitchenKombat {
   pillarPulse(z: (typeof this.zones)[number]) {
     const att = z.owner;
     const def = att === this.f1 ? this.f2 : this.f1;
+    const zoneBox = { x: z.x, y: z.y, w: z.w, h: z.h, foot: 0 };
     const heal = 2;
-    att.hp = Math.min(MAX_HP, att.hp + heal);
+    if (overlap(zoneBox, this.hurtbox(att))) att.hp = Math.min(MAX_HP, att.hp + heal);
     const cx = z.x + z.w / 2;
     const n = this.reduced ? 4 : 10;
     for (let i = 0; i < n; i++) {
@@ -4230,7 +4237,7 @@ export class KitchenKombat {
       p1Hist: this.p1Hist.slice(),
       p2Hist: this.p2Hist.slice(),
     };
-    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 200)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
+    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 1000)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.onHud(h);
