@@ -40,11 +40,11 @@ declare global {
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo";
-export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo"];
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi";
+export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.27";
+export const GAME_VERSION = "v0.28";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -107,7 +107,7 @@ type Atk = {
   cancel: AtkId[];
   low?: boolean;
   unblockable?: boolean;
-  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo";
+  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot";
   pounce?: boolean;
   heal?: number;
   shield?: boolean;
@@ -506,6 +506,44 @@ const SPECIAL_GUITAR: Atk = {
   heal: 5,
 };
 
+const SPECIAL_BAT: Atk = {
+  id: "special",
+  pose: "special",
+  startup: 0.08,
+  active: 0.72,
+  recover: 0.2,
+  dmg: 12,
+  hitstun: 0.16,
+  blockstun: 0.1,
+  knock: 210,
+  cost: 50,
+  hx: 14,
+  hy: 260,
+  hw: 108,
+  hh: 170,
+  cancel: [],
+  zone: "bat",
+};
+const SPECIAL_SHOT: Atk = {
+  id: "special2",
+  pose: "special2",
+  startup: 0.42,
+  active: 0.16,
+  recover: 0.34,
+  dmg: 28,
+  hitstun: 0.55,
+  blockstun: 0,
+  knock: 320,
+  cost: 50,
+  hx: 48,
+  hy: 310,
+  hw: 40,
+  hh: 28,
+  cancel: [],
+  zone: "shot",
+  unblockable: true,
+};
+
 function special1For(id: CharId): Atk {
   if (id === "cica") return SPECIAL_TIGER;
   if (id === "agi") return SPECIAL_SPIT;
@@ -513,6 +551,7 @@ function special1For(id: CharId): Atk {
   if (id === "jezus") return SPECIAL_PILLAR;
   if (id === "hoffer") return SPECIAL_RAGE;
   if (id === "farajo") return SPECIAL_TRUMPET;
+  if (id === "gabi") return SPECIAL_BAT;
   return SPECIAL;
 }
 function special2For(id: CharId): Atk {
@@ -523,6 +562,7 @@ function special2For(id: CharId): Atk {
   if (id === "jezus") return SPECIAL2_AURA;
   if (id === "hoffer") return SPECIAL_PULL;
   if (id === "farajo") return SPECIAL_GUITAR;
+  if (id === "gabi") return SPECIAL_SHOT;
   return SPECIAL2_VAMP;
 }
 
@@ -629,6 +669,13 @@ export const CHARACTERS: Record<
     special2: "GITÁRSZÓLÓ",
     fatality: "",
   },
+  gabi: {
+    name: "GABI AZ IDEGBETEG",
+    title: "Az Elmeháborodott",
+    special: "BASEBALLÜTŐ",
+    special2: "AGYONLÖVÉS",
+    fatality: "",
+  },
 };
 
 export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
@@ -664,6 +711,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Trombita — 2,25 mp helyben fúj, hangjegyek szinuszban az ellenfél felé, blokkolható, támadással megszakítható.",
     s2: "R1 Gitárszóló — amíg nyomva tartod és van energia, gyógyítja Fárajót.",
   },
+  gabi: {
+    s1: "L1 Baseballütő — három erős csapás baseballütővel, blokkolható.",
+    s2: "R1 Agyonlövés — pisztollyal céloz a fejre, majd lő. Blokkolható projectile.",
+  },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
@@ -681,7 +732,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -694,6 +745,7 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   jezus: "/ui/victory/Victory_Jezus.png",
   hoffer: "/ui/victory/Victory_Hoffer_Jozsi.png",
   farajo: "/ui/victory/Victory_Farajo.png",
+  gabi: "/ui/victory/Victory_Gabi.png",
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
@@ -705,6 +757,7 @@ export const VS_ART: Partial<Record<CharId, string>> = {
   jezus: "/ui/vs/jezus.png",
   hoffer: "/ui/vs/hoffer.png",
   farajo: "/ui/vs/farajo.png",
+  gabi: "/ui/vs/gabi.png",
 };
 
 const W = 1280;
@@ -802,6 +855,7 @@ type ImgBag = {
   jezus: Record<Pose, HTMLImageElement>;
   hoffer: Record<Pose, HTMLImageElement>;
   farajo: Record<Pose, HTMLImageElement>;
+  gabi: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
 };
@@ -892,6 +946,7 @@ export class KitchenKombat {
   tornadoImg: HTMLImageElement | null = null;
   noteImg: HTMLImageElement | null = null;
   noteImgs: HTMLImageElement[] = [];
+  bulletImg: HTMLImageElement | null = null;
   rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
   phase: "intro" | "fight" | "ko" | "finish" | "fatality" | "end" = "intro";
@@ -954,7 +1009,7 @@ export class KitchenKombat {
   dummyKeys: string[] = [];
   zones: {
     owner: Fighter;
-    kind: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "brush" | "note" | "solo";
+    kind: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "brush" | "note" | "solo" | "shot";
     x: number;
     y: number;
     w: number;
@@ -1150,8 +1205,9 @@ export class KitchenKombat {
       jezus: {} as Record<Pose, HTMLImageElement>,
       hoffer: {} as Record<Pose, HTMLImageElement>,
       farajo: {} as Record<Pose, HTMLImageElement>,
+      gabi: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {} };
     let revealed = false;
     const reveal = () => {
       if (revealed) return;
@@ -1160,7 +1216,7 @@ export class KitchenKombat {
         if (!bags[id].idle) bags[id].idle = emptyImg();
       }
       this.images = { ...bags, anims, stage: this.stage ?? emptyImg() };
-      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {} };
+      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {} };
       for (const id of CHAR_IDS) {
         for (const p of Object.keys(bags[id]) as Pose[]) {
           this.boxes[id][p] = measureBox(bags[id][p]);
@@ -1176,27 +1232,27 @@ export class KitchenKombat {
       this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
-    }, 8000);
+    }, 18000);
     const load = (src: string) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         let settled = false;
-        const done = () => {
+        const done = (el: HTMLImageElement) => {
           if (settled) return;
           settled = true;
-          res(im);
+          res(el);
         };
-        im.onload = done;
-        im.onerror = done;
-        window.setTimeout(done, 4000);
+        im.onload = () => done(im);
+        im.onerror = () => done(emptyImg());
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 20000);
         im.src = asset(src);
       });
-    const bust = "?v=82";
+    const bust = "?v=83";
     const ui = [
       "/ui/mainmenu-v265.jpg",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
-      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=255`),
+      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=270`),
     ];
     const jobs: Array<() => Promise<void>> = [];
     jobs.push(async () => {
@@ -1293,14 +1349,14 @@ export class KitchenKombat {
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         let settled = false;
-        const done = () => {
+        const done = (el: HTMLImageElement) => {
           if (settled) return;
           settled = true;
-          res(im);
+          res(el);
         };
-        im.onload = done;
-        im.onerror = done;
-        window.setTimeout(done, 4000);
+        im.onload = () => done(im);
+        im.onerror = () => done(emptyImg());
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 20000);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1308,14 +1364,14 @@ export class KitchenKombat {
       "punchL","punchR","kickL","kickR","block","dash","jumpPunchL","jumpPunchR",
       "jumpKickL","jumpKickR","lowPunchL","lowPunchR","lowKickL","lowKickR","special2","crouch",
     ];
-    const bust = "?v=82";
+    const bust = "?v=83";
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
     for (const id of ids) {
       if (this.loadedChars.has(id)) continue;
       for (const p of poses) {
-        if (p === "idle" && this.images[id].idle) continue;
+        if (p === "idle" && this.images[id].idle && (this.images[id].idle.naturalWidth || 0) > 32) continue;
         jobs.push(async () => {
           const im = await loadTick(`/sprites/${id}/${poseFile(p)}.png${bust}`);
           this.images![id][p] = im;
@@ -1331,7 +1387,7 @@ export class KitchenKombat {
         this.images!.anims[id].special2 = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => loadTick(`/sprites/${id}/special2${i}.png${bust}`)));
       });
       const vic = VICTORY_ART[id];
-      if (vic) jobs.push(async () => { await loadTick(`${vic}?v=255`); });
+      if (vic) jobs.push(async () => { await loadTick(`${vic}?v=270`); });
     }
     if (!this.loadedStages.has(stageId)) {
       jobs.push(async () => {
@@ -1387,7 +1443,11 @@ export class KitchenKombat {
     } catch (err) {
       console.error("fight load", err);
     }
-    for (const id of ids) this.loadedChars.add(id);
+    for (const id of ids) {
+      this.loadedChars.add(id);
+      const im = this.images?.[id]?.idle;
+      if (im && (im.naturalWidth || 0) > 32 && this.boxes) this.boxes[id].idle = measureBox(im);
+    }
     this.loadedStages.add(stageId);
     this.fxLoaded = true;
     this.fightReady = true;
@@ -1406,11 +1466,19 @@ export class KitchenKombat {
       this.acc += dt;
       if (this.acc > 0.12) this.acc = 0.12;
       while (this.acc >= STEP) {
-        this.step(STEP);
+        try {
+          this.step(STEP);
+        } catch (err) {
+          console.error("step", err);
+        }
         if (this.netRole && this.netWaiting) break;
         this.acc -= STEP;
       }
-      this.draw();
+      try {
+        this.draw();
+      } catch (err) {
+        console.error("draw", err);
+      }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -2292,6 +2360,18 @@ export class KitchenKombat {
         }
         return;
       }
+      if (f.atk.zone === "bat") {
+        f.pose = "special";
+        f.vx = 0;
+        this.tickBat(f, dt);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          f.state = "idle";
+          f.atk = null;
+          f.pose = "idle";
+        }
+        return;
+      }
       if (f.atk.zone === "note") {
         f.pose = "special";
         f.vx = 0;
@@ -2607,7 +2687,7 @@ export class KitchenKombat {
 
   combat(att: Fighter, def: Fighter) {
     if (!att.atk || att.hasHit || att.state !== "attack") return;
-    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.shield || att.atk.rage || att.atk.pull) return;
+    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.zone === "bat" || att.atk.zone === "shot" || att.atk.shield || att.atk.rage || att.atk.pull) return;
     if (att.atkT < att.atk.startup || att.atkT > att.atk.startup + att.atk.active) return;
     if (def.invuln > 0 || def.state === "ko") return;
     const hb = this.hitbox(att, att.atk);
@@ -2978,12 +3058,33 @@ export class KitchenKombat {
     if (def.hp <= 0) this.onKo(f, def);
   }
 
+  tickBat(f: Fighter, dt: number) {
+    if (!f.atk || f.atk.zone !== "bat") return;
+    if (f.atkT < f.atk.startup) return;
+    void dt;
+    if (!f.spec2Spawned) {
+      f.spec2Spawned = true;
+      f.spinAcc = -1;
+      this.specialCallout(CHARACTERS[f.id].special, 0.9);
+    }
+    const i = Math.min(4, Math.floor(Math.max(0, f.atkT - f.atk.startup) / 0.14));
+    if (i > f.spinAcc) {
+      f.spinAcc = i;
+      this.spinPulse(f);
+    }
+  }
+
   maybeSpec2(f: Fighter) {
     if (f.state !== "attack" || !f.atk || f.spec2Spawned) return;
     if (f.atkT < f.atk.startup) return;
     if (f.atk.zone === "pillar") {
       f.spec2Spawned = true;
       this.spawnPillar(f);
+      return;
+    }
+    if (f.atk.zone === "shot") {
+      f.spec2Spawned = true;
+      this.spawnShot(f);
       return;
     }
     if (f.atk.shield) {
@@ -3125,6 +3226,44 @@ export class KitchenKombat {
         size: 5 + Math.random() * 8,
         kind: "smoke",
         tint: Math.random() < 0.5 ? "#4aa8ff" : "#1e6ad4",
+      });
+    }
+  }
+
+  spawnShot(f: Fighter) {
+    const dir = f.facing;
+    const muzzle = 78;
+    const x = dir === 1 ? f.x + muzzle : f.x - muzzle - 52;
+    const y = GROUND - f.y - 252;
+    this.zones.push({
+      owner: f,
+      kind: "shot",
+      x,
+      y,
+      w: 52,
+      h: 46,
+      life: 0.7,
+      dmg: f.atk?.dmg ?? 28,
+      dir,
+      hit: false,
+      arm: 0,
+      jumped: false,
+    });
+    this.specialCallout(CHARACTERS[f.id].special2, 0.8);
+    this.trauma = Math.min(1, this.trauma + 0.18);
+    sfxPlay.charSpecial2(f.id);
+    const n = this.reduced ? 4 : 8;
+    for (let i = 0; i < n; i++) {
+      this.particles.push({
+        x: x + dir * Math.random() * 10,
+        y: y + 6 + (Math.random() - 0.5) * 8,
+        vx: dir * (520 + Math.random() * 220),
+        vy: (Math.random() - 0.5) * 50,
+        life: 0.12 + Math.random() * 0.12,
+        max: 0.24,
+        size: 3 + Math.random() * 4,
+        kind: "spark",
+        tint: Math.random() < 0.5 ? "#ffe14a" : "#fff6c8",
       });
     }
   }
@@ -3367,6 +3506,9 @@ export class KitchenKombat {
       if (z.kind === "spit") {
         z.x += z.dir * 820 * dt;
       }
+      if (z.kind === "shot") {
+        z.x += z.dir * 1480 * dt;
+      }
       if (z.kind === "note") {
         const age = (z.maxLife ?? 1.45) - z.life;
         z.x += z.dir * 460 * dt;
@@ -3398,12 +3540,21 @@ export class KitchenKombat {
       const def = z.owner === this.f1 ? this.f2 : this.f1;
       const att = z.owner;
       if (def.state === "ko" || def.invuln > 0) continue;
-      if (z.kind !== "spit" && z.kind !== "ki" && z.kind !== "brush" && z.kind !== "note" && z.kind !== "solo") {
+      if (z.kind !== "spit" && z.kind !== "ki" && z.kind !== "brush" && z.kind !== "note" && z.kind !== "solo" && z.kind !== "shot") {
         if (def.y > 36) z.jumped = true;
         if (z.jumped) continue;
       }
       const hurt = this.hurtbox(def);
       if (!overlap({ x: z.x, y: z.y, w: z.w, h: z.h, foot: 0 }, hurt)) continue;
+      if (z.kind === "shot") {
+        const ducked =
+          def.state === "crouch" ||
+          def.crouchGuard ||
+          def.pose === "crouch" ||
+          def.pose.startsWith("low") ||
+          (def.state === "attack" && !!def.atk?.low);
+        if (ducked) continue;
+      }
       const facingOk = def.facing === (def.x <= att.x ? 1 : -1);
       if ((z.kind === "spit" || z.kind === "brush" || z.kind === "note" || z.kind === "solo") && def.state === "block" && facingOk) {
         z.hit = true;
@@ -3436,7 +3587,7 @@ export class KitchenKombat {
       this.hitstop = 0.09;
       this.trauma = Math.min(1, this.trauma + 0.4);
       this.specialCallout(
-        z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "brush" ? "Kefe dobás!" : z.kind === "note" ? CHARACTERS[att.id].special : CHARACTERS[att.id].special2,
+        z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "shot" ? CHARACTERS[att.id].special2 : z.kind === "brush" ? "Kefe dobás!" : z.kind === "note" ? CHARACTERS[att.id].special : CHARACTERS[att.id].special2,
         0.8,
       );
       const cx = z.x + z.w / 2;
@@ -3596,6 +3747,12 @@ export class KitchenKombat {
       if (t < st) return frames[0]!;
       return frames[Math.floor((t - st) * 10) % 4]!;
     }
+    if (f.atk.zone === "bat" && frames.length >= 4) {
+      if (t < st) return frames[0]!;
+      const cycle = 0.14;
+      const local = (t - st) % cycle;
+      return frames[Math.min(frames.length - 1, Math.floor((local / cycle) * frames.length))]!;
+    }
     if ((f.atk.zone === "note" || f.atk.zone === "solo") && frames.length >= 2) {
       if (t < st) return frames[0]!;
       const n = Math.min(4, frames.length);
@@ -3615,11 +3772,16 @@ export class KitchenKombat {
   drawFighter(f: Fighter) {
     if (!this.images || !this.boxes) return;
     const anim = f.state === "attack" ? this.attackFrame(f) : null;
-    const img = anim ?? this.images[f.id][f.pose] ?? this.images[f.id].idle;
-    const idle = this.boxes[f.id].idle!;
+    const img = anim ?? this.images[f.id]?.[f.pose] ?? this.images[f.id]?.idle;
+    if (!img || !(img.naturalWidth || img.width)) return;
+    const idle0 = this.boxes[f.id]?.idle;
+    const idle =
+      idle0 && idle0.h > 8
+        ? idle0
+        : { x: 0, y: 0, w: img.naturalWidth || img.width, h: img.naturalHeight || img.height, foot: img.naturalHeight || img.height };
     const bob = f.state === "walk" ? Math.sin(this.time * 12) * 2 : 0;
     const body = 318 * f.squash;
-    let scale = body / idle.h;
+    let scale = body / Math.max(8, idle.h);
     if (f.pose === "jump") {
       const jumpBox = this.boxes[f.id].jump;
       if (jumpBox && jumpBox.h < idle.h * 0.82) {
@@ -3628,6 +3790,13 @@ export class KitchenKombat {
       }
       if (f.id === "ricsi") scale *= 1.16;
       if (f.id === "farajo") scale *= 0.76;
+    }
+    if (f.id === "gabi") {
+      if (f.pose === "jumpKickR") scale *= 0.84;
+      else if (f.pose === "jumpKickL") scale *= 1.1;
+      else if (f.pose.startsWith("jump")) scale *= 0.9;
+      if (f.pose.startsWith("low")) scale *= 0.88;
+      else if (f.pose.startsWith("punch") || f.pose.startsWith("kick")) scale *= 0.9;
     }
     if (f.id === "farajo" && (f.pose.startsWith("jumpPunch") || f.pose === "punch" || f.pose.startsWith("punchL") || f.pose.startsWith("punchR"))) {
       scale *= 0.86;
@@ -4001,6 +4170,28 @@ export class KitchenKombat {
       ctx.restore();
     }
     for (const z of this.zones) {
+      if (z.kind !== "shot" || z.hit) continue;
+      const cx = z.x + z.w / 2;
+      const cy = z.y + z.h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(z.dir, 1);
+      const a = Math.max(0.35, Math.min(1, z.life / 0.45));
+      ctx.globalAlpha = a;
+      const g = ctx.createLinearGradient(-28, 0, 36, 0);
+      g.addColorStop(0, "rgba(255,180,40,0)");
+      g.addColorStop(0.35, "rgba(255,230,120,0.85)");
+      g.addColorStop(0.7, "rgba(255,255,255,1)");
+      g.addColorStop(1, "rgba(255,80,40,0.2)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-28, -4, 64, 8);
+      ctx.fillStyle = "rgba(255,70,30,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(30, 0, 7, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    for (const z of this.zones) {
       if (z.kind !== "pillar") continue;
       const a = Math.max(0.22, Math.min(0.85, z.life / 5));
       const cx = z.x + z.w / 2;
@@ -4185,17 +4376,21 @@ export class KitchenKombat {
     ctx.fillStyle = "rgba(12,8,6,0.10)";
     ctx.fillRect(0, 0, W, H);
     if (this.screen === "fight" || this.screen === "pause") {
-      this.drawShadow(this.f1);
-      this.drawShadow(this.f2);
-      if (this.f1.x <= this.f2.x) {
-        this.drawFighter(this.f1);
-        this.drawFighter(this.f2);
-      } else {
-        this.drawFighter(this.f2);
-        this.drawFighter(this.f1);
+      try {
+        this.drawShadow(this.f1);
+        this.drawShadow(this.f2);
+        if (this.f1.x <= this.f2.x) {
+          this.drawFighter(this.f1);
+          this.drawFighter(this.f2);
+        } else {
+          this.drawFighter(this.f2);
+          this.drawFighter(this.f1);
+        }
+        for (const p of this.particles) this.drawParticle(p);
+        this.drawZones();
+      } catch (err) {
+        console.error("draw fight", err);
       }
-      for (const p of this.particles) this.drawParticle(p);
-      this.drawZones();
     }
     ctx.restore();
     if (this.screen === "fight" || this.screen === "pause") this.drawHudBars();

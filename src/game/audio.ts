@@ -149,6 +149,7 @@ const CHAR_NAME: Record<string, string> = {
   jezus: "/sfx/name_jezus.mp3",
   hoffer: "/sfx/name_hofferjozsi.mp3",
   farajo: "/sfx/name_farajo.mp3",
+  gabi: "/sfx/name_gabi.mp3",
 };
 const CHAR_WIN: Record<string, string> = {
   ricsi: "/sfx/ricsiwins.mp3",
@@ -159,6 +160,7 @@ const CHAR_WIN: Record<string, string> = {
   jezus: "/sfx/jezuswins.mp3",
   hoffer: "/sfx/hofferjozsiwins.mp3",
   farajo: "/sfx/farajowins.mp3",
+  gabi: "/sfx/gabiwins.mp3",
 };
 const CHAR_TAUNT: Record<string, string> = {
   ricsi: "/sfx/ricsi_taunt.mp3",

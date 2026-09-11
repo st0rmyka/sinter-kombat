@@ -9,6 +9,14 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.28",
+    items: [
+      "Új karakter: Gabi az Idegbeteg — baseballütő (5 csapás, közel, knockback) + agyonlövés (fejmagasság, guggolva kikerülhető)",
+      "Gabi VS/Victory képek és announcer hangok",
+      "Sprite méretek: jump+X / jump+kör igazítva",
+    ],
+  },
+  {
     v: "v0.27",
     items: [
       "Jézus Szent oszlop: csak akkor gyógyít, ha Jézus bent áll",
@@ -1407,7 +1415,7 @@ export function GameView() {
           <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=255`)}
+                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=270`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
               />
@@ -1422,7 +1430,7 @@ export function GameView() {
             </div>
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=255`)}
+                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=270`)}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
                 style={{ transform: "scaleX(-1)" }}
@@ -1534,7 +1542,7 @@ export function GameView() {
         <div className="absolute inset-0 z-10">
           {hud.winner && VICTORY_ART[hud.winner] && (
             <img
-              src={asset(`${VICTORY_ART[hud.winner]}?v=255`)}
+              src={asset(`${VICTORY_ART[hud.winner]}?v=270`)}
               alt=""
               className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
