@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz"];
-export const GAME_VERSION = "v0.265";
+export const GAME_VERSION = "v0.266";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -474,7 +474,7 @@ const SPECIAL_TRUMPET: Atk = {
   startup: 0.18,
   active: 2.25,
   recover: 0.28,
-  dmg: 8,
+  dmg: 5,
   hitstun: 0.38,
   blockstun: 0.16,
   knock: 140,
@@ -489,7 +489,7 @@ const SPECIAL_TRUMPET: Atk = {
 const SPECIAL_GUITAR: Atk = {
   id: "special2",
   pose: "special2",
-  startup: 0.14,
+  startup: 0,
   active: 30,
   recover: 0.32,
   dmg: 0,
@@ -886,6 +886,7 @@ export class KitchenKombat {
   images: ImgBag | null = null;
   boxes: Record<CharId, Partial<Record<Pose, Box>>> | null = null;
   stage: HTMLImageElement | null = null;
+  menuBg: HTMLImageElement | null = null;
   stageArts: Partial<Record<StageId, HTMLImageElement>> = {};
   brushImg: HTMLImageElement | null = null;
   tornadoImg: HTMLImageElement | null = null;
@@ -1196,13 +1197,19 @@ export class KitchenKombat {
       });
     const bust = "?v=82";
     const ui = [
-      "/ui/mainmenu.png?v=21",
+      "/ui/mainmenu-v265.jpg",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
       ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=255`),
     ];
     const jobs: Array<() => Promise<void>> = [];
-    for (const src of ui) jobs.push(async () => { await loadTick(src); });
+    jobs.push(async () => {
+      this.menuBg = await loadTick("/ui/mainmenu-v265.jpg");
+    });
+    for (const src of ui) {
+      if (src.includes("mainmenu")) continue;
+      jobs.push(async () => { await loadTick(src); });
+    }
     for (const id of CHAR_IDS) {
       jobs.push(async () => {
         bags[id].idle = await loadTick(`/sprites/${id}/idle.png${bust}`);
@@ -1939,6 +1946,17 @@ export class KitchenKombat {
 
   cpuStartString(a: Actions, combo: number, spec: number, dist: number, meter: number, id?: CharId) {
     const jesus = id === "jezus";
+    const farajo = id === "farajo";
+    if (farajo && meter >= 50 && dist > 100 && Math.random() < Math.max(0.28, spec * 2.4)) {
+      this.cpuPlan = [];
+      this.cpuPress(a, "special");
+      return;
+    }
+    if (farajo && meter >= 10 && Math.random() < Math.max(0.18, spec * 1.6)) {
+      this.cpuPlan = [];
+      this.cpuPress(a, "special2");
+      return;
+    }
     if (meter >= 50 && Math.random() < (jesus ? Math.max(0.42, spec * 3.2) : spec)) {
       this.cpuPlan = [];
       if (jesus) this.cpuPress(a, dist > 140 || Math.random() < 0.62 ? "special" : "special2");
@@ -2016,6 +2034,9 @@ export class KitchenKombat {
     const faceIn = dx > 0;
 
     if (me.state === "attack") {
+      if (me.id === "farajo" && me.atk?.zone === "solo" && me.meter > 0.4) {
+        a.special2 = true;
+      }
       if (me.atk && me.hasHit && this.cpuPlan.length) {
         const nxt = this.cpuPlan[0]!;
         if (me.atk.cancel.includes(nxt) && me.atkT >= me.atk.startup) {
@@ -2096,6 +2117,19 @@ export class KitchenKombat {
       }
     }
 
+    if (me.id === "farajo" && me.y <= 0) {
+      if (me.meter >= 10 && me.hp < MAX_HP * 0.7 && Math.random() < (hell ? 0.22 : hard ? 0.12 : 0.08)) {
+        this.cpuPress(a, "special2");
+        this.cpuAtkCd = 0.35;
+        return a;
+      }
+      if (me.meter >= 50 && dist > 110 && Math.random() < (hell ? 0.26 : hard ? 0.14 : easy ? 0.06 : 0.1)) {
+        this.cpuPress(a, "special");
+        this.cpuAtkCd = hell ? 0.4 : hard ? 0.7 : 1.0;
+        return a;
+      }
+    }
+
     if (dist > 185) {
       if (faceIn) a.right = true;
       else a.left = true;
@@ -2108,8 +2142,8 @@ export class KitchenKombat {
         this.startDash(me, faceIn ? 1 : -1);
         this.cpuDashCd = hell ? 0.7 : hard ? 1.09 : easy ? 1.84 : 1.55;
       }
-      if (dist > 200 && me.meter >= 50 && Math.random() < (me.id === "jezus" ? 0.28 : spec.special * dt * 1.8)) {
-        this.cpuPress(a, me.id === "jezus" || Math.random() < 0.45 ? "special" : "special2");
+      if (dist > 200 && me.meter >= special1For(me.id).cost && Math.random() < (me.id === "jezus" ? 0.28 : me.id === "farajo" ? spec.special * dt * 4.2 : spec.special * dt * 1.8)) {
+        this.cpuPress(a, me.id === "jezus" || me.id === "farajo" || Math.random() < 0.45 ? "special" : "special2");
       }
       return a;
     }
@@ -2399,8 +2433,14 @@ export class KitchenKombat {
   }
 
   buffered(f: Fighter): Atk | null {
-    if (f.bufSpecial2 > 0 && f.meter >= SPECIAL2_FART.cost) return special2For(f.id);
-    if (f.bufSpecial > 0 && f.meter >= SPECIAL.cost) return special1For(f.id);
+    if (f.bufSpecial2 > 0) {
+      const s2 = special2For(f.id);
+      if (f.meter >= s2.cost) return s2;
+    }
+    if (f.bufSpecial > 0) {
+      const s1 = special1For(f.id);
+      if (f.meter >= s1.cost) return s1;
+    }
     if (f.bufKickR > 0) return KICK_R;
     if (f.bufKickL > 0) return KICK_L;
     if (f.bufPunchR > 0) return PUNCH_R;
@@ -3096,7 +3136,7 @@ export class KitchenKombat {
       w: 64,
       h: 64,
       life,
-      dmg: f.atk?.dmg ?? 8,
+      dmg: f.atk?.dmg ?? 5,
       dir,
       hit: false,
       arm: 0,
@@ -3580,7 +3620,10 @@ export class KitchenKombat {
         scale *= Math.sqrt(closeUp);
       }
       if (f.id === "ricsi") scale *= 1.16;
-      if (f.id === "farajo") scale *= 0.82;
+      if (f.id === "farajo") scale *= 0.76;
+    }
+    if (f.id === "farajo" && (f.pose.startsWith("jumpPunch") || f.pose === "punch" || f.pose.startsWith("punchL") || f.pose.startsWith("punchR"))) {
+      scale *= 0.86;
     }
     if (f.id === "cica" && f.pose.startsWith("low")) scale *= 0.6;
     if (f.id === "cica" && (f.pose === "special" || (f.state === "attack" && f.atk?.pounce))) scale *= 0.68;
@@ -4126,7 +4169,8 @@ export class KitchenKombat {
     const sy = (Math.random() - 0.5) * shake;
     ctx.save();
     ctx.translate(sx, sy);
-    if (this.stage) ctx.drawImage(this.stage, 0, 0, W, H);
+    if (this.screen === "title" && this.menuBg && this.menuBg.naturalWidth) ctx.drawImage(this.menuBg, 0, 0, W, H);
+    else if (this.stage) ctx.drawImage(this.stage, 0, 0, W, H);
     else {
       ctx.fillStyle = "#1a1210";
       ctx.fillRect(0, 0, W, H);

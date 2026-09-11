@@ -9,6 +9,17 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.266",
+    items: [
+      "Fárajó harci hangok (ütés, sebzés, KO)",
+      "Fárajó CPU használja a trombitát és a gitárt",
+      "Gitár special lenyomásra azonnal indul",
+      "Trombita sebzés csökkentve",
+      "Fárajó jump + ütés spriteok kisebbek",
+      "Főmenü háttér javítva itch buildben",
+    ],
+  },
+  {
     v: "v0.265",
     items: [
       "Új főmenü háttérkép (Fárajóval a rosteren)",
@@ -1093,15 +1104,14 @@ export function GameView() {
       )}
 
       {hud.screen === "title" && !hud.loading && (
-        <div
-          className="absolute inset-0 z-10 flex flex-col"
-          style={{
-            backgroundImage: `url(${asset("/ui/mainmenu.png?v=21")})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center top",
-          }}
-        >
-          <div className="from-bg/90 mt-auto flex flex-col items-center gap-1 bg-gradient-to-t to-transparent px-4 pb-10 pt-16">
+        <div className="absolute inset-0 z-10 flex flex-col overflow-hidden bg-[#1a1210]">
+          <img
+            src={asset("/ui/mainmenu-v265.jpg")}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
+            draggable={false}
+          />
+          <div className="from-bg/90 relative z-[1] mt-auto flex flex-col items-center gap-1 bg-gradient-to-t to-transparent px-4 pb-10 pt-16">
             {confirm && hud.screen === "title" ? (
               <ConfirmBox q={confirm.q} choice={confirmChoice} onYes={confirm.yes} onNo={() => setConfirm(null)} />
             ) : menu === "root"

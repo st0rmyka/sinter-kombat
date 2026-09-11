@@ -123,6 +123,15 @@ const HOFFER_DAMAGE: VoicePool = {
 const HOFFER_DEFEAT = "/sfx/hofferjozsi_defeat.mp3";
 const HOFFER_DUHROHAM = "/sfx/hofferjozsi_special_duhroham.mp3";
 const HOFFER_GYEREIDE = "/sfx/hofferjozsi_special_gyereide.mp3";
+const FARAJO_ATTACK: VoicePool = {
+  files: ["/sfx/farajo_attack1.mp3", "/sfx/farajo_attack2.mp3", "/sfx/farajo_attack3.mp3"],
+  last: -1,
+};
+const FARAJO_DAMAGE: VoicePool = {
+  files: ["/sfx/farajo_damage1.mp3", "/sfx/farajo_damage2.mp3", "/sfx/farajo_damage3.mp3"],
+  last: -1,
+};
+const FARAJO_DEFEAT = "/sfx/farajo_defeat.mp3";
 const FARAJO_TROMBITA = "/sfx/farajo_special_trombita.mp3";
 const FARAJO_GITAR = "/sfx/farajo_special_gitar.mp3";
 const RENIKE_FING = "/sfx/renike_fing.mp3";
@@ -162,9 +171,9 @@ const CHAR_TAUNT: Record<string, string> = {
   farajo: "/sfx/farajo_taunt.mp3",
 };
 
-const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK };
-const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE };
-const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT };
+const CHAR_ATTACK: Record<string, VoicePool> = { ricsi: RICSI_ATTACK, renike: RENIKE_ATTACK, cica: CICA_ATTACK, agi: AGI_ATTACK, cricsi: CRICSI_ATTACK, jezus: JEZUS_ATTACK, hoffer: HOFFER_ATTACK, farajo: FARAJO_ATTACK };
+const CHAR_DAMAGE: Record<string, VoicePool> = { ricsi: RICSI_DAMAGE, renike: RENIKE_DAMAGE, cica: CICA_DAMAGE, agi: AGI_DAMAGE, cricsi: CRICSI_DAMAGE, jezus: JEZUS_DAMAGE, hoffer: HOFFER_DAMAGE, farajo: FARAJO_DAMAGE };
+const CHAR_DEFEAT: Record<string, string> = { ricsi: RICSI_DEFEAT, renike: RENIKE_DEFEAT, cica: CICA_DEFEAT, agi: AGI_DEFEAT, cricsi: CRICSI_DEFEAT, jezus: JEZUS_DEFEAT, hoffer: HOFFER_DEFEAT, farajo: FARAJO_DEFEAT };
 const CHAR_SPECIAL1: Record<string, string> = { agi: AGI_KOPES, jezus: JEZUS_OSZLOP, hoffer: HOFFER_DUHROHAM, farajo: FARAJO_TROMBITA };
 const CHAR_SPECIAL2: Record<string, string> = { renike: RENIKE_FING, ricsi: RICSI_HANYAS, cica: CICA_QUAKE, agi: AGI_VERSZIVAS, cricsi: CRICSI_KIBLAST, jezus: JEZUS_VEDOGOMB, hoffer: HOFFER_GYEREIDE, farajo: FARAJO_GITAR };
 
