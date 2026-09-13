@@ -40,11 +40,11 @@ declare global {
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi";
-export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi"];
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti";
+export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony"];
-export const GAME_VERSION = "v0.3";
+export const GAME_VERSION = "v0.31";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -107,7 +107,7 @@ type Atk = {
   cancel: AtkId[];
   low?: boolean;
   unblockable?: boolean;
-  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot";
+  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot" | "meteor" | "stomp";
   pounce?: boolean;
   heal?: number;
   shield?: boolean;
@@ -543,6 +543,43 @@ const SPECIAL_SHOT: Atk = {
   zone: "shot",
   unblockable: true,
 };
+const SPECIAL_METEOR: Atk = {
+  id: "special",
+  pose: "special",
+  startup: 0.38,
+  active: 0.55,
+  recover: 0.3,
+  dmg: 26,
+  hitstun: 0.55,
+  blockstun: 0,
+  knock: 280,
+  cost: 50,
+  hx: -48,
+  hy: 260,
+  hw: 110,
+  hh: 220,
+  cancel: [],
+  zone: "meteor",
+  unblockable: true,
+};
+const SPECIAL_STOMP: Atk = {
+  id: "special2",
+  pose: "special2",
+  startup: 0.24,
+  active: 0.16,
+  recover: 0.32,
+  dmg: 14,
+  hitstun: 0.42,
+  blockstun: 0.16,
+  knock: 60,
+  cost: 50,
+  hx: -36,
+  hy: 100,
+  hw: 150,
+  hh: 100,
+  cancel: [],
+  zone: "stomp",
+};
 
 function special1For(id: CharId): Atk {
   if (id === "cica") return SPECIAL_TIGER;
@@ -552,6 +589,7 @@ function special1For(id: CharId): Atk {
   if (id === "hoffer") return SPECIAL_RAGE;
   if (id === "farajo") return SPECIAL_TRUMPET;
   if (id === "gabi") return SPECIAL_BAT;
+  if (id === "isti") return SPECIAL_METEOR;
   return SPECIAL;
 }
 function special2For(id: CharId): Atk {
@@ -563,6 +601,7 @@ function special2For(id: CharId): Atk {
   if (id === "hoffer") return SPECIAL_PULL;
   if (id === "farajo") return SPECIAL_GUITAR;
   if (id === "gabi") return SPECIAL_SHOT;
+  if (id === "isti") return SPECIAL_STOMP;
   return SPECIAL2_VAMP;
 }
 
@@ -676,6 +715,13 @@ export const CHARACTERS: Record<
     special2: "AGYONLÖVÉS",
     fatality: "",
   },
+  isti: {
+    name: "MC ISTI",
+    title: "A TikTok Sztár",
+    special: "FELUGRÁS",
+    special2: "DOBBANTÁS",
+    fatality: "",
+  },
 };
 
 export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
@@ -715,6 +761,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Baseballütő — öt közel csapás baseballütővel, knockback, blokkolható.",
     s2: "R1 Agyonlövés — pisztollyal céloz a fejre, majd lő. Blokkolható projectile.",
   },
+  isti: {
+    s1: "L1 Felugrás — kiugrik a képernyőről, majd az ellenfélre zuhan. Nem blokkolható.",
+    s2: "R1 Dobbantás — földön lévő ellenfelet a levegőbe löki MC Isti felé.",
+  },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
@@ -734,7 +784,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi", isti: "MC Isti" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -748,6 +798,7 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   hoffer: "/ui/victory/Victory_Hoffer_Jozsi.png",
   farajo: "/ui/victory/Victory_Farajo.png",
   gabi: "/ui/victory/Victory_Gabi.png",
+  isti: "/ui/victory/Victory_Isti.png?v=31",
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
@@ -760,6 +811,7 @@ export const VS_ART: Partial<Record<CharId, string>> = {
   hoffer: "/ui/vs/hoffer.jpg",
   farajo: "/ui/vs/farajo.jpg",
   gabi: "/ui/vs/gabi.jpg",
+  isti: "/ui/vs/isti.jpg",
 };
 
 const W = 1280;
@@ -858,6 +910,7 @@ type ImgBag = {
   hoffer: Record<Pose, HTMLImageElement>;
   farajo: Record<Pose, HTMLImageElement>;
   gabi: Record<Pose, HTMLImageElement>;
+  isti: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
 };
@@ -1208,8 +1261,9 @@ export class KitchenKombat {
       hoffer: {} as Record<Pose, HTMLImageElement>,
       farajo: {} as Record<Pose, HTMLImageElement>,
       gabi: {} as Record<Pose, HTMLImageElement>,
+      isti: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
     let revealed = false;
     const reveal = () => {
       if (revealed) return;
@@ -1218,7 +1272,7 @@ export class KitchenKombat {
         if (!bags[id].idle) bags[id].idle = emptyImg();
       }
       this.images = { ...bags, anims, stage: this.stage ?? emptyImg() };
-      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {} };
+      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
       for (const id of CHAR_IDS) {
         for (const p of Object.keys(bags[id]) as Pose[]) {
           this.boxes[id][p] = measureBox(bags[id][p]);
@@ -1254,7 +1308,7 @@ export class KitchenKombat {
       "/ui/mainmenu-v265.jpg",
       "/ui/selection.jpg",
       ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
-      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=29`),
+      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=31`),
       ...STAGE_IDS.map((id) => STAGES[id].art),
     ];
     const jobs: Array<() => Promise<void>> = [];
@@ -2034,6 +2088,11 @@ export class KitchenKombat {
       this.cpuPress(a, "special2");
       return;
     }
+    if (id === "isti" && meter >= 50 && dist > 80 && Math.random() < Math.max(0.22, spec * 2.1)) {
+      this.cpuPlan = [];
+      this.cpuPress(a, dist > 160 ? "special" : "special2");
+      return;
+    }
     if (meter >= 50 && Math.random() < (jesus ? Math.max(0.42, spec * 3.2) : spec)) {
       this.cpuPlan = [];
       if (jesus) this.cpuPress(a, dist > 140 || Math.random() < 0.62 ? "special" : "special2");
@@ -2387,6 +2446,27 @@ export class KitchenKombat {
         }
         return;
       }
+      if (f.atk.zone === "meteor") {
+        this.tickMeteor(f, dt);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          f.state = f.y > 4 ? "jump" : "idle";
+          f.atk = null;
+          f.pose = f.y > 4 ? "jump" : "idle";
+          f.invuln = 0;
+        }
+        return;
+      }
+      if (f.atk.zone === "stomp") {
+        this.tickStomp(f, dt);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          f.state = f.y > 4 ? "jump" : "idle";
+          f.atk = null;
+          f.pose = f.y > 4 ? "jump" : "idle";
+        }
+        return;
+      }
       if (f.atk.zone === "note") {
         f.pose = "special";
         f.vx = 0;
@@ -2703,7 +2783,7 @@ export class KitchenKombat {
 
   combat(att: Fighter, def: Fighter) {
     if (!att.atk || att.hasHit || att.state !== "attack") return;
-    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.zone === "bat" || att.atk.zone === "shot" || att.atk.shield || att.atk.rage || att.atk.pull) return;
+    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.zone === "bat" || att.atk.zone === "shot" || att.atk.zone === "meteor" || att.atk.zone === "stomp" || att.atk.shield || att.atk.rage || att.atk.pull) return;
     if (att.atkT < att.atk.startup || att.atkT > att.atk.startup + att.atk.active) return;
     if (def.invuln > 0 || def.state === "ko") return;
     const hb = this.hitbox(att, att.atk);
@@ -3088,6 +3168,102 @@ export class KitchenKombat {
       f.spinAcc = i;
       this.spinPulse(f);
     }
+  }
+
+  tickMeteor(f: Fighter, dt: number) {
+    if (!f.atk || f.atk.zone !== "meteor") return;
+    void dt;
+    const def = f === this.f1 ? this.f2 : this.f1;
+    f.vx = 0;
+    f.invuln = Math.max(f.invuln, 0.06);
+    if (f.atkT < f.atk.startup) {
+      f.pose = "special";
+      f.vy = 1680;
+      if (f.y > 640) f.y = 640;
+      return;
+    }
+    if (!f.spec2Spawned) {
+      f.spec2Spawned = true;
+      f.x = def.x;
+      f.y = 560;
+      f.vy = -120;
+      this.specialCallout(CHARACTERS[f.id].special, 0.8);
+    }
+    f.pose = "jump";
+    if (f.y <= 0 && !f.hasHit) {
+      f.y = 0;
+      f.vy = 0;
+      f.pose = "special2";
+      this.meteorLand(f, def);
+    }
+  }
+
+  meteorLand(f: Fighter, def: Fighter) {
+    f.hasHit = true;
+    f.squash = 0.78;
+    this.trauma = Math.min(1, this.trauma + 0.22);
+    if (def.state === "ko" || def.invuln > 0) return;
+    if (def.shieldT > 0) {
+      def.flash = 0.1;
+      sfxPlay.block();
+      return;
+    }
+    const hb = { x: f.x - 70, y: GROUND - 280, w: 140, h: 280, foot: 0 };
+    if (!overlap(hb, this.hurtbox(def))) return;
+    def.hp = Math.max(0, def.hp - (f.atk?.dmg ?? 26));
+    def.vx = (def.x >= f.x ? 1 : -1) * (f.atk?.knock ?? 280);
+    def.stun = f.atk?.hitstun ?? 0.55;
+    def.state = "hurt";
+    def.pose = "hurt";
+    def.flash = 0.12;
+    def.y += 8;
+    sfxPlay.hit();
+    sfxPlay.charDamage(def.id);
+    if (def.hp <= 0) this.onKo(f, def);
+  }
+
+  tickStomp(f: Fighter, dt: number) {
+    if (!f.atk || f.atk.zone !== "stomp") return;
+    void dt;
+    const def = f === this.f1 ? this.f2 : this.f1;
+    f.vx = 0;
+    if (f.atkT < f.atk.startup) {
+      f.pose = "special2";
+      f.vy = 620;
+      if (f.y < 40) f.y = 40;
+      return;
+    }
+    f.pose = "special2";
+    if (f.y > 0) return;
+    f.y = 0;
+    f.vy = 0;
+    f.squash = 0.72;
+    if (f.hasHit) return;
+    f.hasHit = true;
+    this.specialCallout(CHARACTERS[f.id].special2, 0.7);
+    this.trauma = Math.min(1, this.trauma + 0.16);
+    if (def.state === "ko" || def.invuln > 0) return;
+    if (def.y > 8) return;
+    const hb = { x: f.x - 80, y: GROUND - 120, w: 160, h: 120, foot: 0 };
+    if (!overlap(hb, this.hurtbox(def))) return;
+    if (def.shieldT > 0 || (def.state === "block" && def.facing === (def.x <= f.x ? 1 : -1))) {
+      def.flash = 0.08;
+      def.stun = f.atk.blockstun;
+      sfxPlay.block();
+      return;
+    }
+    def.hp = Math.max(0, def.hp - f.atk.dmg);
+    const toward = Math.sign(f.x - def.x) || -f.facing;
+    def.vx = toward * 260;
+    def.vy = 820;
+    def.y = 18;
+    def.stun = f.atk.hitstun;
+    def.state = "hurt";
+    def.pose = "hurt";
+    def.flash = 0.1;
+    sfxPlay.hit();
+    sfxPlay.charDamage(def.id);
+    if (def.hp <= 0) this.onKo(f, def);
   }
 
   maybeSpec2(f: Fighter) {

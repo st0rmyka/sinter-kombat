@@ -9,6 +9,12 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.31",
+    items: [
+      "Új karakter: MC Isti — Felugrás (nem blokkolható meteor zuhanás) + Dobbantás (földön lévőt felé löki)",
+    ],
+  },
+  {
     v: "v0.3",
     items: [
       "Új pályák: Salgótarján, Nagybátony – Vasút",
