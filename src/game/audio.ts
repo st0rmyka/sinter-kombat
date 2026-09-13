@@ -190,6 +190,14 @@ const CHAR_WIN: Record<string, string> = {
   gabi: "/sfx/gabiwins.mp3",
   isti: "/sfx/istiwins.mp3",
 };
+const STAGE_NAME: Record<string, string> = {
+  sintertanya: "/sfx/mapname_duranda.mp3",
+  kisterenye: "/sfx/mapname_kisterenye.mp3",
+  golgota: "/sfx/mapname_golgota.mp3",
+  nepszinhaz: "/sfx/mapname_nepszinhazutca.mp3",
+  salgotarjan: "/sfx/mapname_salgotarjan.mp3",
+  nagybatony: "/sfx/mapname_nagybatony.mp3",
+};
 const CHAR_TAUNT: Record<string, string> = {
   ricsi: "/sfx/ricsi_taunt.mp3",
   renike: "/sfx/renike_taunt.mp3",
@@ -417,7 +425,7 @@ export function sfxPreloadList(): string[] {
 }
 
 export function sfxMenuList(): string[] {
-  return [TITLE_FILE, ...Object.values(CHAR_NAME)];
+  return [TITLE_FILE, ...Object.values(CHAR_NAME), ...Object.values(STAGE_NAME)];
 }
 
 export function sfxFightList(ids: string[]): string[] {
@@ -838,6 +846,11 @@ export const sfxPlay = {
   quake: () => playOneShot(CICA_QUAKE, voiceVol("cica", 0.95), 0.96 + Math.random() * 0.08),
   charName: (id: string) => {
     const url = CHAR_NAME[id];
+    if (!url) return;
+    playAnnouncerShot(url, 1);
+  },
+  stageName: (id: string) => {
+    const url = STAGE_NAME[id];
     if (!url) return;
     playAnnouncerShot(url, 1);
   },

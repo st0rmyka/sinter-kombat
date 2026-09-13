@@ -9,6 +9,15 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.4",
+    items: [
+      "Gabi neve: Gabi",
+      "MC Isti voice (attack/damage/defeat/special/taunt) + gyorsabb dobbantás, hangosabb special VO",
+      "Új főmenü kép",
+      "Pályaválasztáskor az announcer bemondja a pálya nevét (csak választáskor)",
+    ],
+  },
+  {
     v: "v0.35",
     items: [
       "Karakter- és pályaválasztó egy képernyőn, VS képek + enyhén homályos pályahátterek",
@@ -957,6 +966,7 @@ export function GameView() {
         }
         if (!gated() && (m.kickLP || m.punchLP || m.startP)) {
           armGate();
+          sfxPlay.stageName(stageCurRef.current);
           if (net.role === "host") net.stage(stageCurRef.current);
           else if (!net.role) g.confirmStage(stageCurRef.current);
         }
@@ -1403,6 +1413,7 @@ export function GameView() {
                       type="button"
                       onClick={() => {
                         setStageCur(id);
+                        sfxPlay.stageName(id);
                         const net = netRef.current;
                         if (net.role === "host") net.stage(id);
                         else if (!net.role) gameRef.current?.confirmStage(id);

@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony"];
-export const GAME_VERSION = "v0.35";
+export const GAME_VERSION = "v0.4";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -1348,6 +1348,7 @@ export class KitchenKombat {
     this.loadPct = 0.08;
     this.hudKey = "";
     this.pushHud();
+    const menuAudio = preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
     try {
       await runPool(
         fast.map((src) => async () => {
@@ -1362,6 +1363,7 @@ export class KitchenKombat {
         }),
         4,
       );
+      await menuAudio;
       reveal();
       void runPool(
         rest.map((src) => async () => {
@@ -1379,7 +1381,6 @@ export class KitchenKombat {
         }),
         4,
       );
-      void preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined);
     } catch (err) {
       console.error("asset load", err);
       reveal();
