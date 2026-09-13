@@ -1,21 +1,12 @@
-# Sinter Kombat — biztonsági mentés
+# Sinter Kombat backup
 
-**Verzió:** v0.265  
-**Git tag:** `v0.265`  
-**Időpont:** 2026-09-10 21:25 CEST  
+**Verzió:** v0.35  
+**Git tag:** `v0.35`  
+**Repo:** https://github.com/st0rmyka/sinter-kombat  
 
-**Állapot:** v0.265 — új főmenü (Fárajó a rosteren), Fárajó special SFX + taunt, jump méret, VS/victory art.
-
-GitHub: https://github.com/st0rmyka/sinter-kombat (privát)
-
-## Mi van benne
-
-Teljes játék: forrás (`src/`), sprite-ok, zene, SFX, pályák, victory/VS art, script-ek, Electron héj, dokumentáció.
-
-**Nincs benne:** `node_modules`, Vite cache, `release/`, nyers generálási `artifacts`, screenshotok, zippek.
+**Állapot:** v0.35 — egyesített karakter/pályaválasztó, transzparens VS art, blur pályahátterek, MC Isti méretezések, szürke ikonbox.
 
 ## Visszaállítás
 
-1. `git checkout v0.265`
-2. `npm install`
-3. `npm run dev`
+1. `git checkout v0.35`
+2. `npm install && npm run dev`

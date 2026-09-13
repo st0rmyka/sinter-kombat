@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony"];
-export const GAME_VERSION = "v0.31";
+export const GAME_VERSION = "v0.35";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -767,14 +767,14 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
   },
 };
 
-export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string }> = {
-  kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=31" },
-  sintertanya: { id: "sintertanya", name: "DURANDA", nameHu: "Duranda", art: "/stages/sintertanya.jpg?v=31" },
-  kisterenye: { id: "kisterenye", name: "KISTERENYE", nameHu: "Kisterenye", art: "/stages/kisterenye.jpg?v=31" },
-  golgota: { id: "golgota", name: "GOLGOTA", nameHu: "Golgota", art: "/stages/golgota.jpg?v=19" },
-  nepszinhaz: { id: "nepszinhaz", name: "NEPSZINHAZ", nameHu: "Népszínház utca", art: "/stages/nepszinhaz.jpg?v=19" },
-  salgotarjan: { id: "salgotarjan", name: "SALGOTARJAN", nameHu: "Salgótarján", art: "/stages/salgotarjan.jpg?v=29" },
-  nagybatony: { id: "nagybatony", name: "NAGYBATONY", nameHu: "Nagybátony - Vasút", art: "/stages/nagybatony.jpg?v=29" },
+export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string; blur: string }> = {
+  kitchen: { id: "kitchen", name: "KITCHEN", nameHu: "Konyha", art: "/stages/kitchen.jpg?v=31", blur: "/stages/blur/kitchen.jpg?v=2" },
+  sintertanya: { id: "sintertanya", name: "DURANDA", nameHu: "Duranda", art: "/stages/sintertanya.jpg?v=31", blur: "/stages/blur/sintertanya.jpg?v=2" },
+  kisterenye: { id: "kisterenye", name: "KISTERENYE", nameHu: "Kisterenye", art: "/stages/kisterenye.jpg?v=31", blur: "/stages/blur/kisterenye.jpg?v=2" },
+  golgota: { id: "golgota", name: "GOLGOTA", nameHu: "Golgota", art: "/stages/golgota.jpg?v=19", blur: "/stages/blur/golgota.jpg?v=2" },
+  nepszinhaz: { id: "nepszinhaz", name: "NEPSZINHAZ", nameHu: "Népszínház utca", art: "/stages/nepszinhaz.jpg?v=19", blur: "/stages/blur/nepszinhaz.jpg?v=2" },
+  salgotarjan: { id: "salgotarjan", name: "SALGOTARJAN", nameHu: "Salgótarján", art: "/stages/salgotarjan.jpg?v=29", blur: "/stages/blur/salgotarjan.jpg?v=2" },
+  nagybatony: { id: "nagybatony", name: "NAGYBATONY", nameHu: "Nagybátony - Vasút", art: "/stages/nagybatony.jpg?v=29", blur: "/stages/blur/nagybatony.jpg?v=2" },
 };
 
 export const ROUND_CALL: Record<number, string> = {
@@ -1271,7 +1271,7 @@ export class KitchenKombat {
       for (const id of CHAR_IDS) {
         if (!bags[id].idle) bags[id].idle = emptyImg();
       }
-      this.images = { ...bags, anims, stage: this.stage ?? emptyImg() };
+      this.images = { ...bags, anims, stage: this.stage && (this.stage.naturalWidth || 0) > 32 ? this.stage : emptyImg() };
       this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
       for (const id of CHAR_IDS) {
         for (const p of Object.keys(bags[id]) as Pose[]) {
@@ -1288,8 +1288,8 @@ export class KitchenKombat {
       this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
-    }, 5000);
-    const load = (src: string) =>
+    }, 8000);
+    const load = (src: string, ms = 5000) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         let settled = false;
@@ -1300,50 +1300,34 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 3500);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
         im.src = asset(src);
       });
-    const bust = "?v=84";
-    const ui = [
-      "/ui/mainmenu-v265.jpg",
+    const bust = "?v=86";
+    const fast = [
+      "/ui/mainmenu-v31.jpg",
+      ...STAGE_IDS.map((id) => STAGES[id].blur),
+      ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
+    ];
+    const vsPng = CHAR_IDS.map((id) => `/ui/vs/${id}.png?v=37`);
+    const rest = [
       "/ui/selection.jpg",
-      ...CHAR_IDS.flatMap((id) => [`/portraits/${id}.png?v=10`, `/portraits/${id}-icon.png?v=10`]),
+      ...CHAR_IDS.map((id) => `/portraits/${id}.png?v=10`),
       ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=31`),
       ...STAGE_IDS.map((id) => STAGES[id].art),
+      ...CHAR_IDS.map((id) => `/sprites/${id}/idle.png${bust}`),
     ];
-    const jobs: Array<() => Promise<void>> = [];
-    jobs.push(async () => {
-      this.menuBg = await loadTick("/ui/mainmenu-v265.jpg");
-    });
-    for (const src of ui) {
-      if (src.includes("mainmenu")) continue;
-      jobs.push(async () => {
-        const im = await loadTick(src);
-        for (const id of STAGE_IDS) {
-          if (src === STAGES[id].art) {
-            this.stageArts[id] = im;
-            this.loadedStages.add(id);
-          }
-        }
-      });
-    }
-    for (const id of CHAR_IDS) {
-      jobs.push(async () => {
-        bags[id].idle = await loadTick(`/sprites/${id}/idle.png${bust}`);
-      });
-    }
-    const audioN = sfxMenuList().length + musicMenuList().length;
-    const total = Math.max(1, jobs.length + audioN);
+    const total = Math.max(1, fast.length + vsPng.length + 4);
     let doneN = 0;
     const tick = () => {
       doneN += 1;
-      this.loadPct = Math.min(0.99, doneN / total);
+      this.loadPct = Math.min(0.95, 0.06 + (doneN / total) * 0.89);
       this.hudKey = "";
       this.pushHud();
     };
-    const loadTick = async (src: string) => {
+    const loadTick = async (src: string, ms = 5000) => {
       try {
-        const im = await load(src);
+        const im = await load(src, ms);
         tick();
         return im;
       } catch {
@@ -1351,7 +1335,7 @@ export class KitchenKombat {
         return emptyImg();
       }
     };
-    const runPool = async (list: Array<() => Promise<void>>, n = 10) => {
+    const runPool = async (list: Array<() => Promise<void>>, n = 6) => {
       let i = 0;
       const worker = async () => {
         while (i < list.length) {
@@ -1361,13 +1345,41 @@ export class KitchenKombat {
       };
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
+    this.loadPct = 0.08;
+    this.hudKey = "";
+    this.pushHud();
     try {
-      await runPool(jobs, 8);
-      await Promise.race([
-        preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined),
-        new Promise<void>((r) => window.setTimeout(r, 2500)),
-      ]);
+      await runPool(
+        fast.map((src) => async () => {
+          const im = await loadTick(src, 4000);
+          if (src.includes("mainmenu")) this.menuBg = im;
+        }),
+        6,
+      );
+      await runPool(
+        vsPng.map((src) => async () => {
+          await loadTick(src, 6000);
+        }),
+        4,
+      );
       reveal();
+      void runPool(
+        rest.map((src) => async () => {
+          const im = await loadTick(src, 8000);
+          for (const id of STAGE_IDS) {
+            if (src === STAGES[id].art && (im.naturalWidth || im.width) > 32) {
+              this.stageArts[id] = im;
+              this.loadedStages.add(id);
+              if (id === this.stageId || !this.stage) this.stage = im;
+            }
+          }
+          for (const id of CHAR_IDS) {
+            if (src.includes(`/sprites/${id}/idle.png`) && (im.naturalWidth || 0) > 32) bags[id].idle = im;
+          }
+        }),
+        4,
+      );
+      void preloadSfx(tick, sfxMenuList(), musicMenuList()).catch(() => undefined);
     } catch (err) {
       console.error("asset load", err);
       reveal();
@@ -1386,11 +1398,12 @@ export class KitchenKombat {
       im.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
       return im;
     };
+    const stageOk = (this.stageArts[stageId]?.naturalWidth || 0) > 32;
     const already =
       this.images &&
       this.loadedChars.has(p1) &&
       this.loadedChars.has(p2) &&
-      this.loadedStages.has(stageId) &&
+      stageOk &&
       this.fxLoaded;
     if (already) {
       this.stage = this.stageArts[stageId] ?? this.stage;
@@ -1430,7 +1443,7 @@ export class KitchenKombat {
       "punchL","punchR","kickL","kickR","block","dash","jumpPunchL","jumpPunchR",
       "jumpKickL","jumpKickR","lowPunchL","lowPunchR","lowKickL","lowKickR","special2","crouch",
     ];
-    const bust = "?v=84";
+    const bust = "?v=86";
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
@@ -1455,12 +1468,15 @@ export class KitchenKombat {
       const vic = VICTORY_ART[id];
       if (vic) jobs.push(async () => { await loadTick(`${vic}?v=270`); });
     }
-    if (!this.loadedStages.has(stageId)) {
+    if (!stageOk) {
       jobs.push(async () => {
         const im = await loadTick(STAGES[stageId].art);
-        this.stageArts[stageId] = im;
-        this.stage = im;
-        this.images!.stage = im;
+        if ((im.naturalWidth || im.width) > 32) {
+          this.stageArts[stageId] = im;
+          this.loadedStages.add(stageId);
+          this.stage = im;
+          this.images!.stage = im;
+        }
       });
     } else {
       this.stage = this.stageArts[stageId] ?? this.stage;
@@ -3200,7 +3216,7 @@ export class KitchenKombat {
 
   meteorLand(f: Fighter, def: Fighter) {
     f.hasHit = true;
-    f.squash = 0.78;
+    f.squash = 0.94;
     this.trauma = Math.min(1, this.trauma + 0.22);
     if (def.state === "ko" || def.invuln > 0) return;
     if (def.shieldT > 0) {
@@ -3242,10 +3258,11 @@ export class KitchenKombat {
     f.hasHit = true;
     this.specialCallout(CHARACTERS[f.id].special2, 0.7);
     this.trauma = Math.min(1, this.trauma + 0.16);
+    this.spawnRockBurst(f.x, GROUND - 8, f.facing);
+    this.spawnRockBurst(f.x, GROUND - 4, -f.facing);
+    rumble(f === this.f1 ? 0 : 1, 200, 0.7);
     if (def.state === "ko" || def.invuln > 0) return;
     if (def.y > 8) return;
-    const hb = { x: f.x - 80, y: GROUND - 120, w: 160, h: 120, foot: 0 };
-    if (!overlap(hb, this.hurtbox(def))) return;
     if (def.shieldT > 0 || (def.state === "block" && def.facing === (def.x <= f.x ? 1 : -1))) {
       def.flash = 0.08;
       def.stun = f.atk.blockstun;
@@ -3254,8 +3271,8 @@ export class KitchenKombat {
     }
     def.hp = Math.max(0, def.hp - f.atk.dmg);
     const toward = Math.sign(f.x - def.x) || -f.facing;
-    def.vx = toward * 260;
-    def.vy = 820;
+    def.vx = toward * 520;
+    def.vy = 1180;
     def.y = 18;
     def.stun = f.atk.hitstun;
     def.state = "hurt";
@@ -3977,12 +3994,28 @@ export class KitchenKombat {
     let scale = body / Math.max(8, idle.h);
     if (f.pose === "jump") {
       const jumpBox = this.boxes[f.id].jump;
-      if (jumpBox && jumpBox.h < idle.h * 0.82) {
+      if (f.id !== "isti" && jumpBox && jumpBox.h < idle.h * 0.82) {
         const closeUp = Math.min(1, idle.w / Math.max(1, jumpBox.w));
         scale *= Math.sqrt(closeUp);
       }
       if (f.id === "ricsi") scale *= 1.16;
       if (f.id === "farajo") scale *= 0.76;
+    }
+    if (f.id === "isti") {
+      const zone = f.atk?.zone;
+      if (zone === "meteor") {
+        if (f.pose === "special") scale *= 1.32;
+        else if (f.pose === "jump") scale *= 1.2;
+        else if (f.pose === "special2") scale *= 1.2;
+      } else if (zone === "stomp") {
+        const total = (f.atk!.startup + f.atk!.active + f.atk!.recover) || 0.72;
+        const i = Math.min(5, Math.floor((f.atkT / total) * 6));
+        scale *= i === 1 ? 0.94 : 1.2;
+      } else if (f.pose === "jump") {
+        scale *= 1.12;
+      } else if (f.pose === "jumpKickL" || f.pose === "jumpKickR") {
+        scale *= 1.22;
+      }
     }
     if (f.id === "gabi") {
       if (f.pose === "jumpKickR") scale *= 0.84;
@@ -4003,6 +4036,7 @@ export class KitchenKombat {
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "hoffer" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
+      if (f.id === "isti" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.state === "crouch" || (f.state === "block" && f.crouchGuard)) return 0.8;
       return 1;
     })();
@@ -4055,7 +4089,10 @@ export class KitchenKombat {
     else if (f.bleed > 0.15) ctx.filter = `sepia(${Math.min(0.7, f.bleed)}) saturate(2.4) hue-rotate(-18deg)`;
     if (f.state === "ko") ctx.rotate(-0.5);
     const dx = (-img.width * scale) / 2;
-    const dy = -idle.foot * scale;
+    let dy = -idle.foot * scale;
+    if (f.id === "isti" && (f.pose === "crouch" || f.pose.startsWith("low"))) {
+      dy = -img.height * scale;
+    }
     const dw = img.width * scale;
     const dh = img.height * scale;
     if (f.superDash && f.state === "dash") {
@@ -4561,7 +4598,7 @@ export class KitchenKombat {
     ctx.save();
     ctx.translate(sx, sy);
     if (this.screen === "title" && this.menuBg && this.menuBg.naturalWidth) ctx.drawImage(this.menuBg, 0, 0, W, H);
-    else if (this.stage) ctx.drawImage(this.stage, 0, 0, W, H);
+    else if (this.stage && (this.stage.naturalWidth || 0) > 32) ctx.drawImage(this.stage, 0, 0, W, H);
     else {
       ctx.fillStyle = "#1a1210";
       ctx.fillRect(0, 0, W, H);

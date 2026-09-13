@@ -9,6 +9,15 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.35",
+    items: [
+      "Karakter- és pályaválasztó egy képernyőn, VS képek + enyhén homályos pályahátterek",
+      "Új főmenü, 10 karakter egy sorban (desktop)",
+      "MC Isti sprite méretek, dobbantás törmelék, boot preload javítás",
+      "Karakterválasztó: transzparens VS art, név a kép alatt, szürke ikonbox széltől szélig",
+    ],
+  },
+  {
     v: "v0.31",
     items: [
       "Új karakter: MC Isti — Felugrás (nem blokkolható meteor zuhanás) + Dobbantás (földön lévőt felé löki)",
@@ -1139,7 +1148,7 @@ export function GameView() {
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
-            src={asset("/ui/mainmenu-v265.jpg")}
+            src={asset("/ui/mainmenu-v31.jpg")}
             alt=""
             className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
             style={{ objectPosition: "center 18%" }}
@@ -1336,15 +1345,34 @@ export function GameView() {
         />
       )}
 
-      {hud.screen === "select" && (
-        <div
-          className="absolute inset-0 z-10 bg-cover bg-center"
-          style={{ backgroundImage: `url(${asset("/ui/selection.jpg")})` }}
-        >
+      {(hud.screen === "select" || hud.screen === "stage") && (
+        <div className="absolute inset-0 z-10 flex flex-col overflow-hidden bg-[#1a1210]">
+          {STAGE_IDS.map((id) => {
+            const show = hud.screen === "stage" ? stageCur === id : id === "sintertanya";
+            return (
+              <img
+                key={id}
+                src={asset(STAGES[id].blur)}
+                alt=""
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                style={{ opacity: show ? 1 : 0 }}
+                draggable={false}
+              />
+            );
+          })}
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative z-10 min-h-0 flex-1">
           <button
             type="button"
             onClick={() => {
               armGate();
+              if (hud.screen === "stage" && !netRef.current.role) {
+                setP1Lock(false);
+                setP2Lock(false);
+                gameRef.current && (gameRef.current.screen = "select");
+                gameRef.current?.pushHud();
+                return;
+              }
               resetSelect(hud.versusCpu);
               goTitle();
             }}
@@ -1358,64 +1386,62 @@ export function GameView() {
             id={p2Cur}
             locked={p2Lock}
             tone="p2"
-            visible={!hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role) ? true : p1Lock}
+            visible={!hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role) ? true : p1Lock || hud.screen === "stage"}
           />
-          <div className="absolute bottom-[3%] left-1/2 z-10 flex max-w-[72%] -translate-x-1/2 flex-wrap justify-center gap-1.5">
-            {ids.map((id) => {
-              const dual = !hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role);
-              const p1on = p1Cur === id && (dual || !p1Lock);
-              const p2on = p2Cur === id && (dual || p1Lock);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => pickSelectChar(id)}
-                  className="relative size-12 overflow-hidden rounded-sm bg-bg/80 sm:size-14"
-                  style={{
-                    boxShadow: [p1on ? "0 0 0 2px #c43b2e" : "0 0 0 1px #3a2a22", p2on ? "0 0 0 4px #2e6ec4" : ""]
-                      .filter(Boolean)
-                      .join(", "),
-                  }}
-                >
-                  <img src={asset(`/portraits/${id}-icon.png?v=10`)} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
-                </button>
-              );
-            })}
+          </div>
+          <div className="relative z-10 w-full border-t border-white/20 bg-zinc-500/45 px-2 py-2.5 shadow-[0_-8px_28px_rgba(0,0,0,0.28)] backdrop-blur-[6px] sm:px-4 sm:py-3">
+            <div
+              className={`flex w-full justify-center gap-1.5 ${touchUi ? "flex-wrap" : "flex-nowrap"}`}
+            >
+            {hud.screen === "stage"
+              ? STAGE_IDS.map((id) => {
+                  const s = STAGES[id];
+                  const on = stageCur === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setStageCur(id);
+                        const net = netRef.current;
+                        if (net.role === "host") net.stage(id);
+                        else if (!net.role) gameRef.current?.confirmStage(id);
+                      }}
+                      onMouseEnter={() => setStageCur(id)}
+                      className={`relative h-12 w-20 overflow-hidden rounded-sm sm:h-14 sm:w-24 ${
+                        on ? "ring-2 ring-gold" : "ring-1 ring-white/30"
+                      }`}
+                    >
+                      <img src={asset(s.art)} alt={s.nameHu} className="size-full object-cover" />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 text-center text-[9px] leading-4 text-white sm:text-[10px]">
+                        {s.nameHu}
+                      </span>
+                    </button>
+                  );
+                })
+              : ids.map((id) => {
+                  const dual = !hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role);
+                  const p1on = p1Cur === id && (dual || !p1Lock);
+                  const p2on = p2Cur === id && (dual || p1Lock);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => pickSelectChar(id)}
+                      className="relative size-11 shrink-0 overflow-hidden rounded-sm bg-bg/80 sm:size-12"
+                      style={{
+                        boxShadow: [p1on ? "0 0 0 2px #c43b2e" : "0 0 0 1px #3a2a22", p2on ? "0 0 0 4px #2e6ec4" : ""]
+                          .filter(Boolean)
+                          .join(", "),
+                      }}
+                    >
+                      <img src={asset(`/portraits/${id}-icon.png?v=10`)} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                    </button>
+                  );
+                })}
+            </div>
           </div>
         </div>
-      )}
-
-      {hud.screen === "stage" && (
-        <Overlay>
-          <h2 className="font-display text-3xl">VÁLASSZ PÁLYÁT</h2>
-          {netRef.current.role === "guest" && (
-            <p className="text-muted text-sm">A host választ pályát…</p>
-          )}
-          <div className="mt-4 flex flex-wrap justify-center gap-4">
-            {STAGE_IDS.map((id) => {
-              const s = STAGES[id];
-              const on = stageCur === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setStageCur(id);
-                    const net = netRef.current;
-                    if (net.role === "host") net.stage(id);
-                    else if (!net.role) gameRef.current?.confirmStage(id);
-                  }}
-                  className={`w-56 rounded-lg border p-3 text-left sm:w-72 ${
-                    on ? "border-gold bg-surface" : "border-border bg-bg/70"
-                  }`}
-                >
-                  <img src={asset(s.art)} alt="" className="mb-2 h-28 w-full rounded object-cover sm:h-36" />
-                  <div className="font-display text-xl">{s.nameHu}</div>
-                </button>
-              );
-            })}
-          </div>
-        </Overlay>
       )}
 
       {hud.screen === "vs" && (
@@ -1795,25 +1821,25 @@ function SelectPanel({
   visible: boolean;
 }) {
   const name = CHARACTERS[id].name;
-  const pos = side === "left" ? "left-[4.8%]" : "right-[4.8%]";
+  const pos = side === "left" ? "left-[2%]" : "right-[2%]";
   return (
-    <div className={`absolute top-[11%] flex h-[68%] w-[18.5%] flex-col items-center ${pos}`}>
+    <div className={`absolute top-[5%] bottom-0 flex w-[32%] flex-col items-center ${pos}`}>
       {visible && (
-        <>
-          <div className="flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden">
+        <div className="flex h-full w-full items-end justify-center">
+          <div className="flex max-h-full flex-col items-center">
             <img
-              src={asset(`/sprites/${id}/idle.png?v=82`)}
+              src={asset(`/ui/vs/${id}.png?v=37`)}
               alt=""
-              className={`max-h-full max-w-full object-contain object-bottom ${side === "right" ? "-scale-x-100" : ""}`}
+              className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${side === "right" ? "-scale-x-100" : ""}`}
             />
+            <div
+              className={`font-display mt-1.5 text-center text-2xl leading-none tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-4xl ${tone === "p1" ? "text-p1" : "text-p2"}`}
+            >
+              {name}
+              {locked ? " ✓" : ""}
+            </div>
           </div>
-          <div
-            className={`font-display w-full pb-1 text-center text-lg tracking-wide sm:text-xl ${tone === "p1" ? "text-p1" : "text-p2"}`}
-          >
-            {name}
-            {locked ? " ✓" : ""}
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
