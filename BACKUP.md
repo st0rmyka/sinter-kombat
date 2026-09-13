@@ -4,7 +4,7 @@
 **Git tag:** `v0.35`  
 **Repo:** https://github.com/st0rmyka/sinter-kombat  
 
-**Állapot:** v0.35 — egyesített karakter/pályaválasztó, transzparens VS art, blur pályahátterek, MC Isti méretezések, szürke ikonbox.
+**Állapot:** v0.35 — Gabi név csak „Gabi”, MC Isti voice, új főmenü, gyorsabb dobbantás, egyesített karakter/pályaválasztó.
 
 ## Visszaállítás
 

@@ -1148,7 +1148,7 @@ export function GameView() {
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
-            src={asset("/ui/mainmenu-v31.jpg")}
+            src={asset("/ui/mainmenu-v35.jpg")}
             alt=""
             className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
             style={{ objectPosition: "center 18%" }}

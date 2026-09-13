@@ -12,7 +12,7 @@ export default defineConfig({
   publicDir: path.join(root, "public"),
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: path.join(root, "release", "itch-v0.3"),
+    outDir: path.join(root, "release", "itch-v0.35"),
     emptyOutDir: true,
     assetsDir: "assets",
     sourcemap: false,

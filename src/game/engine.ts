@@ -565,9 +565,9 @@ const SPECIAL_METEOR: Atk = {
 const SPECIAL_STOMP: Atk = {
   id: "special2",
   pose: "special2",
-  startup: 0.24,
-  active: 0.16,
-  recover: 0.32,
+  startup: 0.14,
+  active: 0.12,
+  recover: 0.18,
   dmg: 14,
   hitstun: 0.42,
   blockstun: 0.16,
@@ -709,7 +709,7 @@ export const CHARACTERS: Record<
     fatality: "",
   },
   gabi: {
-    name: "GABI AZ IDEGBETEG",
+    name: "GABI",
     title: "Az Elmeháborodott",
     special: "BASEBALLÜTŐ",
     special2: "AGYONLÖVÉS",
@@ -1305,7 +1305,7 @@ export class KitchenKombat {
       });
     const bust = "?v=86";
     const fast = [
-      "/ui/mainmenu-v31.jpg",
+      "/ui/mainmenu-v35.jpg",
       ...STAGE_IDS.map((id) => STAGES[id].blur),
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
     ];
@@ -3245,12 +3245,15 @@ export class KitchenKombat {
     f.vx = 0;
     if (f.atkT < f.atk.startup) {
       f.pose = "special2";
-      f.vy = 620;
-      if (f.y < 40) f.y = 40;
+      f.vy = 780;
+      if (f.y < 28) f.y = 28;
       return;
     }
     f.pose = "special2";
-    if (f.y > 0) return;
+    if (f.y > 0) {
+      f.vy = Math.min(f.vy, -2100);
+      return;
+    }
     f.y = 0;
     f.vy = 0;
     f.squash = 0.72;
