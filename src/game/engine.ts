@@ -1023,6 +1023,9 @@ export class KitchenKombat {
   cpuDashCd = 0;
   cpuJumpCd = 0;
   cpuAtkCd = 0;
+  cpuEscapeCd = 0;
+  cpuPressure = 0;
+  cpuHpMark = MAX_HP;
   p1id: CharId = "renike";
   p2id: CharId = "ricsi";
   stageId: StageId = "sintertanya";
@@ -1766,6 +1769,9 @@ export class KitchenKombat {
     this.cpuDashCd = 0;
     this.cpuJumpCd = 0;
     this.cpuAtkCd = 0;
+    this.cpuEscapeCd = 0;
+    this.cpuPressure = 0;
+    this.cpuHpMark = MAX_HP;
     this.p1Hist = [];
     this.p2Hist = [];
     this.p1Bits = 0;
@@ -2105,9 +2111,10 @@ export class KitchenKombat {
       this.cpuPress(a, "special2");
       return;
     }
-    if (id === "isti" && meter >= 50 && dist > 80 && Math.random() < Math.max(0.22, spec * 2.1)) {
+    if (id === "isti" && meter >= 50 && Math.random() < Math.max(0.28, spec * 2.2)) {
       this.cpuPlan = [];
-      this.cpuPress(a, dist > 160 ? "special" : "special2");
+      const stomp = dist < 150 && Math.random() < 0.42;
+      this.cpuPress(a, stomp ? "special2" : "special");
       return;
     }
     if (meter >= 50 && Math.random() < (jesus ? Math.max(0.42, spec * 3.2) : spec)) {
@@ -2166,6 +2173,11 @@ export class KitchenKombat {
     this.cpuDashCd = Math.max(0, this.cpuDashCd - dt);
     this.cpuJumpCd = Math.max(0, this.cpuJumpCd - dt);
     this.cpuAtkCd = Math.max(0, this.cpuAtkCd - dt);
+    this.cpuEscapeCd = Math.max(0, this.cpuEscapeCd - dt);
+    const dmg = this.cpuHpMark - me.hp;
+    this.cpuHpMark = me.hp;
+    if (dmg > 0) this.cpuPressure = Math.min(1.25, this.cpuPressure + dmg / (MAX_HP * 0.1));
+    else this.cpuPressure = Math.max(0, this.cpuPressure - dt * 0.3);
     if (this.phase !== "fight" || me.state === "hurt" || me.state === "ko") {
       this.cpuGuard = false;
       return a;
@@ -2212,6 +2224,30 @@ export class KitchenKombat {
       return a;
     }
     this.cpuAirOffense = false;
+
+    const cornered = me.x <= 140 || me.x >= W - 140;
+    const escapeDir: 1 | -1 = me.x <= W * 0.5 ? 1 : -1;
+    const escapeP = easy ? 0.015 : hell ? 0.52 : hard ? 0.26 : 0.07;
+    if (
+      cornered &&
+      me.meter >= SUPER_DASH_COST &&
+      me.y <= 0 &&
+      this.cpuEscapeCd <= 0 &&
+      me.state !== "dash" &&
+      me.state !== "attack"
+    ) {
+      const pressured = this.cpuPressure > 0.4 || me.hp < MAX_HP * 0.42;
+      if (pressured && Math.random() < escapeP) {
+        a.superDash = true;
+        a.superDashP = true;
+        if (escapeDir > 0) a.right = true;
+        else a.left = true;
+        this.cpuGuard = false;
+        this.cpuEscapeCd = hell ? 1.5 : hard ? 2.3 : 3.4;
+        this.cpuPressure *= 0.25;
+        return a;
+      }
+    }
 
     const yat = you.atk;
     const youAtk = you.state === "attack" && !!yat;
@@ -2283,6 +2319,21 @@ export class KitchenKombat {
       }
     }
 
+    if (me.id === "isti" && me.y <= 0 && me.meter >= 50) {
+      const pMeteor = hell ? 0.24 : hard ? 0.13 : easy ? 0.05 : 0.085;
+      const pStomp = hell ? 0.2 : hard ? 0.11 : easy ? 0.05 : 0.075;
+      if (you.y <= 8 && dist < 230 && Math.random() < pStomp) {
+        this.cpuPress(a, "special2");
+        this.cpuAtkCd = hell ? 0.35 : hard ? 0.65 : 1.0;
+        return a;
+      }
+      if (Math.random() < pMeteor) {
+        this.cpuPress(a, "special");
+        this.cpuAtkCd = hell ? 0.4 : hard ? 0.7 : 1.05;
+        return a;
+      }
+    }
+
     if (dist > 185) {
       if (faceIn) a.right = true;
       else a.left = true;
@@ -2295,8 +2346,8 @@ export class KitchenKombat {
         this.startDash(me, faceIn ? 1 : -1);
         this.cpuDashCd = hell ? 0.7 : hard ? 1.09 : easy ? 1.84 : 1.55;
       }
-      if (dist > 200 && me.meter >= special1For(me.id).cost && Math.random() < (me.id === "jezus" ? 0.28 : me.id === "farajo" ? spec.special * dt * 4.2 : spec.special * dt * 1.8)) {
-        this.cpuPress(a, me.id === "jezus" || me.id === "farajo" || Math.random() < 0.45 ? "special" : "special2");
+      if (dist > 200 && me.meter >= special1For(me.id).cost && Math.random() < (me.id === "jezus" ? 0.28 : me.id === "farajo" || me.id === "isti" ? spec.special * dt * 4.4 : spec.special * dt * 1.8)) {
+        this.cpuPress(a, me.id === "jezus" || me.id === "farajo" || me.id === "isti" || Math.random() < 0.45 ? "special" : "special2");
       }
       return a;
     }
