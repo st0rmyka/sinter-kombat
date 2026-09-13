@@ -42,8 +42,8 @@ declare global {
 
 export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti";
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
-export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony";
-export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony"];
+export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
+export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
 export const GAME_VERSION = "v0.4";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
@@ -775,6 +775,12 @@ export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string
   nepszinhaz: { id: "nepszinhaz", name: "NEPSZINHAZ", nameHu: "Népszínház utca", art: "/stages/nepszinhaz.jpg?v=19", blur: "/stages/blur/nepszinhaz.jpg?v=2" },
   salgotarjan: { id: "salgotarjan", name: "SALGOTARJAN", nameHu: "Salgótarján", art: "/stages/salgotarjan.jpg?v=29", blur: "/stages/blur/salgotarjan.jpg?v=2" },
   nagybatony: { id: "nagybatony", name: "NAGYBATONY", nameHu: "Nagybátony - Vasút", art: "/stages/nagybatony.jpg?v=29", blur: "/stages/blur/nagybatony.jpg?v=2" },
+  maconka: { id: "maconka", name: "MACONKA", nameHu: "Maconka - Víztározó", art: "/stages/maconka.jpg?v=40", blur: "/stages/blur/maconka.jpg?v=40" },
+  miskolc: { id: "miskolc", name: "MISKOLC", nameHu: "Miskolc - Avas", art: "/stages/miskolc.jpg?v=40", blur: "/stages/blur/miskolc.jpg?v=40" },
+  ozd: { id: "ozd", name: "OZD", nameHu: "Ózd - Hétes Telep", art: "/stages/ozd.jpg?v=40", blur: "/stages/blur/ozd.jpg?v=40" },
+  kispest: { id: "kispest", name: "KISPEST", nameHu: "Budapest - Kispest", art: "/stages/kispest.jpg?v=40", blur: "/stages/blur/kispest.jpg?v=40" },
+  hosutca: { id: "hosutca", name: "HOS UTCA", nameHu: "Budapest - Hős Utca", art: "/stages/hosutca.jpg?v=40", blur: "/stages/blur/hosutca.jpg?v=40" },
+  pokol: { id: "pokol", name: "POKOL", nameHu: "A Pokol", art: "/stages/pokol.jpg?v=40", blur: "/stages/blur/pokol.jpg?v=40" },
 };
 
 export const ROUND_CALL: Record<number, string> = {

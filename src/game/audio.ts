@@ -26,6 +26,12 @@ const MUSIC_FILES: Record<string, string> = {
   nepszinhaz: "/music/nepszinhaz.mp3",
   salgotarjan: "/music/salgotarjan.mp3",
   nagybatony: "/music/nagybatony.mp3",
+  maconka: "/music/maconka.mp3",
+  miskolc: "/music/miskolc.mp3",
+  ozd: "/music/ozd.mp3",
+  kispest: "/music/kispest.mp3",
+  hosutca: "/music/hosutca.mp3",
+  pokol: "/music/pokol.mp3",
 };
 const MUSIC_VOL = 0.48;
 
@@ -197,6 +203,12 @@ const STAGE_NAME: Record<string, string> = {
   nepszinhaz: "/sfx/mapname_nepszinhazutca.mp3",
   salgotarjan: "/sfx/mapname_salgotarjan.mp3",
   nagybatony: "/sfx/mapname_nagybatony.mp3",
+  maconka: "/sfx/mapname_maconka.mp3",
+  miskolc: "/sfx/mapname_miskolc.mp3",
+  ozd: "/sfx/mapname_ozd.mp3",
+  kispest: "/sfx/mapname_kispest.mp3",
+  hosutca: "/sfx/mapname_hosutca.mp3",
+  pokol: "/sfx/mapname_pokol.mp3",
 };
 const CHAR_TAUNT: Record<string, string> = {
   ricsi: "/sfx/ricsi_taunt.mp3",

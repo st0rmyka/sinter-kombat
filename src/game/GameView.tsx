@@ -15,6 +15,8 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
       "MC Isti voice (attack/damage/defeat/special/taunt) + gyorsabb dobbantás, hangosabb special VO",
       "Új főmenü kép",
       "Pályaválasztáskor az announcer bemondja a pálya nevét (csak választáskor)",
+      "Új pályák: Maconka – Víztározó, Miskolc – Avas, Ózd – Hétes Telep, Budapest – Kispest, Budapest – Hős Utca, A Pokol",
+      "CPU: MC Isti mindkét special, sarokban Super Dash kimenekülés (főleg Hard / Szopni fogsz)",
     ],
   },
   {
