@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.4";
+export const GAME_VERSION = "v0.45";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";

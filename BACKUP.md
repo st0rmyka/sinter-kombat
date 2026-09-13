@@ -1,14 +1,12 @@
 # Sinter Kombat backup
 
-**Verzió:** v0.4  
-**Git tag:** `v0.4`  
+**Verzió:** v0.45  
+**Git tag:** `v0.45`  
 **Repo:** https://github.com/st0rmyka/sinter-kombat  
 
-**Állapot:** v0.4 pályabővítés: Maconka, Miskolc–Avas, Ózd–Hétes, Budapest–Kispest, Budapest–Hős Utca, A Pokol. CPU Isti + sarok Super Dash.
-
-Előző snapshot pályák előtt: `v0.4-pre-maps`
+**Állapot:** v0.45 — hat új pálya (Maconka, Miskolc–Avas, Ózd–Hétes, Kispest, Hős Utca, A Pokol).
 
 ## Visszaállítás
 
-1. `git checkout v0.4`
+1. `git checkout v0.45`
 2. `npm install && npm run dev`

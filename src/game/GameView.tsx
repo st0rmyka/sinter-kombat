@@ -9,14 +9,20 @@ import { asset } from "./asset";
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.45",
+    items: [
+      "Új pályák: Maconka – Víztározó, Miskolc – Avas, Ózd – Hétes Telep, Budapest – Kispest, Budapest – Hős Utca, A Pokol",
+      "Pályaválasztáskor announcer a pálya nevével",
+      "CPU: MC Isti mindkét special, sarokban Super Dash kimenekülés",
+    ],
+  },
+  {
     v: "v0.4",
     items: [
       "Gabi neve: Gabi",
       "MC Isti voice (attack/damage/defeat/special/taunt) + gyorsabb dobbantás, hangosabb special VO",
       "Új főmenü kép",
       "Pályaválasztáskor az announcer bemondja a pálya nevét (csak választáskor)",
-      "Új pályák: Maconka – Víztározó, Miskolc – Avas, Ózd – Hétes Telep, Budapest – Kispest, Budapest – Hős Utca, A Pokol",
-      "CPU: MC Isti mindkét special, sarokban Super Dash kimenekülés (főleg Hard / Szopni fogsz)",
     ],
   },
   {
