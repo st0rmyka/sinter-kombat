@@ -839,7 +839,7 @@ const GRAV = 5100;
 const JUMP_V = 1760;
 const BUFFER = 0.14;
 const STEP = 1 / 60;
-const MAX_HP = 170;
+const MAX_HP = 204;
 const ROUND_TIME = 45;
 const BLOOD_TINT = ["#3a0509", "#5c0810", "#7a0c18", "#a11020", "#c41828", "#6b0a12"];
 
@@ -984,6 +984,7 @@ type Fighter = {
   rageT: number;
   rageAcc: number;
   pullT: number;
+  lastHurtT: number;
   sameAtkId: AtkId | "";
   sameAtkN: number;
 };
@@ -1346,13 +1347,14 @@ export class KitchenKombat {
       rageT: 0,
       rageAcc: 0,
       pullT: 0,
+      lastHurtT: 9,
       sameAtkId: "",
       sameAtkN: 0,
     };
   }
 
   async load() {
-    this.loadPct = 0.02;
+    this.loadPct = 0.04;
     this.menuReady = false;
     this.hudKey = "";
     this.pushHud();
@@ -1389,17 +1391,15 @@ export class KitchenKombat {
         }
       }
       this.menuReady = true;
+      this.loadPct = 1;
       this.hudKey = "";
       this.pushHud();
     };
     const watchdog = window.setTimeout(() => {
       console.warn("load watchdog");
       reveal();
-      this.loadPct = 1;
-      this.hudKey = "";
-      this.pushHud();
-    }, 8000);
-    const load = (src: string, ms = 5000) =>
+    }, 10000);
+    const loadImg = (src: string, ms = 3000) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         let settled = false;
@@ -1411,36 +1411,13 @@ export class KitchenKombat {
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
         window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
-        im.src = asset(src);
+        try {
+          im.src = asset(src);
+        } catch {
+          done(emptyImg());
+        }
       });
-    const fast = [
-      "/ui/mainmenu-v35.jpg",
-      "/ui/ko.png?v=1",
-      "/ui/selection.jpg",
-      ...STAGE_IDS.map((id) => STAGES[id].blur),
-      ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
-      ...CHAR_IDS.map((id) => `${VS_ART[id]}?v=37`),
-    ];
-    const rest = STAGE_IDS.map((id) => STAGES[id].art);
-    const total = Math.max(1, fast.length + 2);
-    let doneN = 0;
-    const tick = () => {
-      doneN += 1;
-      this.loadPct = Math.min(0.95, 0.06 + (doneN / total) * 0.89);
-      this.hudKey = "";
-      this.pushHud();
-    };
-    const loadTick = async (src: string, ms = 5000) => {
-      try {
-        const im = await load(src, ms);
-        tick();
-        return im;
-      } catch {
-        tick();
-        return emptyImg();
-      }
-    };
-    const runPool = async (list: Array<() => Promise<void>>, n = 6) => {
+    const runPool = async (list: Array<() => Promise<void>>, n = 8) => {
       let i = 0;
       const worker = async () => {
         while (i < list.length) {
@@ -1450,47 +1427,56 @@ export class KitchenKombat {
       };
       await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
     };
-    this.loadPct = 0.08;
-    this.hudKey = "";
-    this.pushHud();
-    const menuAudio = Promise.race([
-      preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined),
-      new Promise<void>((r) => window.setTimeout(r, 3500)),
-    ]);
-    try {
+    const loadGroup = async (srcs: string[], from: number, to: number, n = 8) => {
+      const total = Math.max(1, srcs.length);
+      let doneN = 0;
       await runPool(
-        fast.map((src) => async () => {
-          const im = await loadTick(src, 4000);
-          if (src.includes("mainmenu")) this.menuBg = im;
-          if (src.includes("/ui/ko.png")) this.koArt = im;
-        }),
-        6,
-      );
-      await menuAudio;
-      reveal();
-      void runPool(
-        rest.map((src) => async () => {
-          const im = await loadTick(src, 8000);
-          for (const id of STAGE_IDS) {
-            if (src === STAGES[id].art && (im.naturalWidth || im.width) > 32) {
-              this.stageArts[id] = im;
-              this.loadedStages.add(id);
-              if (id === this.stageId || !this.stage) this.stage = im;
-            }
+        srcs.map((src) => async () => {
+          const im = await loadImg(src, 3000);
+          if (src.includes("mainmenu") && (im.naturalWidth || 0) > 32) this.menuBg = im;
+          if (src.includes("/ui/ko.png") && (im.naturalWidth || 0) > 8) this.koArt = im;
+          doneN += 1;
+          if (!revealed) {
+            this.loadPct = from + ((to - from) * doneN) / total;
+            this.hudKey = "";
+            this.pushHud();
           }
         }),
-        4,
+        n,
       );
+    };
+    const menuSrcs = ["/ui/mainmenu-v35.jpg", "/ui/ko.png?v=1"];
+    const selectSrcs = [
+      "/ui/selection.jpg",
+      ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
+      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=37`),
+      ...STAGE_IDS.map((id) => STAGES[id]?.blur).filter((u): u is string => !!u),
+    ];
+    try {
+      await loadGroup(menuSrcs, 0.04, 0.18, 2);
+      await loadGroup(selectSrcs, 0.18, 0.82, 8);
+      const audioN = Math.max(1, sfxMenuList().length + musicMenuList().length);
+      let audioDone = 0;
+      await Promise.race([
+        preloadSfx(
+          () => {
+            audioDone += 1;
+            if (!revealed) {
+              this.loadPct = 0.82 + 0.14 * Math.min(1, audioDone / audioN);
+              this.hudKey = "";
+              this.pushHud();
+            }
+          },
+          sfxMenuList(),
+          musicMenuList(),
+        ).catch(() => undefined),
+        new Promise<void>((r) => window.setTimeout(r, 2200)),
+      ]);
     } catch (err) {
       console.error("asset load", err);
-      reveal();
     }
     window.clearTimeout(watchdog);
-    if (!revealed) reveal();
-    this.loadPct = 1;
-    this.menuReady = true;
-    this.hudKey = "";
-    this.pushHud();
+    reveal();
   }
 
   async ensureFight(p1: CharId = this.p1id, p2: CharId = this.p2id, stageId: StageId = this.stageId) {
@@ -2554,6 +2540,7 @@ export class KitchenKombat {
       if (take > 0 && f.state !== "ko" && f.hp > 0) {
         f.rageAcc -= take;
         f.hp = Math.max(0, f.hp - take);
+        f.lastHurtT = 0;
         f.flash = Math.max(f.flash, 0.05);
         if (f.hp <= 0) {
           const other = f === this.f1 ? this.f2 : this.f1;
@@ -2564,6 +2551,17 @@ export class KitchenKombat {
       f.rageAcc = 0;
     }
     if (f.pullT > 0) f.pullT = Math.max(0, f.pullT - dt);
+    f.lastHurtT += dt;
+    if (
+      this.phase === "fight" &&
+      !this.training &&
+      f.hp > 0 &&
+      f.state !== "ko" &&
+      f.lastHurtT >= 3 &&
+      f.hp < MAX_HP * 0.15
+    ) {
+      f.hp = Math.min(MAX_HP * 0.15, f.hp + MAX_HP * 0.03 * dt);
+    }
 
     if (f.state === "hurt") {
       if (
@@ -2819,6 +2817,12 @@ export class KitchenKombat {
     f.meter = Math.min(100, f.meter + n);
   }
 
+  hurtHp(f: Fighter, n: number) {
+    if (n <= 0) return;
+    f.hp = Math.max(0, f.hp - n);
+    f.lastHurtT = 0;
+  }
+
   startDash(f: Fighter, dir: 1 | -1, superD = false) {
     f.state = "dash";
     f.dashDir = dir;
@@ -3034,7 +3038,7 @@ export class KitchenKombat {
     if (def.state === "attack" && def.atk?.armor) {
       att.hasHit = true;
       def.flash = 0.1;
-      def.hp = Math.max(0, def.hp - Math.max(1, Math.round(att.atk.dmg * 0.4)));
+      this.hurtHp(def, Math.max(1, Math.round(att.atk.dmg * 0.4)));
       if (att.atk.id !== "special" && att.atk.id !== "special2") this.addMeter(att, METER_HIT_ATT);
       this.addMeter(def, METER_HIT_DEF);
       sfxPlay.charDamage(def.id);
@@ -3077,7 +3081,7 @@ export class KitchenKombat {
       this.comboName = route.name;
       this.specialCallout(route.name, 0.7);
     }
-    def.hp = Math.max(0, def.hp - dmg);
+    this.hurtHp(def, dmg);
     if (att.atk.heal) att.hp = Math.min(MAX_HP, att.hp + att.atk.heal);
     def.vx = dir * att.atk.knock;
     def.vy = att.atk.id === "kickR" || att.atk.id.startsWith("special") ? 700 : att.atk.id === "kickL" ? 470 : 270;
@@ -3472,7 +3476,7 @@ export class KitchenKombat {
       sfxPlay.block();
       return;
     }
-    def.hp = Math.max(0, def.hp - atk.dmg);
+    this.hurtHp(def, atk.dmg);
     def.vx = f.facing * atk.knock;
     def.stun = atk.hitstun;
     def.state = "hurt";
@@ -3541,7 +3545,7 @@ export class KitchenKombat {
     }
     const hb = { x: f.x - 70, y: GROUND - 280, w: 140, h: 280, foot: 0 };
     if (!overlap(hb, this.hurtbox(def))) return;
-    def.hp = Math.max(0, def.hp - (f.atk?.dmg ?? 26));
+    this.hurtHp(def, f.atk?.dmg ?? 26);
     def.vx = (def.x >= f.x ? 1 : -1) * (f.atk?.knock ?? 280);
     def.stun = f.atk?.hitstun ?? 0.55;
     def.state = "hurt";
@@ -3587,7 +3591,7 @@ export class KitchenKombat {
       sfxPlay.block();
       return;
     }
-    def.hp = Math.max(0, def.hp - f.atk.dmg);
+    this.hurtHp(def, f.atk.dmg);
     const toward = Math.sign(f.x - def.x) || -f.facing;
     def.vx = toward * 520;
     def.vy = 1180;
@@ -4099,7 +4103,7 @@ export class KitchenKombat {
       }
       z.hit = true;
       const dir = z.dir;
-      def.hp = Math.max(0, def.hp - z.dmg);
+      this.hurtHp(def, z.dmg);
       def.vx = dir * (z.kind === "ki" ? 420 : z.kind === "note" ? 80 : 240);
       def.vy = z.kind === "ki" ? 620 : z.kind === "note" ? 160 : 420;
       def.y += 2;
@@ -4155,7 +4159,7 @@ export class KitchenKombat {
       def.flash = 0.08;
       return;
     }
-    def.hp = Math.max(0, def.hp - z.dmg);
+    this.hurtHp(def, z.dmg);
     def.flash = 0.08;
     def.stun = Math.max(def.stun, 0.12);
     this.addMeter(def, 1);
@@ -4189,7 +4193,7 @@ export class KitchenKombat {
       sfxPlay.block();
       return;
     }
-    def.hp = Math.max(0, def.hp - z.dmg);
+    this.hurtHp(def, z.dmg);
     def.vx = dir * z.dmg * 18;
     def.vy = 320;
     def.y += 2;
@@ -4825,7 +4829,8 @@ export class KitchenKombat {
       ctx.fillRect(x - 4, y - 4, w + 8, 28);
       ctx.fillStyle = "#3a1212";
       ctx.fillRect(x, y, w, 20);
-      ctx.fillStyle = hp > MAX_HP * 0.3 ? "#c41c2b" : "#7a0c14";
+      const ratio = hp / MAX_HP;
+      ctx.fillStyle = ratio > 0.35 ? "#2db84d" : ratio > 0.15 ? "#e08a12" : "#c41c2b";
       const hw = (w * hp) / MAX_HP;
       if (flip) ctx.fillRect(x + w - hw, y, hw, 20);
       else ctx.fillRect(x, y, hw, 20);
@@ -4905,12 +4910,22 @@ export class KitchenKombat {
     ctx.restore();
     if (this.phase === "replay") {
       ctx.save();
-      ctx.font = "800 22px 'Barlow Condensed', sans-serif";
+      const bx = 16;
+      const by = 16;
+      const bw = 168;
+      const bh = 40;
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.font = "800 32px 'Barlow Condensed', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      ctx.fillRect(W / 2 - 70, 86, 140, 28);
+      ctx.textBaseline = "middle";
+      const blink = 0.38 + 0.62 * (0.5 + 0.5 * Math.sin(performance.now() / 700));
+      ctx.globalAlpha = blink;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#000";
       ctx.fillStyle = "#e2c15a";
-      ctx.fillText("REPLAY", W / 2, 107);
+      ctx.strokeText("REPLAY", bx + bw / 2, by + bh / 2 + 1);
+      ctx.fillText("REPLAY", bx + bw / 2, by + bh / 2 + 1);
       ctx.restore();
     }
     if (this.callout) {
@@ -4918,7 +4933,7 @@ export class KitchenKombat {
       if (this.callout === "K.O." && this.koArt && this.koArt.naturalWidth > 8) {
         const iw = this.koArt.naturalWidth;
         const ih = this.koArt.naturalHeight;
-        const tw = Math.min(W * 0.58, 620);
+        const tw = Math.min(W * 0.48, 500);
         const th = tw * (ih / iw);
         ctx.drawImage(this.koArt, W / 2 - tw / 2, H / 2 - th / 2, tw, th);
       } else {

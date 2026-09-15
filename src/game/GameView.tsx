@@ -34,9 +34,11 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
       "Mobilon pályaválasztás két koppintással, announcer csak megerősítéskor",
       "Random ? a karakter- és pályaválasztón",
       "Jézus Szent oszlop: energy 50%-kal lassabban töltődik",
-      "VS / betöltés: pálya neve; K.O. grafika, hosszabb ideig, kisebb",
-      "Visszavágó: a pályazene nem indul újra, megy tovább",
-      "Replay: K.O. után, zoom, átugorható, hang a találat pillanatában",
+      "VS: pálya neve csak fent; karakternevek fekete kontúrral",
+      "K.O. grafika kisebb; visszavágónál a pályazene megy tovább",
+      "Replay: K.O. után, zoom, átugorható, hang a találatnál, villogó felirat bal fent",
+      "Max HP +20%; életsáv zöld / narancs / piros; 15% alatt lassú regen 3 mp sebzés után",
+      "Boot preload: főmenü → választó/VS/pályablur/announcer; harci asset a VS alatt",
     ],
   },
   {
@@ -585,15 +587,17 @@ export function GameView() {
     const onResize = () => game.resize();
     game.resize();
     window.addEventListener("resize", onResize);
-    game.loadPct = 0.02;
+    game.loadPct = 0.08;
     game.pushHud();
+    game.start();
     void game.load().then(() => {
-      game.start();
       game.resize();
     }).catch((err) => {
       console.error("load", err);
       game.loadPct = 1;
-      game.start();
+      game.menuReady = true;
+      game.hudKey = "";
+      game.pushHud();
       game.resize();
     });
     const onKey = (e: KeyboardEvent) => {
@@ -1578,7 +1582,7 @@ export function GameView() {
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
               />
-              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide sm:text-4xl">
+              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide [text-shadow:-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,1px_1px_0_#000] sm:text-4xl">
                 {CHARACTERS[hud.p1].name}
               </div>
             </div>
@@ -1594,7 +1598,7 @@ export function GameView() {
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
                 style={{ transform: "scaleX(-1)" }}
               />
-              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide sm:text-4xl">
+              <div className="font-display text-gold mt-2 text-center text-2xl tracking-wide [text-shadow:-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,1px_1px_0_#000] sm:text-4xl">
                 {CHARACTERS[hud.p2].name}
                 {hud.versusCpu ? " (CPU)" : ""}
               </div>
@@ -1602,9 +1606,6 @@ export function GameView() {
           </div>
           {hud.vsLoading && (
             <div className="absolute bottom-4 left-1/2 z-20 w-72 max-w-[80vw] -translate-x-1/2 text-center">
-              <p className="font-display text-gold mb-1 text-sm tracking-widest">
-                {STAGES[hud.stage]?.nameHu ?? ""}
-              </p>
               <p className="text-muted mb-1 text-xs tracking-widest">BETÖLTÉS</p>
               <div className="h-2 overflow-hidden rounded-sm border border-gold bg-bg">
                 <div className="bg-gold h-full" style={{ width: `${Math.round(hud.vsLoadPct * 100)}%` }} />
