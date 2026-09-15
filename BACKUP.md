@@ -1,15 +1,12 @@
 # Sinter Kombat backup
 
-**Verzió:** v0.47  
-**Git tag:** `v0.47-backup`  
+**Verzió:** v0.48  
+**Git tag:** `v0.48-backup`  
 **Repo:** https://github.com/st0rmyka/sinter-kombat  
 
-**Állapot (2026-09-15):** v0.47 — HP/regen, replay polish, boot preload sorrend.
-
-Cinematic referencia ZIP (nem a játék kódja):  
-https://github.com/st0rmyka/sinter-kombat/releases/download/cinematic-ref/SINTER_KOMBAT_CINEMATIC_REFERENCE.zip
+**Állapot (2026-09-15):** v0.48 — swing/dash/block/KO SFX, KO pose freeze, boot fail-open, VS URL cache javítás.
 
 ## Visszaállítás
 
-1. `git checkout v0.47-backup`
+1. `git checkout v0.48-backup`
 2. `npm install && npm run dev`

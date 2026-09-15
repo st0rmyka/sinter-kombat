@@ -172,7 +172,20 @@ const RICSI_HANYAS = "/sfx/ricsi_hanyas.mp3";
 const CICA_QUAKE = "/sfx/cica_quake.mp3";
 const TITLE_FILE = "/sfx/sinterkombat_title.mp3";
 const KO_FILE = "/sfx/ko.mp3";
+const KO_IMPACT = "/sfx/ko_impact.mp3?v=1";
 const SUPER_DASH_FILE = "/sfx/superdash.mp3";
+const BLOCK_FILE = "/sfx/block.mp3?v=1";
+const DASH_FILE = "/sfx/dash.mp3?v=1";
+const SWING_FILES = [
+  "/sfx/swing1.mp3?v=1",
+  "/sfx/swing2.mp3?v=1",
+  "/sfx/swing3.mp3?v=1",
+  "/sfx/swing4.mp3?v=1",
+  "/sfx/swing5.mp3?v=1",
+  "/sfx/swing6.mp3?v=1",
+  "/sfx/swing7.mp3?v=1",
+];
+let lastSwingIndex = -1;
 const CHAR_NAME: Record<string, string> = {
   ricsi: "/sfx/name_ricsi.mp3",
   renike: "/sfx/name_renike.mp3",
@@ -442,7 +455,7 @@ export function sfxMenuList(): string[] {
 }
 
 export function sfxFightList(ids: string[]): string[] {
-  const extra: string[] = [...Object.values(ROUND_FILES), ...HIT_FILES, KO_FILE, SUPER_DASH_FILE];
+  const extra: string[] = [...Object.values(ROUND_FILES), ...HIT_FILES, ...SWING_FILES, KO_FILE, KO_IMPACT, SUPER_DASH_FILE, BLOCK_FILE, DASH_FILE];
   const seen = new Set<string>(extra);
   const add = (url?: string) => {
     if (!url || seen.has(url)) return;
@@ -599,6 +612,13 @@ function pickHitUrl() {
   return HIT_FILES[i];
 }
 
+function pickSwingUrl() {
+  let i = Math.floor(Math.random() * SWING_FILES.length);
+  if (i === lastSwingIndex) i = (i + 1) % SWING_FILES.length;
+  lastSwingIndex = i;
+  return SWING_FILES[i]!;
+}
+
 function playHit(vol: number) {
   playOneShot(pickHitUrl(), vol * (0.88 + Math.random() * 0.16), 0.94 + Math.random() * 0.12);
 }
@@ -656,6 +676,7 @@ function playVoice(who: string, url: string, vol: number, rate = 1) {
 
 function voiceVol(id: string, base: number) {
   if (id === "hoffer" || id === "cica") return base * 0.32;
+  if (id === "isti") return base * 0.84;
   return base;
 }
 
@@ -805,22 +826,12 @@ export const sfxPlay = {
   },
   block: () => {
     sfxTap?.("block");
-    beep(420, 0.08, "triangle", 0.08);
+    playOneShot(BLOCK_FILE, 0.52, 0.96 + Math.random() * 0.08);
   },
   ko: () => {
     sfxTap?.("ko");
-    if (buffers.has(KO_FILE)) {
-      playBuffer(KO_FILE, 1);
-      return;
-    }
-    void decodeUrl(KO_FILE)
-      .then((buf) => {
-        buffers.set(KO_FILE, buf);
-        playBuffer(KO_FILE, 1);
-      })
-      .catch(() => {
-        beep(70, 0.4, "sawtooth", 0.14, -40);
-      });
+    playOneShot(KO_IMPACT, 0.55, 1);
+    playOneShot(KO_FILE, 1, 1);
   },
   win: () => beep(440, 0.25, "triangle", 0.08, 220),
   fatality: () => {
@@ -829,7 +840,11 @@ export const sfxPlay = {
   },
   dash: () => {
     sfxTap?.("dash");
-    beep(240, 0.08, "square", 0.07, 180);
+    playOneShot(DASH_FILE, 0.42, 0.96 + Math.random() * 0.08);
+  },
+  swing: () => {
+    sfxTap?.("swing");
+    playOneShot(pickSwingUrl(), 0.34, 0.94 + Math.random() * 0.1);
   },
   superDash: () => {
     sfxTap?.("superDash");
@@ -867,7 +882,7 @@ export const sfxPlay = {
     else if (id === "agi") playOneShot(url, 1, 1);
     else if (id === "hoffer") playOneShot(url, voiceVol(id, 1), 1);
     else if (id === "gabi") playOneShot(url, 1, 1);
-    else if (id === "isti") playOneShot(url, 1.2, 1);
+    else if (id === "isti") playOneShot(url, 1.12, 1);
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial2: (id: string) => {
@@ -881,7 +896,7 @@ export const sfxPlay = {
     else if (id === "gabi") {
       playOneShot(url, 1, 1);
       playOneShot(GABI_PISTOL, 1, 1);
-    } else if (id === "isti") playOneShot(url, 1.2, 1);
+    } else if (id === "isti") playOneShot(url, voiceVol(id, 0.9), 1);
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
   quake: () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, VICTORY_ART, VS_ART, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, victoryUrl, vsJpgUrl, vsPngUrl, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, type KeyAction, PAD_BTNS, KEY_ACTIONS, DEFAULT_KEYS, codeLabel, patchPadBtn, resetPadLayout, patchKey, resetKeys } from "./settings";
@@ -26,6 +26,16 @@ function asStage(id: StageSlot): StageId {
 }
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.48",
+    items: [
+      "Új harci SFX: random swing az ütés/rúgás indításakor, dash, block, KO impact (trimmelve, halkítva)",
+      "Győztes ütés animja megmarad KO-nál (nem ugrik special pózba)",
+      "Boot: menü max ~1 mp alatt bejön; ikonok/blur a bootban, VS képek a háttérben",
+      "Karakterválasztó PNG és VS JPG azonos cache-URL; pályaikonok a blur képeket használják",
+      "MC Isti voice hangerő finomhangolva, Felugrás VO hangosabb",
+    ],
+  },
   {
     v: "v0.47",
     items: [
@@ -332,7 +342,7 @@ const emptyHud = (): Hud => ({
   pads: 0,
   stage: "sintertanya",
   netWait: false,
-  loadPct: 0.02,
+  loadPct: 0.08,
   vsLoading: false,
   vsLoadPct: 0,
   training: false,
@@ -382,6 +392,7 @@ export function GameView() {
   const [netErr, setNetErr] = useState<string | null>(null);
   const [lobbyTick, setLobbyTick] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
+  const [bootFloor, setBootFloor] = useState(0.16);
   const netRef = useRef(new NetPlay());
   const hudRef = useRef(hud);
   hudRef.current = hud;
@@ -439,6 +450,17 @@ export function GameView() {
     gateUntil.current = performance.now() + 280;
   };
   const gated = () => performance.now() < gateUntil.current;
+
+  useEffect(() => {
+    if (!hud.loading) {
+      setBootFloor(0.16);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setBootFloor((n) => Math.min(0.92, n + 0.07));
+    }, 180);
+    return () => window.clearInterval(id);
+  }, [hud.loading]);
 
   const goTitle = () => {
     const g = gameRef.current;
@@ -587,12 +609,21 @@ export function GameView() {
     const onResize = () => game.resize();
     game.resize();
     window.addEventListener("resize", onResize);
-    game.loadPct = 0.08;
+    game.loadPct = 0.22;
     game.pushHud();
     game.start();
+    const bootFail = window.setTimeout(() => {
+      if (game.menuReady) return;
+      console.warn("boot fail-open");
+      game.menuReady = true;
+      game.loadPct = 1;
+      game.hudKey = "";
+      game.pushHud();
+    }, 1600);
     void game.load().then(() => {
       game.resize();
     }).catch((err) => {
+      window.clearTimeout(bootFail);
       console.error("load", err);
       game.loadPct = 1;
       game.menuReady = true;
@@ -1211,9 +1242,9 @@ export function GameView() {
           <h2 className="font-display text-4xl">SINTER KOMBAT</h2>
           <p className="text-muted tracking-widest">BETÖLTÉS</p>
           <div className="mt-2 h-3 w-72 max-w-[80vw] overflow-hidden rounded-sm border border-gold bg-bg">
-            <div className="bg-gold h-full transition-[width] duration-150" style={{ width: `${Math.round(hud.loadPct * 100)}%` }} />
+            <div className="bg-gold h-full transition-[width] duration-150" style={{ width: `${Math.round(Math.max(hud.loadPct, bootFloor) * 100)}%` }} />
           </div>
-          <p className="font-display text-gold text-xl">{Math.round(hud.loadPct * 100)}%</p>
+          <p className="font-display text-gold text-xl">{Math.round(Math.max(hud.loadPct, bootFloor) * 100)}%</p>
         </Overlay>
       )}
 
@@ -1523,7 +1554,7 @@ export function GameView() {
                         on ? "ring-2 ring-gold" : "ring-1 ring-white/30"
                       }`}
                     >
-                      <img src={asset(s.art)} alt={s.nameHu} className="size-full object-cover" />
+                      <img src={asset(s.blur)} alt={s.nameHu} className="size-full object-cover" />
                       <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 text-center text-[9px] leading-4 text-white sm:text-[10px]">
                         {s.nameHu}
                       </span>
@@ -1578,7 +1609,7 @@ export function GameView() {
           <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p1] ?? `/portraits/${hud.p1}.png`}?v=29`)}
+                src={asset(vsJpgUrl(hud.p1))}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
               />
@@ -1593,7 +1624,7 @@ export function GameView() {
             </div>
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
-                src={asset(`${VS_ART[hud.p2] ?? `/portraits/${hud.p2}.png`}?v=29`)}
+                src={asset(vsJpgUrl(hud.p2))}
                 alt=""
                 className="max-h-[78%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
                 style={{ transform: "scaleX(-1)" }}
@@ -1703,9 +1734,9 @@ export function GameView() {
 
       {hud.screen === "result" && (
         <div className="absolute inset-0 z-10">
-          {hud.winner && VICTORY_ART[hud.winner] && (
+          {hud.winner && victoryUrl(hud.winner) && (
             <img
-              src={asset(`${VICTORY_ART[hud.winner]}?v=270`)}
+              src={asset(victoryUrl(hud.winner))}
               alt=""
               className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
@@ -1958,7 +1989,7 @@ function SelectPanel({
               </div>
             ) : (
               <img
-                src={asset(`/ui/vs/${id}.png?v=37`)}
+                src={asset(vsPngUrl(id))}
                 alt=""
                 className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${side === "right" ? "-scale-x-100" : ""}`}
               />

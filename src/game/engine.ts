@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.47";
+export const GAME_VERSION = "v0.48";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -804,7 +804,7 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   hoffer: "/ui/victory/Victory_Hoffer_Jozsi.png",
   farajo: "/ui/victory/Victory_Farajo.png",
   gabi: "/ui/victory/Victory_Gabi.png",
-  isti: "/ui/victory/Victory_Isti.png?v=31",
+  isti: "/ui/victory/Victory_Isti.png",
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
@@ -819,6 +819,17 @@ export const VS_ART: Partial<Record<CharId, string>> = {
   gabi: "/ui/vs/gabi.jpg",
   isti: "/ui/vs/isti.jpg",
 };
+
+export function vsJpgUrl(id: CharId) {
+  return `/ui/vs/${id}.jpg?v=37`;
+}
+export function vsPngUrl(id: CharId) {
+  return `/ui/vs/${id}.png?v=37`;
+}
+export function victoryUrl(id: CharId) {
+  const base = VICTORY_ART[id]?.split("?")[0];
+  return base ? `${base}?v=270` : "";
+}
 
 const W = 1280;
 const H = 720;
@@ -1354,7 +1365,7 @@ export class KitchenKombat {
   }
 
   async load() {
-    this.loadPct = 0.04;
+    this.loadPct = 0.22;
     this.menuReady = false;
     this.hudKey = "";
     this.pushHud();
@@ -1398,8 +1409,8 @@ export class KitchenKombat {
     const watchdog = window.setTimeout(() => {
       console.warn("load watchdog");
       reveal();
-    }, 10000);
-    const loadImg = (src: string, ms = 3000) =>
+    }, 800);
+    const loadImg = (src: string, ms = 1800) =>
       new Promise<HTMLImageElement>((res) => {
         const im = new Image();
         let settled = false;
@@ -1408,75 +1419,60 @@ export class KitchenKombat {
           settled = true;
           res(el);
         };
-        im.onload = () => done(im);
-        im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
+        const to = window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
+        im.onload = () => {
+          window.clearTimeout(to);
+          done(im);
+        };
+        im.onerror = () => {
+          window.clearTimeout(to);
+          done(emptyImg());
+        };
         try {
           im.src = asset(src);
         } catch {
+          window.clearTimeout(to);
           done(emptyImg());
         }
       });
-    const runPool = async (list: Array<() => Promise<void>>, n = 8) => {
-      let i = 0;
-      const worker = async () => {
-        while (i < list.length) {
-          const job = list[i++];
-          if (job) await job();
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(n, Math.max(1, list.length)) }, () => worker()));
-    };
-    const loadGroup = async (srcs: string[], from: number, to: number, n = 8) => {
-      const total = Math.max(1, srcs.length);
-      let doneN = 0;
-      await runPool(
-        srcs.map((src) => async () => {
-          const im = await loadImg(src, 3000);
-          if (src.includes("mainmenu") && (im.naturalWidth || 0) > 32) this.menuBg = im;
-          if (src.includes("/ui/ko.png") && (im.naturalWidth || 0) > 8) this.koArt = im;
-          doneN += 1;
-          if (!revealed) {
-            this.loadPct = from + ((to - from) * doneN) / total;
-            this.hudKey = "";
-            this.pushHud();
-          }
-        }),
-        n,
-      );
-    };
-    const menuSrcs = ["/ui/mainmenu-v35.jpg", "/ui/ko.png?v=1"];
-    const selectSrcs = [
+    const critical = [
+      "/ui/mainmenu-v35.jpg",
+      "/ui/ko.png?v=1",
       "/ui/selection.jpg",
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
-      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=37`),
       ...STAGE_IDS.map((id) => STAGES[id]?.blur).filter((u): u is string => !!u),
     ];
-    try {
-      await loadGroup(menuSrcs, 0.04, 0.18, 2);
-      await loadGroup(selectSrcs, 0.18, 0.82, 8);
-      const audioN = Math.max(1, sfxMenuList().length + musicMenuList().length);
-      let audioDone = 0;
-      await Promise.race([
-        preloadSfx(
-          () => {
-            audioDone += 1;
-            if (!revealed) {
-              this.loadPct = 0.82 + 0.14 * Math.min(1, audioDone / audioN);
-              this.hudKey = "";
-              this.pushHud();
-            }
-          },
-          sfxMenuList(),
-          musicMenuList(),
-        ).catch(() => undefined),
-        new Promise<void>((r) => window.setTimeout(r, 2200)),
-      ]);
-    } catch (err) {
-      console.error("asset load", err);
-    }
-    window.clearTimeout(watchdog);
-    reveal();
+    const extra = [
+      ...CHAR_IDS.map((id) => vsJpgUrl(id)),
+      ...CHAR_IDS.map((id) => vsPngUrl(id)),
+    ];
+    const eat = (src: string, im: HTMLImageElement) => {
+      if (src.includes("mainmenu") && (im.naturalWidth || 0) > 32) this.menuBg = im;
+      if (src.includes("/ui/ko.png") && (im.naturalWidth || 0) > 8) this.koArt = im;
+    };
+    void preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
+    void (async () => {
+      for (const src of critical) {
+        try {
+          eat(src, await loadImg(src, 1800));
+        } catch {
+          /* skip */
+        }
+        if (!revealed) {
+          this.loadPct = Math.min(0.9, Math.max(0.22, this.loadPct + 0.06));
+          this.hudKey = "";
+          this.pushHud();
+        }
+      }
+      reveal();
+      for (const src of extra) {
+        try {
+          await loadImg(src, 4000);
+        } catch {
+          /* skip */
+        }
+      }
+    })();
   }
 
   async ensureFight(p1: CharId = this.p1id, p2: CharId = this.p2id, stageId: StageId = this.stageId) {
@@ -1554,8 +1550,8 @@ export class KitchenKombat {
       jobs.push(async () => {
         this.images!.anims[id].special2 = await Promise.all([0, 1, 2, 3, 4, 5].map((i) => loadTick(`/sprites/${id}/special2${i}.png${bust}`)));
       });
-      const vic = VICTORY_ART[id];
-      if (vic) jobs.push(async () => { await loadTick(`${vic}?v=270`); });
+      const vic = victoryUrl(id);
+      if (vic) jobs.push(async () => { await loadTick(vic); });
     }
     if (!stageOk) {
       jobs.push(async () => {
@@ -2947,7 +2943,10 @@ export class KitchenKombat {
       /* Farajo special SFX: farajoBed while the move is live */
     } else if (atk.id === "special2") sfxPlay.charSpecial2(f.id);
     else if (atk.id === "special") sfxPlay.charSpecial1(f.id);
-    else sfxPlay.charAttack(f.id);
+    else {
+      sfxPlay.charAttack(f.id);
+      sfxPlay.swing();
+    }
   }
 
   syncFarajoAudio() {
@@ -3173,7 +3172,7 @@ export class KitchenKombat {
     winner.wins += 1;
     const match = winner.wins >= 2;
     winner.state = "win";
-    winner.pose = "special";
+    winner.vx *= 0.35;
     this.recordReplay();
     this.phase = "ko";
     this.callout = "K.O.";
@@ -3285,6 +3284,7 @@ export class KitchenKombat {
     else if (ev.k === "dash") sfxPlay.dash();
     else if (ev.k === "superDash") sfxPlay.superDash();
     else if (ev.k === "attack") sfxPlay.charAttack(id);
+    else if (ev.k === "swing") sfxPlay.swing();
     else if (ev.k === "damage") sfxPlay.charDamage(id);
     else if (ev.k === "defeat") sfxPlay.charDefeat(id);
     else if (ev.k === "special1") sfxPlay.charSpecial1(id);
@@ -4304,7 +4304,7 @@ export class KitchenKombat {
   drawFighter(f: Fighter) {
     if (!this.images || !this.boxes) return;
     const slot = f === this.f1 ? 0 : 1;
-    const anim = f.state === "attack" ? this.attackFrame(f) : null;
+    const anim = f.state === "attack" || (f.state === "win" && f.atk) ? this.attackFrame(f) : null;
     const pick = (im: HTMLImageElement | null | undefined) =>
       im && (im.naturalWidth || im.width) > 8 ? im : null;
     const img =
@@ -4370,7 +4370,7 @@ export class KitchenKombat {
     const flip = f.state === "dash" ? f.dashDir : f.facing;
     let lunge = 0;
     let tilt = 0;
-    if (f.state === "attack" && f.atk) {
+    if ((f.state === "attack" || f.state === "win") && f.atk) {
       const t = f.atkT;
       const st = f.atk.startup;
       const ac = f.atk.active;
