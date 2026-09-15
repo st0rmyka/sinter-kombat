@@ -1156,7 +1156,7 @@ export class KitchenKombat {
   replaySfxAt = 0;
   replayPlayI = -1;
   replayTailT = 0;
-  replayHold: [HTMLImageElement | null, HTMLImageElement | null] = [null, null];
+  replayHold: [{ id: CharId; img: HTMLImageElement } | null, { id: CharId; img: HTMLImageElement } | null] = [null, null];
   replayCamX = W / 2;
   replayCamY = H / 2;
   winner: CharId | null = null;
@@ -1365,10 +1365,6 @@ export class KitchenKombat {
   }
 
   async load() {
-    this.loadPct = 0.22;
-    this.menuReady = false;
-    this.hudKey = "";
-    this.pushHud();
     const emptyImg = () => {
       const im = new Image();
       im.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
@@ -1387,92 +1383,42 @@ export class KitchenKombat {
       isti: {} as Record<Pose, HTMLImageElement>,
     };
     const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
-    let revealed = false;
-    const reveal = () => {
-      if (revealed) return;
-      revealed = true;
-      for (const id of CHAR_IDS) {
-        if (!bags[id].idle) bags[id].idle = emptyImg();
-      }
-      this.images = { ...bags, anims, stage: this.stage && (this.stage.naturalWidth || 0) > 32 ? this.stage : emptyImg() };
-      this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
-      for (const id of CHAR_IDS) {
-        for (const p of Object.keys(bags[id]) as Pose[]) {
-          this.boxes[id][p] = measureBox(bags[id][p]);
-        }
-      }
-      this.menuReady = true;
-      this.loadPct = 1;
-      this.hudKey = "";
-      this.pushHud();
+    for (const id of CHAR_IDS) bags[id].idle = emptyImg();
+    this.images = { ...bags, anims, stage: emptyImg() };
+    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
+    this.menuReady = true;
+    this.loadPct = 1;
+    this.hudKey = "";
+    this.pushHud();
+    const eat = (src: string, im: HTMLImageElement) => {
+      if ((im.naturalWidth || 0) < 8) return;
+      if (src.includes("mainmenu")) this.menuBg = im;
+      if (src.includes("/ui/ko.png")) this.koArt = im;
     };
-    const watchdog = window.setTimeout(() => {
-      console.warn("load watchdog");
-      reveal();
-    }, 800);
-    const loadImg = (src: string, ms = 1800) =>
-      new Promise<HTMLImageElement>((res) => {
+    const fire = (src: string) => {
+      try {
         const im = new Image();
-        let settled = false;
-        const done = (el: HTMLImageElement) => {
-          if (settled) return;
-          settled = true;
-          res(el);
-        };
-        const to = window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
-        im.onload = () => {
-          window.clearTimeout(to);
-          done(im);
-        };
-        im.onerror = () => {
-          window.clearTimeout(to);
-          done(emptyImg());
-        };
-        try {
-          im.src = asset(src);
-        } catch {
-          window.clearTimeout(to);
-          done(emptyImg());
-        }
-      });
-    const critical = [
+        im.decoding = "async";
+        im.onload = () => eat(src, im);
+        im.onerror = () => undefined;
+        im.src = asset(src);
+      } catch {
+        /* ignore */
+      }
+    };
+    const later = [
       "/ui/mainmenu-v35.jpg",
       "/ui/ko.png?v=1",
       "/ui/selection.jpg",
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
       ...STAGE_IDS.map((id) => STAGES[id]?.blur).filter((u): u is string => !!u),
-    ];
-    const extra = [
       ...CHAR_IDS.map((id) => vsJpgUrl(id)),
       ...CHAR_IDS.map((id) => vsPngUrl(id)),
     ];
-    const eat = (src: string, im: HTMLImageElement) => {
-      if (src.includes("mainmenu") && (im.naturalWidth || 0) > 32) this.menuBg = im;
-      if (src.includes("/ui/ko.png") && (im.naturalWidth || 0) > 8) this.koArt = im;
-    };
-    void preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
-    void (async () => {
-      for (const src of critical) {
-        try {
-          eat(src, await loadImg(src, 1800));
-        } catch {
-          /* skip */
-        }
-        if (!revealed) {
-          this.loadPct = Math.min(0.9, Math.max(0.22, this.loadPct + 0.06));
-          this.hudKey = "";
-          this.pushHud();
-        }
-      }
-      reveal();
-      for (const src of extra) {
-        try {
-          await loadImg(src, 4000);
-        } catch {
-          /* skip */
-        }
-      }
-    })();
+    window.setTimeout(() => {
+      later.forEach(fire);
+      void preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
+    }, 40);
   }
 
   async ensureFight(p1: CharId = this.p1id, p2: CharId = this.p2id, stageId: StageId = this.stageId) {
@@ -4304,13 +4250,15 @@ export class KitchenKombat {
   drawFighter(f: Fighter) {
     if (!this.images || !this.boxes) return;
     const slot = f === this.f1 ? 0 : 1;
+    const bag = this.images[f.id];
     const anim = f.state === "attack" || (f.state === "win" && f.atk) ? this.attackFrame(f) : null;
     const pick = (im: HTMLImageElement | null | undefined) =>
-      im && (im.naturalWidth || im.width) > 8 ? im : null;
-    const img =
-      pick(anim) ?? pick(this.images[f.id]?.[f.pose]) ?? pick(this.images[f.id]?.idle) ?? this.replayHold[slot];
+      im && (im.naturalWidth || 0) > 8 ? im : null;
+    const hold = this.replayHold[slot];
+    const holdOk = hold && hold.id === f.id ? hold.img : null;
+    const img = pick(anim) ?? pick(bag?.[f.pose]) ?? pick(bag?.idle) ?? pick(holdOk);
     if (!img) return;
-    this.replayHold[slot] = img;
+    this.replayHold[slot] = { id: f.id, img };
     const idle0 = this.boxes[f.id]?.idle;
     const idle =
       idle0 && idle0.h > 8

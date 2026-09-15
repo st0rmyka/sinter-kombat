@@ -609,28 +609,14 @@ export function GameView() {
     const onResize = () => game.resize();
     game.resize();
     window.addEventListener("resize", onResize);
-    game.loadPct = 0.22;
-    game.pushHud();
+    void game.load();
     game.start();
-    const bootFail = window.setTimeout(() => {
-      if (game.menuReady) return;
-      console.warn("boot fail-open");
+    const bootKill = window.setTimeout(() => {
       game.menuReady = true;
       game.loadPct = 1;
       game.hudKey = "";
       game.pushHud();
-    }, 1600);
-    void game.load().then(() => {
-      game.resize();
-    }).catch((err) => {
-      window.clearTimeout(bootFail);
-      console.error("load", err);
-      game.loadPct = 1;
-      game.menuReady = true;
-      game.hudKey = "";
-      game.pushHud();
-      game.resize();
-    });
+    }, 700);
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") game.pauseToggle();
     };
@@ -642,6 +628,7 @@ export function GameView() {
     window.addEventListener("pointerdown", onGesture, { capture: true });
     window.addEventListener("keydown", onGesture, { capture: true });
     return () => {
+      window.clearTimeout(bootKill);
       unbind();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKey);
@@ -1237,7 +1224,7 @@ export function GameView() {
       <div className="relative h-full w-full overflow-hidden">
       <canvas ref={canvasRef} className="block h-full w-full touch-none bg-bg" />
 
-      {hud.loading && hud.loadPct < 0.995 && (
+      {hud.loading && hud.loadPct < 0.86 && (
         <Overlay>
           <h2 className="font-display text-4xl">SINTER KOMBAT</h2>
           <p className="text-muted tracking-widest">BETÖLTÉS</p>
