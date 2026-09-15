@@ -839,7 +839,7 @@ const GRAV = 5100;
 const JUMP_V = 1760;
 const BUFFER = 0.14;
 const STEP = 1 / 60;
-const MAX_HP = 204;
+const MAX_HP = 300;
 const ROUND_TIME = 45;
 const BLOOD_TINT = ["#3a0509", "#5c0810", "#7a0c18", "#a11020", "#c41828", "#6b0a12"];
 
