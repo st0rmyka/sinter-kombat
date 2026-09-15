@@ -36,6 +36,7 @@ const PATCH_NOTES: { v: string; items: string[] }[] = [
       "Jézus Szent oszlop: energy 50%-kal lassabban töltődik",
       "VS / betöltés: pálya neve; K.O. grafika, hosszabb ideig, kisebb",
       "Visszavágó: a pályazene nem indul újra, megy tovább",
+      "Replay: K.O. után, zoom, átugorható, hang a találat pillanatában",
     ],
   },
   {

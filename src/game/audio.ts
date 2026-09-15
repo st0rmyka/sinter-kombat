@@ -789,11 +789,26 @@ function resetFarajoBeds() {
   }
 }
 
+let sfxTap: ((k: string, id?: string) => void) | null = null;
+export function setSfxTap(fn: ((k: string, id?: string) => void) | null) {
+  sfxTap = fn;
+}
+
 export const sfxPlay = {
-  hit: () => playHit(0.92),
-  heavy: () => playHit(1),
-  block: () => beep(420, 0.08, "triangle", 0.08),
+  hit: () => {
+    sfxTap?.("hit");
+    playHit(0.92);
+  },
+  heavy: () => {
+    sfxTap?.("heavy");
+    playHit(1);
+  },
+  block: () => {
+    sfxTap?.("block");
+    beep(420, 0.08, "triangle", 0.08);
+  },
   ko: () => {
+    sfxTap?.("ko");
     if (buffers.has(KO_FILE)) {
       playBuffer(KO_FILE, 1);
       return;
@@ -812,28 +827,40 @@ export const sfxPlay = {
     beep(80, 0.5, "sawtooth", 0.18, -50);
     beep(160, 0.4, "square", 0.1, -80);
   },
-  dash: () => beep(240, 0.08, "square", 0.07, 180),
-  superDash: () => playOneShot(SUPER_DASH_FILE, 1, 1),
+  dash: () => {
+    sfxTap?.("dash");
+    beep(240, 0.08, "square", 0.07, 180);
+  },
+  superDash: () => {
+    sfxTap?.("superDash");
+    playOneShot(SUPER_DASH_FILE, 1, 1);
+  },
   charAttack: (id: string) => {
+    sfxTap?.("attack", id);
     const pool = CHAR_ATTACK[id];
     if (!pool) return;
     playVoice(id, pickFrom(pool), voiceVol(id, 0.96), 0.98 + Math.random() * 0.04);
   },
   charDamage: (id: string) => {
+    sfxTap?.("damage", id);
     const pool = CHAR_DAMAGE[id];
     if (!pool) return;
     playVoice(id, pickFrom(pool), voiceVol(id, 1), 0.98 + Math.random() * 0.04);
   },
   charDefeat: (id: string) => {
+    sfxTap?.("defeat", id);
     const url = CHAR_DEFEAT[id];
     if (!url) return;
     playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial1: (id: string) => {
+    sfxTap?.("special1", id);
     if (id === "farajo") return;
     const url = CHAR_SPECIAL1[id];
     if (!url) {
-      sfxPlay.charAttack(id);
+      const pool = CHAR_ATTACK[id];
+      if (!pool) return;
+      playVoice(id, pickFrom(pool), voiceVol(id, 0.96), 0.98 + Math.random() * 0.04);
       return;
     }
     if (id === "jezus") playOneShot(url, 2.4, 1);
@@ -844,6 +871,7 @@ export const sfxPlay = {
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
   charSpecial2: (id: string) => {
+    sfxTap?.("special2", id);
     if (id === "farajo") return;
     const url = CHAR_SPECIAL2[id];
     if (!url) return;
@@ -856,7 +884,10 @@ export const sfxPlay = {
     } else if (id === "isti") playOneShot(url, 1.2, 1);
     else playVoice(id, url, voiceVol(id, 1), 1);
   },
-  quake: () => playOneShot(CICA_QUAKE, voiceVol("cica", 0.95), 0.96 + Math.random() * 0.08),
+  quake: () => {
+    sfxTap?.("quake");
+    playOneShot(CICA_QUAKE, voiceVol("cica", 0.95), 0.96 + Math.random() * 0.08);
+  },
   charName: (id: string) => {
     const url = CHAR_NAME[id];
     if (!url) return;

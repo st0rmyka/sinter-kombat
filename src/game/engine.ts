@@ -1,6 +1,6 @@
 import { getHudScale } from "./settings";
-import { getPadCount, rumble, sampleP1, sampleP2, injectKeys, type Actions } from "./input";
-import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic, sfxMenuList, sfxFightList, musicMenuList, musicFightList } from "./audio";
+import { getPadCount, rumble, sampleP1, sampleP2, sampleMenu, injectKeys, type Actions } from "./input";
+import { sfxPlay, preloadSfx, lastRoundSfx, startStageMusic, stopStageMusic, startMenuMusic, sfxMenuList, sfxFightList, musicMenuList, musicFightList, setSfxTap } from "./audio";
 import { packBits, unpackBits } from "./net";
 import { asset } from "./asset";
 
@@ -858,6 +858,88 @@ type Particle = {
   tint?: string;
 };
 
+type ReplayF = {
+  x: number;
+  y: number;
+  facing: 1 | -1;
+  pose: Pose;
+  state: FState;
+  flash: number;
+  squash: number;
+  bleed: number;
+  superDash: boolean;
+  rageT: number;
+  shieldT: number;
+  pullT: number;
+  atk: Atk | null;
+  atkT: number;
+  dashDir: 1 | -1;
+  dashT: number;
+  crouchGuard: boolean;
+  hp: number;
+  meter: number;
+};
+type ReplaySfx = { i: number; k: string; id?: string };
+type ReplaySnap = {
+  f1: ReplayF;
+  f2: ReplayF;
+  particles: Particle[];
+  trauma: number;
+  timer: number;
+  combo: number;
+  comboSide: 1 | 2 | 0;
+};
+const REPLAY_SEC = 4.6;
+const REPLAY_HZ = 60;
+const REPLAY_MAX = Math.ceil(REPLAY_SEC * REPLAY_HZ);
+const REPLAY_PLAY = 4.2;
+const REPLAY_TAIL = 1.8;
+
+function snapFighter(f: Fighter): ReplayF {
+  return {
+    x: f.x,
+    y: f.y,
+    facing: f.facing,
+    pose: f.pose,
+    state: f.state,
+    flash: f.flash,
+    squash: f.squash,
+    bleed: f.bleed,
+    superDash: f.superDash,
+    rageT: f.rageT,
+    shieldT: f.shieldT,
+    pullT: f.pullT,
+    atk: f.atk,
+    atkT: f.atkT,
+    dashDir: f.dashDir,
+    dashT: f.dashT,
+    crouchGuard: f.crouchGuard,
+    hp: f.hp,
+    meter: f.meter,
+  };
+}
+function applyFighter(f: Fighter, s: ReplayF) {
+  f.x = s.x;
+  f.y = s.y;
+  f.facing = s.facing;
+  f.pose = s.pose;
+  f.state = s.state;
+  f.flash = s.flash;
+  f.squash = s.squash;
+  f.bleed = s.bleed;
+  f.superDash = s.superDash;
+  f.rageT = s.rageT;
+  f.shieldT = s.shieldT;
+  f.pullT = s.pullT;
+  f.atk = s.atk;
+  f.atkT = s.atkT;
+  f.dashDir = s.dashDir;
+  f.dashT = s.dashT;
+  f.crouchGuard = s.crouchGuard;
+  f.hp = s.hp;
+  f.meter = s.meter;
+}
+
 type Box = { x: number; y: number; w: number; h: number; foot: number };
 type Fighter = {
   id: CharId;
@@ -1011,7 +1093,7 @@ export class KitchenKombat {
   bulletImg: HTMLImageElement | null = null;
   rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
-  phase: "intro" | "fight" | "ko" | "finish" | "fatality" | "end" = "intro";
+  phase: "intro" | "fight" | "ko" | "replay" | "finish" | "fatality" | "end" = "intro";
   versusCpu = true;
   training = false;
   dummy: DummyMode = "idle";
@@ -1054,6 +1136,17 @@ export class KitchenKombat {
   trauma = 0;
   hitstop = 0;
   particles: Particle[] = [];
+  replayBuf: ReplaySnap[] = [];
+  replayAcc = 0;
+  replaySkipLock = 0;
+  replaySfx: ReplaySfx[] = [];
+  replayCum: number[] = [];
+  replaySfxAt = 0;
+  replayPlayI = -1;
+  replayTailT = 0;
+  replayHold: [HTMLImageElement | null, HTMLImageElement | null] = [null, null];
+  replayCamX = W / 2;
+  replayCamY = H / 2;
   winner: CharId | null = null;
   fatality: string | null = null;
   running = false;
@@ -1116,7 +1209,14 @@ export class KitchenKombat {
     this.ctx = canvas.getContext("2d")!;
     this.onHud = onHud;
     this.reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    setSfxTap((k, id) => {
+      if (this.training || (this.phase !== "fight" && this.phase !== "intro")) return;
+      this.replaySfx.push({ i: this.replayBuf.length, k, id });
+    });
     this.bootFighters();
+    this.canvas.addEventListener("pointerdown", () => {
+      if (this.phase === "replay" && this.replaySkipLock <= 0) this.endReplay();
+    });
     window.__controlsTest = {
       getYaw: () => (this.f1.facing === 1 ? 0 : Math.PI),
       getSpeed: () => Math.abs(this.f1.vx),
@@ -1313,22 +1413,16 @@ export class KitchenKombat {
         window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), ms);
         im.src = asset(src);
       });
-    const bust = "?v=86";
     const fast = [
       "/ui/mainmenu-v35.jpg",
       "/ui/ko.png?v=1",
+      "/ui/selection.jpg",
       ...STAGE_IDS.map((id) => STAGES[id].blur),
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
+      ...CHAR_IDS.map((id) => `${VS_ART[id]}?v=37`),
     ];
-    const vsPng = CHAR_IDS.map((id) => `/ui/vs/${id}.png?v=37`);
-    const rest = [
-      "/ui/selection.jpg",
-      ...CHAR_IDS.map((id) => `/portraits/${id}.png?v=10`),
-      ...CHAR_IDS.map((id) => VS_ART[id]).filter((u): u is string => !!u).map((u) => `${u}?v=31`),
-      ...STAGE_IDS.map((id) => STAGES[id].art),
-      ...CHAR_IDS.map((id) => `/sprites/${id}/idle.png${bust}`),
-    ];
-    const total = Math.max(1, fast.length + vsPng.length + 4);
+    const rest = STAGE_IDS.map((id) => STAGES[id].art);
+    const total = Math.max(1, fast.length + 2);
     let doneN = 0;
     const tick = () => {
       doneN += 1;
@@ -1359,7 +1453,10 @@ export class KitchenKombat {
     this.loadPct = 0.08;
     this.hudKey = "";
     this.pushHud();
-    const menuAudio = preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
+    const menuAudio = Promise.race([
+      preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined),
+      new Promise<void>((r) => window.setTimeout(r, 3500)),
+    ]);
     try {
       await runPool(
         fast.map((src) => async () => {
@@ -1368,12 +1465,6 @@ export class KitchenKombat {
           if (src.includes("/ui/ko.png")) this.koArt = im;
         }),
         6,
-      );
-      await runPool(
-        vsPng.map((src) => async () => {
-          await loadTick(src, 6000);
-        }),
-        4,
       );
       await menuAudio;
       reveal();
@@ -1386,9 +1477,6 @@ export class KitchenKombat {
               this.loadedStages.add(id);
               if (id === this.stageId || !this.stage) this.stage = im;
             }
-          }
-          for (const id of CHAR_IDS) {
-            if (src.includes(`/sprites/${id}/idle.png`) && (im.naturalWidth || 0) > 32) bags[id].idle = im;
           }
         }),
         4,
@@ -1466,8 +1554,10 @@ export class KitchenKombat {
         if (p === "idle" && this.images[id].idle && (this.images[id].idle.naturalWidth || 0) > 32) continue;
         jobs.push(async () => {
           const im = await loadTick(`/sprites/${id}/${poseFile(p)}.png${bust}`);
-          this.images![id][p] = im;
-          this.boxes![id][p] = measureBox(im);
+          if ((im.naturalWidth || im.width) > 8) {
+            this.images![id][p] = im;
+            this.boxes![id][p] = measureBox(im);
+          }
         });
       }
       for (const atk of ANIM_ATKS) {
@@ -1740,6 +1830,10 @@ export class KitchenKombat {
     this.cpuGuard = false;
     this.f1 = this.makeFighter(this.p1id, 340, 1);
     this.f2 = this.makeFighter(this.p2id, 940, -1);
+    this.replayBuf = [];
+    this.replayAcc = 0;
+    this.replaySfx = [];
+    this.replayTailT = 0;
     this.screen = "vs";
     this.introT = 1.6;
     this.fightReady = false;
@@ -1767,6 +1861,10 @@ export class KitchenKombat {
     this.calloutT = this.training ? 1.2 : 2.8;
     this.particles = [];
     this.zones = [];
+    this.replayBuf = [];
+    this.replayAcc = 0;
+    this.replaySfx = [];
+    this.replayTailT = 0;
     this.combo = 0;
     this.comboName = null;
     this.winAnnounceId = null;
@@ -1822,6 +1920,7 @@ export class KitchenKombat {
     if (this.paused) return;
     if (this.hitstop > 0) {
       this.hitstop -= dt;
+      this.maybeRecordReplay();
       this.draw();
       return;
     }
@@ -1864,11 +1963,43 @@ export class KitchenKombat {
       this.introT -= dt;
       if (this.introT <= 0 && this.calloutT <= 0) this.phase = "fight";
     }
+    if (this.phase === "replay") {
+      this.finishT -= dt;
+      this.replaySkipLock = Math.max(0, this.replaySkipLock - dt);
+      const n = this.replayBuf.length;
+      const cum = this.replayCum;
+      const total = cum.length ? cum[cum.length - 1]! + 0.0001 : REPLAY_PLAY;
+      const elapsed = Math.max(0, total - this.finishT);
+      let i = 0;
+      if (n > 0 && cum.length) {
+        while (i + 1 < cum.length && cum[i + 1]! <= elapsed) i++;
+        i = Math.min(n - 1, i);
+        this.applyReplay(this.replayBuf[i]!);
+        const from = this.replayPlayI + 1;
+        this.replayPlayI = i;
+        for (let f = from; f <= i; f++) this.pumpReplaySfx(f);
+      }
+      const a = sampleP1();
+      const b = sampleP2();
+      const m = sampleMenu();
+      const skip =
+        this.replaySkipLock <= 0 &&
+        (a.punchLP || a.punchRP || a.kickLP || a.kickRP || a.specialP || a.special2P || a.startP || a.superDashP ||
+          b.punchLP || b.punchRP || b.kickLP || b.kickRP || b.specialP || b.startP ||
+          m.punchLP || m.kickLP || m.startP);
+      if (skip || this.finishT <= 0) this.endReplay();
+      else this.pushHud();
+      return;
+    }
     if (this.phase === "ko" || this.phase === "finish" || this.phase === "fatality") {
       this.finishT -= dt;
       this.tickBody(this.f1, dt);
       this.tickBody(this.f2, dt);
       this.tickParticles(dt);
+      if (this.phase === "ko" && this.replayTailT > 0 && !this.training) {
+        this.replayTailT -= dt;
+        this.maybeRecordReplay();
+      }
       if (this.phase === "finish") {
         const wa = sampleP1();
         if (wa.specialP || wa.punchLP || wa.punchRP || wa.kickLP || wa.kickRP) this.doFatality(this.f1.hp > 0 ? this.f1 : this.f2);
@@ -1883,6 +2014,11 @@ export class KitchenKombat {
         }
       }
       if (this.finishT <= 0) {
+        if (this.phase === "ko" && this.replayBuf.length > 12) {
+          this.startReplay();
+          this.pushHud();
+          return;
+        }
         if (this.phase === "fatality" || this.f1.wins >= 2 || this.f2.wins >= 2) this.goResult();
         else {
           this.round += 1;
@@ -1977,6 +2113,7 @@ export class KitchenKombat {
     this.combat(this.f2, this.f1);
     this.tickZones(dt);
     this.tickParticles(dt);
+    this.maybeRecordReplay();
     if (this.training && this.comboT <= 0) {
       this.f1.hp = MAX_HP;
       this.f2.hp = MAX_HP;
@@ -2999,7 +3136,6 @@ export class KitchenKombat {
     sfxPlay.charDefeat(loser.id);
     this.spawnBlood(loser.x, GROUND - 160, winner.facing, true);
     this.roundWin(winner);
-    if (winner.wins >= 2) this.phase = "finish";
   }
 
   doFatality(winner: Fighter) {
@@ -3016,7 +3152,7 @@ export class KitchenKombat {
     loser.pose = "hurt";
     loser.bleed = 1.4;
     this.callout = "K.O.";
-    this.calloutT = 3.4;
+    this.calloutT = 2.4;
     this.fatality = null;
     this.trauma = 1;
     this.hitstop = 0.16;
@@ -3031,19 +3167,20 @@ export class KitchenKombat {
 
   roundWin(winner: Fighter) {
     winner.wins += 1;
-    this.phase = "ko";
     const match = winner.wins >= 2;
     winner.state = "win";
     winner.pose = "special";
+    this.recordReplay();
+    this.phase = "ko";
     this.callout = "K.O.";
-    this.calloutT = 3.7;
+    this.calloutT = 2.7;
+    this.finishT = 2.7;
+    this.replayTailT = REPLAY_TAIL;
     if (match) {
       this.winner = winner.id;
-      this.finishT = 9;
-      this.winAnnounceId = winner.id;
-      this.winAnnounceT = 3.75;
+      this.winAnnounceId = null;
+      this.winAnnounceT = 0;
     } else {
-      this.finishT = 4.05;
       this.winAnnounceId = null;
       this.winAnnounceT = 0;
     }
@@ -3069,6 +3206,103 @@ export class KitchenKombat {
     this.phase = "end";
     if (this.winner) sfxPlay.charTaunt(this.winner);
     this.pushHud();
+  }
+
+  recordReplay() {
+    if (!this.f1 || !this.f2) return;
+    this.replayBuf.push({
+      f1: snapFighter(this.f1),
+      f2: snapFighter(this.f2),
+      particles: this.particles.slice(-48).map((p) => ({ ...p })),
+      trauma: this.trauma,
+      timer: this.timer,
+      combo: this.combo,
+      comboSide: this.comboSide,
+    });
+    while (this.replayBuf.length > REPLAY_MAX) {
+      this.replayBuf.shift();
+      for (const s of this.replaySfx) s.i -= 1;
+      this.replaySfx = this.replaySfx.filter((s) => s.i >= 0);
+    }
+  }
+
+  maybeRecordReplay() {
+    if (this.training) return;
+    if (this.phase === "fight" || this.phase === "intro") this.recordReplay();
+    else if (this.phase === "ko" && this.replayTailT > 0) this.recordReplay();
+  }
+
+  applyReplay(s: ReplaySnap) {
+    applyFighter(this.f1, s.f1);
+    applyFighter(this.f2, s.f2);
+    this.particles = s.particles.map((p) => ({ ...p }));
+    this.trauma = s.trauma;
+    this.timer = s.timer;
+    this.combo = s.combo;
+    this.comboSide = s.comboSide;
+  }
+
+  startReplay() {
+    this.phase = "replay";
+    this.callout = null;
+    this.calloutT = 0;
+    this.replaySkipLock = 0.22;
+    this.winAnnounceT = 0;
+    this.replaySfxAt = 0;
+    this.replayPlayI = -1;
+    this.replayHold = [null, null];
+    this.replayCamX = (this.f1.x + this.f2.x) / 2;
+    this.replayCamY = GROUND - (this.f1.y + this.f2.y) * 0.28 - 150;
+    this.replayCum = [];
+    let t = 0;
+    const step = 1 / REPLAY_HZ;
+    const n = this.replayBuf.length;
+    for (let i = 0; i < n; i++) {
+      this.replayCum.push(t);
+      t += step / 0.62;
+    }
+    this.finishT = Math.max(0.8, t);
+  }
+
+  pumpReplaySfx(frameI: number) {
+    while (this.replaySfxAt < this.replaySfx.length) {
+      const ev = this.replaySfx[this.replaySfxAt]!;
+      if (ev.i > frameI) break;
+      this.replaySfxAt += 1;
+      if (ev.i === frameI) this.runReplaySfx(ev);
+    }
+  }
+
+  runReplaySfx(ev: ReplaySfx) {
+    const id = ev.id ?? "";
+    if (ev.k === "hit") sfxPlay.hit();
+    else if (ev.k === "heavy") sfxPlay.heavy();
+    else if (ev.k === "block") sfxPlay.block();
+    else if (ev.k === "dash") sfxPlay.dash();
+    else if (ev.k === "superDash") sfxPlay.superDash();
+    else if (ev.k === "attack") sfxPlay.charAttack(id);
+    else if (ev.k === "damage") sfxPlay.charDamage(id);
+    else if (ev.k === "defeat") sfxPlay.charDefeat(id);
+    else if (ev.k === "special1") sfxPlay.charSpecial1(id);
+    else if (ev.k === "special2") sfxPlay.charSpecial2(id);
+    else if (ev.k === "quake") sfxPlay.quake();
+    else if (ev.k === "ko") sfxPlay.ko();
+  }
+
+  endReplay() {
+    if (this.phase !== "replay") return;
+    if (this.f1.wins >= 2 || this.f2.wins >= 2) {
+      this.phase = "finish";
+      this.winAnnounceId = this.winner;
+      this.winAnnounceT = 0.08;
+      this.finishT = 5.2;
+      this.callout = null;
+      this.calloutT = 0;
+      this.pushHud();
+      return;
+    }
+    this.round += 1;
+    this.beginRound();
   }
 
   spawnFx(x: number, y: number, kind: Particle["kind"], dmg: number) {
@@ -4026,8 +4260,10 @@ export class KitchenKombat {
 
   attackFrame(f: Fighter): HTMLImageElement | null {
     if (!this.images || !f.atk) return null;
+    const ok = (im: HTMLImageElement | null | undefined) =>
+      im && (im.naturalWidth || im.width) > 8 ? im : null;
     if (f.atk.pose.startsWith("jump") || f.atk.pose.startsWith("low")) {
-      return this.images[f.id][f.atk.pose] ?? null;
+      return ok(this.images[f.id][f.atk.pose]) ?? null;
     }
     const frames = this.images.anims[f.id][f.atk.id];
     if (!frames || frames.length === 0) return null;
@@ -4035,46 +4271,49 @@ export class KitchenKombat {
     const st = f.atk.startup;
     const ac = f.atk.active;
     const rec = f.atk.recover;
+    const pick = (i: number) => ok(frames[Math.max(0, Math.min(frames.length - 1, i))]);
     if (f.atk.zone === "spin" && frames.length >= 4) {
-      if (t < st) return frames[0]!;
-      return frames[Math.floor((t - st) * 10) % 4]!;
+      if (t < st) return pick(0);
+      return pick(Math.floor((t - st) * 10) % 4);
     }
     if (f.atk.zone === "bat" && frames.length >= 4) {
-      if (t < st) return frames[0]!;
+      if (t < st) return pick(0);
       const cycle = 0.14;
       const local = (t - st) % cycle;
-      return frames[Math.min(frames.length - 1, Math.floor((local / cycle) * frames.length))]!;
+      return pick(Math.floor((local / cycle) * frames.length));
     }
     if ((f.atk.zone === "note" || f.atk.zone === "solo") && frames.length >= 2) {
-      if (t < st) return frames[0]!;
+      if (t < st) return pick(0);
       const n = Math.min(4, frames.length);
-      return frames[Math.floor(Math.max(0, t - st) * 8) % n]!;
+      return pick(Math.floor(Math.max(0, t - st) * 8) % n);
     }
     if (frames.length >= 6) {
       const total = st + ac + rec;
-      const i = Math.min(frames.length - 1, Math.floor((t / Math.max(0.001, total)) * frames.length));
-      return frames[i];
+      return pick(Math.floor((t / Math.max(0.001, total)) * frames.length));
     }
-    if (t < st * 0.45) return frames[0];
-    if (t < st) return frames[Math.min(1, frames.length - 1)];
-    if (t < st + ac) return frames[Math.min(2, frames.length - 1)];
-    return frames[Math.min(3, frames.length - 1)];
+    if (t < st * 0.45) return pick(0);
+    if (t < st) return pick(Math.min(1, frames.length - 1));
+    if (t < st + ac) return pick(Math.min(2, frames.length - 1));
+    return pick(Math.min(3, frames.length - 1));
   }
 
   drawFighter(f: Fighter) {
     if (!this.images || !this.boxes) return;
+    const slot = f === this.f1 ? 0 : 1;
     const anim = f.state === "attack" ? this.attackFrame(f) : null;
     const pick = (im: HTMLImageElement | null | undefined) =>
       im && (im.naturalWidth || im.width) > 8 ? im : null;
-    const img = pick(anim) ?? pick(this.images[f.id]?.[f.pose]) ?? pick(this.images[f.id]?.idle);
+    const img =
+      pick(anim) ?? pick(this.images[f.id]?.[f.pose]) ?? pick(this.images[f.id]?.idle) ?? this.replayHold[slot];
     if (!img) return;
+    this.replayHold[slot] = img;
     const idle0 = this.boxes[f.id]?.idle;
     const idle =
       idle0 && idle0.h > 8
         ? idle0
         : { x: 0, y: 0, w: img.naturalWidth || img.width, h: img.naturalHeight || img.height, foot: img.naturalHeight || img.height };
     const bob = f.state === "walk" ? Math.sin(this.time * 12) * 2 : 0;
-    const body = 318 * f.squash;
+    const body = 318 * Math.max(0.72, Math.min(1.22, f.squash || 1));
     let scale = body / Math.max(8, idle.h);
     if (f.pose === "jump") {
       const jumpBox = this.boxes[f.id].jump;
@@ -4572,6 +4811,7 @@ export class KitchenKombat {
     ctx.translate(W / 2, 0);
     ctx.scale(s, s);
     ctx.translate(-W / 2, 0);
+    if (this.phase !== "replay") {
     const outline = (txt: string, x: number, y: number, align: CanvasTextAlign) => {
       ctx.textAlign = align;
       ctx.lineWidth = 3;
@@ -4661,7 +4901,18 @@ export class KitchenKombat {
         ctx.fillText(this.comboName, cx, 146);
       }
     }
+    }
     ctx.restore();
+    if (this.phase === "replay") {
+      ctx.save();
+      ctx.font = "800 22px 'Barlow Condensed', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(W / 2 - 70, 86, 140, 28);
+      ctx.fillStyle = "#e2c15a";
+      ctx.fillText("REPLAY", W / 2, 107);
+      ctx.restore();
+    }
     if (this.callout) {
       ctx.save();
       if (this.callout === "K.O." && this.koArt && this.koArt.naturalWidth > 8) {
@@ -4684,11 +4935,28 @@ export class KitchenKombat {
 
   draw() {
     const ctx = this.ctx;
-    const shake = this.trauma * this.trauma * 14;
+    const shake = this.phase === "replay" ? 0 : this.trauma * this.trauma * 14;
     const sx = (Math.random() - 0.5) * shake;
     const sy = (Math.random() - 0.5) * shake;
     ctx.save();
-    ctx.translate(sx, sy);
+    if (this.phase === "replay" && this.f1 && this.f2) {
+      const total = this.replayCum.length ? this.replayCum[this.replayCum.length - 1]! : REPLAY_PLAY;
+      const u = total > 0 ? Math.min(1, Math.max(0, 1 - this.finishT / total)) : 1;
+      const zoom = 1 + 0.36 * Math.min(1, u / 0.14);
+      const fx = (this.f1.x + this.f2.x) / 2;
+      const fy = GROUND - (this.f1.y + this.f2.y) * 0.28 - 150;
+      const vw = W / zoom;
+      const vh = H / zoom;
+      const cx = Math.max(vw / 2, Math.min(W - vw / 2, fx));
+      const cy = Math.max(vh / 2, Math.min(H - vh / 2, fy));
+      this.replayCamX += (cx - this.replayCamX) * 0.18;
+      this.replayCamY += (cy - this.replayCamY) * 0.18;
+      ctx.translate(W / 2 + sx, H / 2 + sy);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-this.replayCamX, -this.replayCamY);
+    } else {
+      ctx.translate(sx, sy);
+    }
     if (this.screen === "title" && this.menuBg && this.menuBg.naturalWidth) ctx.drawImage(this.menuBg, 0, 0, W, H);
     else if (this.stage && (this.stage.naturalWidth || 0) > 32) ctx.drawImage(this.stage, 0, 0, W, H);
     else {
