@@ -1383,7 +1383,6 @@ export class KitchenKombat {
       isti: {} as Record<Pose, HTMLImageElement>,
     };
     const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
-    for (const id of CHAR_IDS) bags[id].idle = emptyImg();
     this.images = { ...bags, anims, stage: emptyImg() };
     this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
     this.menuReady = true;
@@ -1464,7 +1463,7 @@ export class KitchenKombat {
         };
         im.onload = () => done(im);
         im.onerror = () => done(emptyImg());
-        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 3500);
+        window.setTimeout(() => done(im.naturalWidth > 8 ? im : emptyImg()), 8000);
         im.src = asset(src);
       });
     const poses: Pose[] = [
@@ -1477,9 +1476,11 @@ export class KitchenKombat {
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
     for (const id of ids) {
-      if (this.loadedChars.has(id)) continue;
-      for (const p of poses) {
-        if (p === "idle" && this.images[id].idle && (this.images[id].idle.naturalWidth || 0) > 32) continue;
+      if (this.loadedChars.has(id) && (this.images[id].idle?.naturalWidth || 0) > 64) continue;
+      const first: Pose[] = ["idle", "walk0", "walk1", "walk2", "walk3", "hurt", "crouch", "block"];
+      const rest = poses.filter((p) => !first.includes(p));
+      for (const p of [...first, ...rest]) {
+        if (p === "idle" && (this.images[id].idle?.naturalWidth || 0) > 64) continue;
         jobs.push(async () => {
           const im = await loadTick(`/sprites/${id}/${poseFile(p)}.png${bust}`);
           if ((im.naturalWidth || im.width) > 8) {
@@ -1560,9 +1561,11 @@ export class KitchenKombat {
       console.error("fight load", err);
     }
     for (const id of ids) {
-      this.loadedChars.add(id);
       const im = this.images?.[id]?.idle;
-      if (im && (im.naturalWidth || 0) > 32 && this.boxes) this.boxes[id].idle = measureBox(im);
+      if (im && (im.naturalWidth || 0) > 64) {
+        this.loadedChars.add(id);
+        if (this.boxes) this.boxes[id].idle = measureBox(im);
+      }
     }
     this.loadedStages.add(stageId);
     this.fxLoaded = true;
@@ -4257,13 +4260,14 @@ export class KitchenKombat {
     const hold = this.replayHold[slot];
     const holdOk = hold && hold.id === f.id ? hold.img : null;
     const img = pick(anim) ?? pick(bag?.[f.pose]) ?? pick(bag?.idle) ?? pick(holdOk);
-    if (!img) return;
+    if (!img || (img.naturalWidth || 0) < 32) return;
     this.replayHold[slot] = { id: f.id, img };
-    const idle0 = this.boxes[f.id]?.idle;
-    const idle =
-      idle0 && idle0.h > 8
-        ? idle0
-        : { x: 0, y: 0, w: img.naturalWidth || img.width, h: img.naturalHeight || img.height, foot: img.naturalHeight || img.height };
+    let idle = this.boxes[f.id]?.idle;
+    if (!idle || idle.h < 24) {
+      idle = measureBox(img);
+      if (idle.h > 24) this.boxes[f.id].idle = idle;
+    }
+    if (!idle || idle.h < 24) return;
     const bob = f.state === "walk" ? Math.sin(this.time * 12) * 2 : 0;
     const body = 318 * Math.max(0.72, Math.min(1.22, f.squash || 1));
     let scale = body / Math.max(8, idle.h);
