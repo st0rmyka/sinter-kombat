@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.45";
+export const GAME_VERSION = "v0.47";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -1002,6 +1002,7 @@ export class KitchenKombat {
   boxes: Record<CharId, Partial<Record<Pose, Box>>> | null = null;
   stage: HTMLImageElement | null = null;
   menuBg: HTMLImageElement | null = null;
+  koArt: HTMLImageElement | null = null;
   stageArts: Partial<Record<StageId, HTMLImageElement>> = {};
   brushImg: HTMLImageElement | null = null;
   tornadoImg: HTMLImageElement | null = null;
@@ -1315,6 +1316,7 @@ export class KitchenKombat {
     const bust = "?v=86";
     const fast = [
       "/ui/mainmenu-v35.jpg",
+      "/ui/ko.png?v=1",
       ...STAGE_IDS.map((id) => STAGES[id].blur),
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
     ];
@@ -1363,6 +1365,7 @@ export class KitchenKombat {
         fast.map((src) => async () => {
           const im = await loadTick(src, 4000);
           if (src.includes("mainmenu")) this.menuBg = im;
+          if (src.includes("/ui/ko.png")) this.koArt = im;
         }),
         6,
       );
@@ -1727,7 +1730,7 @@ export class KitchenKombat {
     this.calloutT = t;
   }
 
-  beginMatch() {
+  beginMatch(keepMusic = false) {
     this.round = 1;
     this.winner = null;
     this.fatality = null;
@@ -1741,7 +1744,7 @@ export class KitchenKombat {
     this.introT = 1.6;
     this.fightReady = false;
     this.vsLoadPct = 0.02;
-    startStageMusic(this.stageId);
+    startStageMusic(this.stageId, !keepMusic);
     this.pushHud();
     void this.ensureFight(this.p1id, this.p2id, this.stageId);
   }
@@ -2455,7 +2458,21 @@ export class KitchenKombat {
     }
     if (f.state === "ko" || f.state === "win") return;
 
+    if (this.phase === "intro") {
+      if (f.y <= 0) {
+        f.vx = 0;
+        f.state = "idle";
+        f.pose = "idle";
+        f.crouchGuard = false;
+      }
+      return;
+    }
+
     if (f.pullT > 0) {
+      if (a.superDashP && this.trySuperDash(f, a)) {
+        f.pullT = 0;
+        return;
+      }
       const other = f === this.f1 ? this.f2 : this.f1;
       const dir: 1 | -1 = other.x >= f.x ? 1 : -1;
       f.facing = dir;
@@ -2657,6 +2674,12 @@ export class KitchenKombat {
       if (axis) f.vx = axis * 400 * (f.rageT > 0 ? 1.3 : 1);
       f.pose = "jump";
     }
+  }
+
+  addMeter(f: Fighter, n: number) {
+    if (n <= 0 || f.rageT > 0) return;
+    if (f.id === "jezus" && this.zones.some((z) => z.kind === "pillar" && z.owner === f && z.life > 0)) n *= 0.5;
+    f.meter = Math.min(100, f.meter + n);
   }
 
   startDash(f: Fighter, dir: 1 | -1, superD = false) {
@@ -2875,8 +2898,8 @@ export class KitchenKombat {
       att.hasHit = true;
       def.flash = 0.1;
       def.hp = Math.max(0, def.hp - Math.max(1, Math.round(att.atk.dmg * 0.4)));
-      if (att.atk.id !== "special" && att.atk.id !== "special2") att.meter = Math.min(100, att.meter + METER_HIT_ATT);
-      def.meter = Math.min(100, def.meter + METER_HIT_DEF);
+      if (att.atk.id !== "special" && att.atk.id !== "special2") this.addMeter(att, METER_HIT_ATT);
+      this.addMeter(def, METER_HIT_DEF);
       sfxPlay.charDamage(def.id);
       if (def.hp <= 0) this.onKo(att, def);
       return;
@@ -2893,8 +2916,8 @@ export class KitchenKombat {
       def.stun = att.atk.blockstun;
       def.state = "block";
       def.pose = "block";
-      if (att.atk.id !== "special" && att.atk.id !== "special2") att.meter = Math.min(100, att.meter + METER_BLOCK_ATT);
-      def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
+      if (att.atk.id !== "special" && att.atk.id !== "special2") this.addMeter(att, METER_BLOCK_ATT);
+      this.addMeter(def, METER_BLOCK_DEF);
       this.trauma = Math.min(1, this.trauma + 0.18);
       this.spawnGuardSmoke(hb.x + hb.w / 2, hb.y + hb.h / 2, dir);
       rumble(attPad, 80, 0.25);
@@ -2930,8 +2953,8 @@ export class KitchenKombat {
     def.flash = 0.12;
     def.squash = 1.16;
     def.bleed = Math.min(1.4, def.bleed + (att.atk.id.startsWith("special") ? 1 : 0.55));
-    if (att.atk.id !== "special" && att.atk.id !== "special2") att.meter = Math.min(100, att.meter + METER_HIT_ATT);
-    def.meter = Math.min(100, def.meter + METER_HIT_DEF);
+    if (att.atk.id !== "special" && att.atk.id !== "special2") this.addMeter(att, METER_HIT_ATT);
+    this.addMeter(def, METER_HIT_DEF);
     this.hitstop = att.atk.id.startsWith("special") ? 0.11 : 0.05;
     this.trauma = Math.min(1, this.trauma + (att.atk.id.startsWith("special") ? 0.55 : 0.34));
     if (this.comboSide === side) this.combo += 1;
@@ -2993,7 +3016,7 @@ export class KitchenKombat {
     loser.pose = "hurt";
     loser.bleed = 1.4;
     this.callout = "K.O.";
-    this.calloutT = 1.4;
+    this.calloutT = 3.4;
     this.fatality = null;
     this.trauma = 1;
     this.hitstop = 0.16;
@@ -3013,14 +3036,14 @@ export class KitchenKombat {
     winner.state = "win";
     winner.pose = "special";
     this.callout = "K.O.";
-    this.calloutT = 1.7;
+    this.calloutT = 3.7;
     if (match) {
       this.winner = winner.id;
-      this.finishT = 7;
+      this.finishT = 9;
       this.winAnnounceId = winner.id;
-      this.winAnnounceT = 1.75;
+      this.winAnnounceT = 3.75;
     } else {
-      this.finishT = 2.05;
+      this.finishT = 4.05;
       this.winAnnounceId = null;
       this.winAnnounceT = 0;
     }
@@ -3828,7 +3851,7 @@ export class KitchenKombat {
       if ((z.kind === "spit" || z.kind === "brush" || z.kind === "note" || z.kind === "solo") && def.state === "block" && facingOk) {
         z.hit = true;
         def.vx = z.dir * 70;
-        def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
+        this.addMeter(def, METER_BLOCK_DEF);
         this.spawnGuardSmoke(def.x, GROUND - 180, z.dir);
         sfxPlay.block();
         continue;
@@ -3852,7 +3875,7 @@ export class KitchenKombat {
       def.atk = null;
       def.spec2Spawned = false;
       def.flash = 0.12;
-      def.meter = Math.min(100, def.meter + METER_HIT_DEF);
+      this.addMeter(def, METER_HIT_DEF);
       this.hitstop = 0.09;
       this.trauma = Math.min(1, this.trauma + 0.4);
       this.specialCallout(
@@ -3901,7 +3924,7 @@ export class KitchenKombat {
     def.hp = Math.max(0, def.hp - z.dmg);
     def.flash = 0.08;
     def.stun = Math.max(def.stun, 0.12);
-    def.meter = Math.min(100, def.meter + 2);
+    this.addMeter(def, 1);
     if (def.state !== "hurt") {
       def.state = "hurt";
       def.pose = "hurt";
@@ -3928,7 +3951,7 @@ export class KitchenKombat {
     if (guarding) {
       def.vx = dir * 80;
       this.spawnGuardSmoke(def.x, GROUND - 50, dir);
-      def.meter = Math.min(100, def.meter + METER_BLOCK_DEF);
+      this.addMeter(def, METER_BLOCK_DEF);
       sfxPlay.block();
       return;
     }
@@ -3943,7 +3966,7 @@ export class KitchenKombat {
     def.spec2Spawned = false;
     def.flash = 0.1;
     def.bleed = Math.min(1.4, def.bleed + 0.35);
-    def.meter = Math.min(100, def.meter + METER_HIT_DEF);
+    this.addMeter(def, METER_HIT_DEF);
     this.hitstop = 0.07;
     this.spawnFx(def.x, GROUND - 40, "burst", z.dmg);
     sfxPlay.heavy();
@@ -4641,12 +4664,20 @@ export class KitchenKombat {
     ctx.restore();
     if (this.callout) {
       ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(0, H / 2 - 50, W, 90);
-      ctx.fillStyle = "#f3e6d0";
-      ctx.font = "900 44px 'Cinzel', serif";
-      ctx.textAlign = "center";
-      ctx.fillText(this.callout, W / 2, H / 2 + 12);
+      if (this.callout === "K.O." && this.koArt && this.koArt.naturalWidth > 8) {
+        const iw = this.koArt.naturalWidth;
+        const ih = this.koArt.naturalHeight;
+        const tw = Math.min(W * 0.58, 620);
+        const th = tw * (ih / iw);
+        ctx.drawImage(this.koArt, W / 2 - tw / 2, H / 2 - th / 2, tw, th);
+      } else {
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(0, H / 2 - 50, W, 90);
+        ctx.fillStyle = "#f3e6d0";
+        ctx.font = "900 44px 'Cinzel', serif";
+        ctx.textAlign = "center";
+        ctx.fillText(this.callout, W / 2, H / 2 + 12);
+      }
       ctx.restore();
     }
   }

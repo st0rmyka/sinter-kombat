@@ -7,7 +7,37 @@ import { getSettings, patchSettings, subscribeSettings, type GameSettings, type 
 import { NetPlay } from "./net";
 import { asset } from "./asset";
 
+type PickSlot = CharId | "random";
+type StageSlot = StageId | "random";
+const CHAR_SLOTS: PickSlot[] = [...CHAR_IDS, "random"];
+const STAGE_SLOTS: StageSlot[] = [...STAGE_IDS, "random"];
+
+function rollChar(): CharId {
+  return CHAR_IDS[Math.floor(Math.random() * CHAR_IDS.length)]!;
+}
+function rollStage(): StageId {
+  return STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)]!;
+}
+function asChar(id: PickSlot): CharId {
+  return id === "random" ? rollChar() : id;
+}
+function asStage(id: StageSlot): StageId {
+  return id === "random" ? rollStage() : id;
+}
+
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.47",
+    items: [
+      "Kör elején mozgás és támadás is tiltva a HARC feliratig",
+      "Hoffer Dühroham alatt nem töltődik az energy; Gyere ide Super Dash-sel megszakítható",
+      "Mobilon pályaválasztás két koppintással, announcer csak megerősítéskor",
+      "Random ? a karakter- és pályaválasztón",
+      "Jézus Szent oszlop: energy 50%-kal lassabban töltődik",
+      "VS / betöltés: pálya neve; K.O. grafika, hosszabb ideig, kisebb",
+      "Visszavágó: a pályazene nem indul újra, megy tovább",
+    ],
+  },
   {
     v: "v0.45",
     items: [
@@ -334,12 +364,13 @@ export function GameView() {
   const [pauseIdx, setPauseIdx] = useState(0);
   const [confirm, setConfirm] = useState<{ q: string; yes: () => void } | null>(null);
   const [confirmChoice, setConfirmChoice] = useState<0 | 1>(0);
-  const [p1Cur, setP1Cur] = useState<CharId>("renike");
-  const [p2Cur, setP2Cur] = useState<CharId>("ricsi");
+  const [p1Cur, setP1Cur] = useState<PickSlot>("renike");
+  const [p2Cur, setP2Cur] = useState<PickSlot>("ricsi");
   const [p1Lock, setP1Lock] = useState(false);
   const [p2Lock, setP2Lock] = useState(false);
-  const [touchPick, setTouchPick] = useState<{ slot: 1 | 2; id: CharId } | null>(null);
-  const [stageCur, setStageCur] = useState<StageId>("sintertanya");
+  const [touchPick, setTouchPick] = useState<{ slot: 1 | 2; id: PickSlot } | null>(null);
+  const [stageCur, setStageCur] = useState<StageSlot>("sintertanya");
+  const [stageTouch, setStageTouch] = useState<StageSlot | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [onlineIdx, setOnlineIdx] = useState(0);
@@ -433,7 +464,7 @@ export function GameView() {
     const g = gameRef.current;
     if (!g) return;
     setConfirm(null);
-    g.beginMatch();
+    g.beginMatch(true);
   };
 
   const goRestart = () => {
@@ -478,6 +509,7 @@ export function GameView() {
     setP1Lock(false);
     setP2Lock(false);
     setTouchPick(null);
+    setStageTouch(null);
     setStageCur("sintertanya");
     void cpu;
   };
@@ -490,11 +522,11 @@ export function GameView() {
     if (s === "title" || s === "select" || s === "stage" || s === "online" || s === "lobby") startMenuMusic();
   };
 
-  const cycle = (id: CharId, dir: 1 | -1) =>
-    CHAR_IDS[(CHAR_IDS.indexOf(id) + dir + CHAR_IDS.length) % CHAR_IDS.length];
+  const cycle = (id: PickSlot, dir: 1 | -1) =>
+    CHAR_SLOTS[(CHAR_SLOTS.indexOf(id) + dir + CHAR_SLOTS.length) % CHAR_SLOTS.length]!;
 
-  const cycleStage = (id: StageId, dir: 1 | -1) =>
-    STAGE_IDS[(STAGE_IDS.indexOf(id) + dir + STAGE_IDS.length) % STAGE_IDS.length];
+  const cycleStage = (id: StageSlot, dir: 1 | -1) =>
+    STAGE_SLOTS[(STAGE_SLOTS.indexOf(id) + dir + STAGE_SLOTS.length) % STAGE_SLOTS.length]!;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -847,22 +879,25 @@ export function GameView() {
               if (a.leftP) {
                 const n = cycle(p1CurRef.current, -1);
                 setP1Cur(n);
-                net.pick(n, false);
+                if (n !== "random") net.pick(n, false);
               }
               if (a.rightP) {
                 const n = cycle(p1CurRef.current, 1);
                 setP1Cur(n);
-                net.pick(n, false);
+                if (n !== "random") net.pick(n, false);
               }
               if (okOf(a)) {
+                const id = asChar(p1CurRef.current);
+                setP1Cur(id);
+                p1CurRef.current = id;
                 setP1Lock(true);
-                net.pick(p1CurRef.current, true);
-                sfxPlay.charName(p1CurRef.current);
+                net.pick(id, true);
+                sfxPlay.charName(id);
                 armGate();
               }
             } else if (backOf(a)) {
               setP1Lock(false);
-              net.pick(p1CurRef.current, false);
+              if (p1CurRef.current !== "random") net.pick(p1CurRef.current, false);
               armGate();
             }
           } else {
@@ -870,22 +905,25 @@ export function GameView() {
               if (a.leftP) {
                 const n = cycle(p2CurRef.current, -1);
                 setP2Cur(n);
-                net.pick(n, false);
+                if (n !== "random") net.pick(n, false);
               }
               if (a.rightP) {
                 const n = cycle(p2CurRef.current, 1);
                 setP2Cur(n);
-                net.pick(n, false);
+                if (n !== "random") net.pick(n, false);
               }
               if (okOf(a)) {
+                const id = asChar(p2CurRef.current);
+                setP2Cur(id);
+                p2CurRef.current = id;
                 setP2Lock(true);
-                net.pick(p2CurRef.current, true);
-                sfxPlay.charName(p2CurRef.current);
+                net.pick(id, true);
+                sfxPlay.charName(id);
                 armGate();
               }
             } else if (backOf(a)) {
               setP2Lock(false);
-              net.pick(p2CurRef.current, false);
+              if (p2CurRef.current !== "random") net.pick(p2CurRef.current, false);
               armGate();
             }
           }
@@ -899,8 +937,11 @@ export function GameView() {
             if (a1.rightP) setP1Cur((c) => cycle(c, 1));
             if (okOf(a1)) {
               p1L = true;
+              const id = asChar(p1CurRef.current);
+              setP1Cur(id);
+              p1CurRef.current = id;
               setP1Lock(true);
-              sfxPlay.charName(p1CurRef.current);
+              sfxPlay.charName(id);
             }
           } else if (backOf(a1)) {
             p1L = false;
@@ -911,8 +952,11 @@ export function GameView() {
             if (a2.rightP) setP2Cur((c) => cycle(c, 1));
             if (okOf(a2)) {
               p2L = true;
+              const id = asChar(p2CurRef.current);
+              setP2Cur(id);
+              p2CurRef.current = id;
               setP2Lock(true);
-              sfxPlay.charName(p2CurRef.current);
+              sfxPlay.charName(id);
             }
           } else if (backOf(a2)) {
             p2L = false;
@@ -920,7 +964,8 @@ export function GameView() {
           }
           if (p1L && p2L) {
             armGate();
-            g.goStage(p1CurRef.current, p2CurRef.current);
+            setStageTouch(null);
+            g.goStage(asChar(p1CurRef.current), asChar(p2CurRef.current));
           }
           if (!p1L && !p2L && backOf(a1)) {
             armGate();
@@ -935,8 +980,11 @@ export function GameView() {
             if (a.leftP) setP1Cur((c) => cycle(c, -1));
             if (a.rightP) setP1Cur((c) => cycle(c, 1));
             if (okOf(a)) {
+              const id = asChar(p1CurRef.current);
+              setP1Cur(id);
+              p1CurRef.current = id;
               setP1Lock(true);
-              sfxPlay.charName(p1CurRef.current);
+              sfxPlay.charName(id);
               armGate();
             }
             if (backOf(a)) {
@@ -950,10 +998,14 @@ export function GameView() {
             if (a.leftP) setP2Cur((c) => cycle(c, -1));
             if (a.rightP) setP2Cur((c) => cycle(c, 1));
             if (okOf(a)) {
+              const id = asChar(p2CurRef.current);
+              setP2Cur(id);
+              p2CurRef.current = id;
               setP2Lock(true);
-              sfxPlay.charName(p2CurRef.current);
+              sfxPlay.charName(id);
               armGate();
-              g.goStage(p1CurRef.current, p2CurRef.current);
+              setStageTouch(null);
+              g.goStage(asChar(p1CurRef.current), id);
             }
             if (backOf(a)) setP1Lock(false);
           }
@@ -974,9 +1026,13 @@ export function GameView() {
         }
         if (!gated() && (m.kickLP || m.punchLP || m.startP)) {
           armGate();
-          sfxPlay.stageName(stageCurRef.current);
-          if (net.role === "host") net.stage(stageCurRef.current);
-          else if (!net.role) g.confirmStage(stageCurRef.current);
+          const id = asStage(stageCurRef.current);
+          setStageCur(id);
+          stageCurRef.current = id;
+          setStageTouch(null);
+          sfxPlay.stageName(id);
+          if (net.role === "host") net.stage(id);
+          else if (!net.role) g.confirmStage(id);
         }
       } else if (h.screen === "result" || h.screen === "pause") {
         const m = sampleMenu();
@@ -1060,37 +1116,40 @@ export function GameView() {
   const touchUi = useTouchUi();
   const landscape = useLandscape();
 
-  const pickSelectChar = (id: CharId) => {
+  const pickSelectChar = (id: PickSlot) => {
     if (gated()) return;
     const net = netRef.current;
+    const lockName = (picked: PickSlot) => asChar(picked);
     if (net.role) {
       if (net.role === "host") {
         if (p1Lock) return;
         if (touchUi && !(touchPick && touchPick.slot === 1 && touchPick.id === id)) {
           setTouchPick({ slot: 1, id });
           setP1Cur(id);
-          net.pick(id, false);
+          if (id !== "random") net.pick(id, false);
           return;
         }
         setTouchPick(null);
-        setP1Cur(id);
+        const real = lockName(id);
+        setP1Cur(real);
         setP1Lock(true);
-        net.pick(id, true);
-        sfxPlay.charName(id);
+        net.pick(real, true);
+        sfxPlay.charName(real);
         armGate();
       } else {
         if (p2Lock) return;
         if (touchUi && !(touchPick && touchPick.slot === 2 && touchPick.id === id)) {
           setTouchPick({ slot: 2, id });
           setP2Cur(id);
-          net.pick(id, false);
+          if (id !== "random") net.pick(id, false);
           return;
         }
         setTouchPick(null);
-        setP2Cur(id);
+        const real = lockName(id);
+        setP2Cur(real);
         setP2Lock(true);
-        net.pick(id, true);
-        sfxPlay.charName(id);
+        net.pick(real, true);
+        sfxPlay.charName(real);
         armGate();
       }
       return;
@@ -1107,18 +1166,23 @@ export function GameView() {
       }
     }
     setTouchPick(null);
+    const real = lockName(id);
     if (slot === 1) {
-      setP1Cur(id);
+      setP1Cur(real);
       setP1Lock(true);
-      sfxPlay.charName(id);
+      sfxPlay.charName(real);
       armGate();
-      if (dual && p2Lock) gameRef.current?.goStage(id, p2Cur);
+      if (dual && p2Lock) {
+        setStageTouch(null);
+        gameRef.current?.goStage(real, asChar(p2Cur));
+      }
     } else {
-      setP2Cur(id);
+      setP2Cur(real);
       setP2Lock(true);
-      sfxPlay.charName(id);
+      sfxPlay.charName(real);
       armGate();
-      gameRef.current?.goStage(p1Cur, id);
+      setStageTouch(null);
+      gameRef.current?.goStage(asChar(p1Cur), real);
     }
   };
 
@@ -1366,7 +1430,7 @@ export function GameView() {
       {(hud.screen === "select" || hud.screen === "stage") && (
         <div className="absolute inset-0 z-10 flex flex-col overflow-hidden bg-[#1a1210]">
           {STAGE_IDS.map((id) => {
-            const show = hud.screen === "stage" ? stageCur === id : id === "sintertanya";
+            const show = hud.screen === "stage" ? (stageCur === "random" ? id === "sintertanya" : stageCur === id) : id === "sintertanya";
             return (
               <img
                 key={id}
@@ -1412,20 +1476,43 @@ export function GameView() {
               className={`flex w-full justify-center gap-1.5 ${touchUi ? "flex-wrap" : "flex-nowrap"}`}
             >
             {hud.screen === "stage"
-              ? STAGE_IDS.map((id) => {
-                  const s = STAGES[id];
+              ? [...STAGE_IDS, "random" as const].map((id) => {
                   const on = stageCur === id;
+                  const pick = () => {
+                    if (touchUi && stageTouch !== id) {
+                      setStageTouch(id);
+                      setStageCur(id);
+                      return;
+                    }
+                    setStageTouch(null);
+                    const real = asStage(id);
+                    setStageCur(real);
+                    sfxPlay.stageName(real);
+                    const net = netRef.current;
+                    if (net.role === "host") net.stage(real);
+                    else if (!net.role) gameRef.current?.confirmStage(real);
+                  };
+                  if (id === "random") {
+                    return (
+                      <button
+                        key="random"
+                        type="button"
+                        onClick={pick}
+                        onMouseEnter={() => setStageCur("random")}
+                        className={`relative flex h-12 w-20 items-center justify-center overflow-hidden rounded-sm bg-black/70 sm:h-14 sm:w-24 ${
+                          on ? "ring-2 ring-gold" : "ring-1 ring-white/30"
+                        }`}
+                      >
+                        <span className="font-display text-3xl leading-none text-gold sm:text-4xl">?</span>
+                      </button>
+                    );
+                  }
+                  const s = STAGES[id];
                   return (
                     <button
                       key={id}
                       type="button"
-                      onClick={() => {
-                        setStageCur(id);
-                        sfxPlay.stageName(id);
-                        const net = netRef.current;
-                        if (net.role === "host") net.stage(id);
-                        else if (!net.role) gameRef.current?.confirmStage(id);
-                      }}
+                      onClick={pick}
                       onMouseEnter={() => setStageCur(id)}
                       className={`relative h-12 w-20 overflow-hidden rounded-sm sm:h-14 sm:w-24 ${
                         on ? "ring-2 ring-gold" : "ring-1 ring-white/30"
@@ -1438,7 +1525,7 @@ export function GameView() {
                     </button>
                   );
                 })
-              : ids.map((id) => {
+              : [...ids, "random" as const].map((id) => {
                   const dual = !hud.versusCpu && (hud.pads >= 2 || !!netRef.current.role);
                   const p1on = p1Cur === id && (dual || !p1Lock);
                   const p2on = p2Cur === id && (dual || p1Lock);
@@ -1454,7 +1541,13 @@ export function GameView() {
                           .join(", "),
                       }}
                     >
-                      <img src={asset(`/portraits/${id}-icon.png?v=10`)} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                      {id === "random" ? (
+                        <span className="font-display flex size-full items-center justify-center bg-black/75 text-2xl text-gold sm:text-3xl">
+                          ?
+                        </span>
+                      ) : (
+                        <img src={asset(`/portraits/${id}-icon.png?v=10`)} alt={CHARACTERS[id].name} className="size-full object-cover object-top" />
+                      )}
                     </button>
                   );
                 })}
@@ -1472,6 +1565,11 @@ export function GameView() {
             style={{ filter: "blur(14px) saturate(0.85)", transform: "scale(1.12)" }}
           />
           <div className="absolute inset-0 bg-black/40" />
+          <div className="pointer-events-none absolute left-0 right-0 top-[4%] z-20 text-center">
+            <div className="font-display text-gold text-sm tracking-[0.16em] drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] sm:text-xl">
+              {STAGES[hud.stage]?.nameHu ?? ""}
+            </div>
+          </div>
           <div className="relative z-10 flex h-full items-end justify-between px-[3%] pb-[7%] pt-[6%]">
             <div className="flex h-full w-[40%] flex-col items-center justify-end">
               <img
@@ -1503,6 +1601,9 @@ export function GameView() {
           </div>
           {hud.vsLoading && (
             <div className="absolute bottom-4 left-1/2 z-20 w-72 max-w-[80vw] -translate-x-1/2 text-center">
+              <p className="font-display text-gold mb-1 text-sm tracking-widest">
+                {STAGES[hud.stage]?.nameHu ?? ""}
+              </p>
               <p className="text-muted mb-1 text-xs tracking-widest">BETÖLTÉS</p>
               <div className="h-2 overflow-hidden rounded-sm border border-gold bg-bg">
                 <div className="bg-gold h-full" style={{ width: `${Math.round(hud.vsLoadPct * 100)}%` }} />
@@ -1834,23 +1935,32 @@ function SelectPanel({
   visible,
 }: {
   side: "left" | "right";
-  id: CharId;
+  id: PickSlot;
   locked: boolean;
   tone: "p1" | "p2";
   visible: boolean;
 }) {
-  const name = CHARACTERS[id].name;
+  const mystery = id === "random";
+  const name = mystery ? "???" : CHARACTERS[id].name;
   const pos = side === "left" ? "left-[2%]" : "right-[2%]";
   return (
     <div className={`absolute top-[5%] bottom-0 flex w-[32%] flex-col items-center ${pos}`}>
       {visible && (
         <div className="flex h-full w-full items-end justify-center">
           <div className="flex max-h-full flex-col items-center">
-            <img
-              src={asset(`/ui/vs/${id}.png?v=37`)}
-              alt=""
-              className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${side === "right" ? "-scale-x-100" : ""}`}
-            />
+            {mystery ? (
+              <div className="flex min-h-0 max-h-[calc(100%-2.8rem)] w-full flex-1 items-center justify-center">
+                <span className="font-display text-[7rem] leading-none text-gold drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] sm:text-[9rem]">
+                  ?
+                </span>
+              </div>
+            ) : (
+              <img
+                src={asset(`/ui/vs/${id}.png?v=37`)}
+                alt=""
+                className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${side === "right" ? "-scale-x-100" : ""}`}
+              />
+            )}
             <div
               className={`font-display mt-1.5 text-center text-2xl leading-none tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-4xl ${tone === "p1" ? "text-p1" : "text-p2"}`}
             >

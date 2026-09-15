@@ -15,6 +15,7 @@ let musicEl: HTMLAudioElement | null = null;
 let musicNode: MediaElementAudioSourceNode | null = null;
 let musicKind: "menu" | "stage" | null = null;
 let musicSrc: string | null = null;
+let musicFile: string | null = null;
 const MUSIC_BLOBS: Record<string, string> = {};
 
 const MENU_FILE = "/music/menu.mp3?v=19";
@@ -26,12 +27,12 @@ const MUSIC_FILES: Record<string, string> = {
   nepszinhaz: "/music/nepszinhaz.mp3",
   salgotarjan: "/music/salgotarjan.mp3",
   nagybatony: "/music/nagybatony.mp3",
-  maconka: "/music/maconka.mp3",
-  miskolc: "/music/miskolc.mp3",
-  ozd: "/music/ozd.mp3",
-  kispest: "/music/kispest.mp3",
-  hosutca: "/music/hosutca.mp3",
-  pokol: "/music/pokol.mp3",
+  maconka: "/music/maconka.mp3?v=45l",
+  miskolc: "/music/miskolc.mp3?v=45l",
+  ozd: "/music/ozd.mp3?v=45l",
+  kispest: "/music/kispest.mp3?v=45l",
+  hosutca: "/music/hosutca.mp3?v=45l",
+  pokol: "/music/pokol.mp3?v=45l",
 };
 const MUSIC_VOL = 0.48;
 
@@ -943,10 +944,11 @@ function ensureMusicEl(url: string, kind: "menu" | "stage") {
     musicEl.loop = true;
     musicEl.preload = "auto";
     musicEl.crossOrigin = "anonymous";
-  } else if (musicKind !== kind || musicSrc !== resolved) {
+  } else if (musicKind !== kind || musicFile !== url) {
     musicEl.src = resolved;
   }
   musicKind = kind;
+  musicFile = url;
   musicSrc = resolved;
   return musicEl;
 }
@@ -1003,20 +1005,31 @@ function setGuitarStageHold(on: boolean) {
   });
 }
 
-export function startStageMusic(stage: string) {
+export function startStageMusic(stage: string, restart = true) {
   const url = MUSIC_FILES[stage] ?? MUSIC_FILES.kitchen;
   if (!url) return;
   guitarHold = false;
   const c = ac();
   if (c.state === "suspended") void c.resume();
+  if (!restart && musicKind === "stage" && musicFile === url && musicEl) {
+    musicEl.muted = mix().music <= 0;
+    if (musicEl.paused) {
+      void musicEl.play().catch(() => {
+        /* autoplay */
+      });
+    }
+    return;
+  }
   const el = ensureMusicEl(url, "stage");
   if (!el) return;
   hookMusicGraph(el);
   stopKitchenDrone();
-  try {
-    el.currentTime = 0;
-  } catch {
-    /* ignore */
+  if (restart) {
+    try {
+      el.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
   }
   el.muted = mix().music <= 0;
   void el.play().catch(() => {

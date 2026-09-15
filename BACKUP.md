@@ -1,15 +1,15 @@
 # Sinter Kombat backup
 
-**Verzió:** v0.45  
-**Git tag:** `v0.45` és `v0.45-backup`  
+**Verzió:** v0.47  
+**Git tag:** `v0.47` és `v0.47-backup`  
 **Repo:** https://github.com/st0rmyka/sinter-kombat  
 
-**Állapot (2026-09-13):** v0.45 — hat új pálya, CPU Super Dash, MC Isti mindkét special.
+**Állapot (2026-09-15):** v0.47 — körkezdő lock, Hoffer/Jézus energy, random pick, KO grafika, visszavágó zene.
 
 Cinematic referencia ZIP (nem a játék kódja):  
 https://github.com/st0rmyka/sinter-kombat/releases/download/cinematic-ref/SINTER_KOMBAT_CINEMATIC_REFERENCE.zip
 
 ## Visszaállítás
 
-1. `git checkout v0.45-backup`
+1. `git checkout v0.47-backup`
 2. `npm install && npm run dev`
