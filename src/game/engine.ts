@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.48";
+export const GAME_VERSION = "v0.5";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -850,8 +850,8 @@ const GRAV = 5100;
 const JUMP_V = 1760;
 const BUFFER = 0.14;
 const STEP = 1 / 60;
-const MAX_HP = 300;
-const ROUND_TIME = 45;
+const MAX_HP = 270;
+const ROUND_TIME = 60;
 const BLOOD_TINT = ["#3a0509", "#5c0810", "#7a0c18", "#a11020", "#c41828", "#6b0a12"];
 
 type Particle = {
@@ -1049,6 +1049,7 @@ export type Hud = {
   trainMeter: boolean;
   p1Hist: TrainPress[];
   p2Hist: TrainPress[];
+  story: boolean;
 };
 
 function overlap(a: Box, b: Box) {
@@ -1107,6 +1108,7 @@ export class KitchenKombat {
   screen: Screen = "title";
   phase: "intro" | "fight" | "ko" | "replay" | "finish" | "fatality" | "end" = "intro";
   versusCpu = true;
+  storyMode = false;
   training = false;
   dummy: DummyMode = "idle";
   trainMeter = false;
@@ -1633,6 +1635,7 @@ export class KitchenKombat {
     this.versusCpu = training ? true : cpu;
     this.difficulty = diff;
     this.training = training;
+    this.storyMode = false;
     this.dummy = training ? "idle" : "cpu";
     this.trainMeter = training ? this.trainMeter : false;
     this.screen = "select";
@@ -1657,6 +1660,18 @@ export class KitchenKombat {
     this.p2id = id;
     this.screen = "stage";
     this.pushHud();
+  }
+
+  startStoryFight() {
+    this.storyMode = true;
+    this.versusCpu = true;
+    this.training = false;
+    this.dummy = "cpu";
+    this.trainMeter = false;
+    this.p1id = "hoffer";
+    this.p2id = "agi";
+    this.stageId = "sintertanya";
+    this.confirmStage("sintertanya");
   }
 
   confirmStage(id: StageId = this.stageId) {
@@ -3156,7 +3171,7 @@ export class KitchenKombat {
   goResult() {
     this.screen = "result";
     this.phase = "end";
-    if (this.winner) sfxPlay.charTaunt(this.winner);
+    if (this.winner && !this.storyMode) sfxPlay.charTaunt(this.winner);
     this.pushHud();
   }
 
@@ -4988,8 +5003,9 @@ export class KitchenKombat {
       trainMeter: this.trainMeter,
       p1Hist: this.p1Hist.slice(),
       p2Hist: this.p2Hist.slice(),
+      story: this.storyMode,
     };
-    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 1000)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}`;
+    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 1000)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}|${h.story}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.onHud(h);

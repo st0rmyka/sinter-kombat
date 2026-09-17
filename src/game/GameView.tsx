@@ -27,6 +27,15 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.5",
+    items: [
+      "1 Játékos menü: Történet + 1 Játékos VS CPU",
+      "Első fejezet: Hoffer Józsi vs Vámpír Ági (Duranda), prológus videó, dupla koppintással átugorható",
+      "Story végén Folytatás (még nem elérhető) és Vissza a menübe — nincs Victory képernyő",
+      "Max életerő 270, köridő 60 másodperc",
+    ],
+  },
+  {
     v: "v0.48",
     items: [
       "Új harci SFX: random swing az ütés/rúgás indításakor, dash, block, KO impact (trimmelve, halkítva)",
@@ -350,6 +359,7 @@ const emptyHud = (): Hud => ({
   trainMeter: false,
   p1Hist: [],
   p2Hist: [],
+  story: false,
 });
 
 export function GameView() {
@@ -371,7 +381,7 @@ export function GameView() {
   const [exited, setExited] = useState(false);
   const [patchIdx, setPatchIdx] = useState(0);
   const [diff, setDiff] = useState<Difficulty>("normal");
-  const [menu, setMenu] = useState<"root" | "diff">("root");
+  const [menu, setMenu] = useState<"root" | "onep" | "diff">("root");
   const [titleIdx, setTitleIdx] = useState(0);
   const [resultIdx, setResultIdx] = useState(0);
   const [pauseIdx, setPauseIdx] = useState(0);
@@ -393,6 +403,7 @@ export function GameView() {
   const [lobbyTick, setLobbyTick] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
   const [bootFloor, setBootFloor] = useState(0.16);
+  const [storyPlay, setStoryPlay] = useState(false);
   const netRef = useRef(new NetPlay());
   const hudRef = useRef(hud);
   hudRef.current = hud;
@@ -426,6 +437,13 @@ export function GameView() {
   resultIdxRef.current = resultIdx;
   const pauseIdxRef = useRef(pauseIdx);
   pauseIdxRef.current = pauseIdx;
+  const storyPlayRef = useRef(storyPlay);
+  storyPlayRef.current = storyPlay;
+  const storySkipAt = useRef(0);
+  const storyDone = useRef(false);
+  const storyVidRef = useRef<HTMLVideoElement | null>(null);
+  const tapStorySkipRef = useRef<() => void>(() => undefined);
+  const startStoryRef = useRef<() => void>(() => undefined);
   const confirmRef = useRef(confirm);
   confirmRef.current = confirm;
   const confirmChoiceRef = useRef(confirmChoice);
@@ -469,12 +487,58 @@ export function GameView() {
     sfxPlay.title();
     setMenu("root");
     setConfirm(null);
+    setStoryPlay(false);
+    g.storyMode = false;
     g.screen = "title";
     g.paused = false;
     g.training = false;
     g.trainMeter = false;
     g.pushHud();
   };
+
+  const finishStory = () => {
+    if (storyDone.current) return;
+    storyDone.current = true;
+    const v = storyVidRef.current;
+    if (v) {
+      v.pause();
+      v.removeAttribute("src");
+      v.load();
+    }
+    setStoryPlay(false);
+    storyPlayRef.current = false;
+    const g = gameRef.current;
+    if (!g) return;
+    g.startStoryFight();
+  };
+
+  const tapStorySkip = () => {
+    const v = storyVidRef.current;
+    if (v && v.paused) {
+      void v.play().catch(() => undefined);
+      return;
+    }
+    const now = performance.now();
+    if (now - storySkipAt.current < 500) finishStory();
+    else storySkipAt.current = now;
+  };
+
+  const startStory = () => {
+    const g = gameRef.current;
+    if (!g) return;
+    boot();
+    primeAudio();
+    setAudioReady(true);
+    stopStageMusic();
+    storyDone.current = false;
+    storySkipAt.current = 0;
+    setStoryPlay(true);
+    storyPlayRef.current = true;
+    g.storyMode = true;
+    void g.ensureFight("hoffer", "agi", "sintertanya");
+  };
+  tapStorySkipRef.current = tapStorySkip;
+  startStoryRef.current = startStory;
 
   const goNewFight = () => {
     const g = gameRef.current;
@@ -670,7 +734,7 @@ export function GameView() {
 
   useEffect(() => {
     if (hud.screen === "result") {
-      setResultIdx(0);
+      setResultIdx(hud.story ? 1 : 0);
       setConfirm(null);
     }
     if (hud.screen === "pause") {
@@ -786,6 +850,15 @@ export function GameView() {
         raf = requestAnimationFrame(tick);
         return;
       }
+      if (storyPlayRef.current) {
+        const m = sampleMenu();
+        if (!gated() && (m.kickLP || m.punchLP || m.startP || m.kickRP)) {
+          armGate();
+          tapStorySkipRef.current();
+        }
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       if (h.screen === "title") {
         const m = sampleMenu();
         const c = confirmRef.current;
@@ -815,7 +888,8 @@ export function GameView() {
             const i = titleIdxRef.current;
             if (i === 0) {
               boot();
-              setMenu("diff");
+              setTitleIdx(0);
+              setMenu("onep");
             } else if (i === 1) {
               boot();
               resetSelect(false);
@@ -838,10 +912,29 @@ export function GameView() {
               setUpdates(true);
             }
           }
+        } else if (menuRef.current === "onep") {
+          if (m.upP || m.downP) setTitleIdx((i) => (i === 0 ? 1 : 0));
+          if (!gated() && m.kickRP) {
+            armGate();
+            setTitleIdx(0);
+            setMenu("root");
+          }
+          if (ok) {
+            armGate();
+            if (titleIdxRef.current === 0) startStoryRef.current();
+            else {
+              boot();
+              setMenu("diff");
+            }
+          }
         } else {
           if (m.upP || m.leftP) setDiff((d) => diffs[(diffs.indexOf(d) + diffs.length - 1) % diffs.length]);
           if (m.downP || m.rightP) setDiff((d) => diffs[(diffs.indexOf(d) + 1) % diffs.length]);
-          if (!gated() && m.kickRP) setMenu("root");
+          if (!gated() && m.kickRP) {
+            armGate();
+            setTitleIdx(1);
+            setMenu("onep");
+          }
           if (ok) {
             boot();
             armGate();
@@ -1119,13 +1212,18 @@ export function GameView() {
             else ask("Biztos ki akarsz lépni a játékból?", goExit);
           }
         } else if (h.screen === "result") {
-          if (m.upP) setResultIdx((i) => (i + 2) % 3);
-          if (m.downP) setResultIdx((i) => (i + 1) % 3);
-          if (ok) {
-            const i = resultIdxRef.current;
-            if (i === 0) ask("Biztos új harcot indítasz?", goNewFight);
-            else if (i === 1) ask("Biztos visszavágót akarsz?", goRematch);
-            else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+          if (h.story) {
+            if (m.upP || m.downP) setResultIdx(1);
+            if (ok && resultIdxRef.current === 1) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+          } else {
+            if (m.upP) setResultIdx((i) => (i + 2) % 3);
+            if (m.downP) setResultIdx((i) => (i + 1) % 3);
+            if (ok) {
+              const i = resultIdxRef.current;
+              if (i === 0) ask("Biztos új harcot indítasz?", goNewFight);
+              else if (i === 1) ask("Biztos visszavágót akarsz?", goRematch);
+              else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            }
           }
         }
       }
@@ -1250,6 +1348,32 @@ export function GameView() {
         </div>
       )}
 
+      {storyPlay && (
+        <div
+          className="fixed inset-0 z-[80] bg-black"
+          onPointerDown={() => tapStorySkip()}
+        >
+          <video
+            ref={storyVidRef}
+            src={asset("/story/Chapter1_Prologue.mp4")}
+            className="h-full w-full bg-black object-contain"
+            playsInline
+            autoPlay
+            onEnded={() => finishStory()}
+            onError={() => finishStory()}
+            onLoadedData={(e) => {
+              const el = e.currentTarget;
+              const s = getSettings();
+              el.volume = !s.soundOn || isMuted() ? 0 : s.music;
+              void el.play().catch(() => undefined);
+            }}
+          />
+          <p className="pointer-events-none absolute bottom-5 left-0 right-0 text-center font-display text-sm tracking-wide text-white/70 [text-shadow:0_1px_3px_#000]">
+            Kattints / koppints kétszer a kihagyáshoz
+          </p>
+        </div>
+      )}
+
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
@@ -1269,7 +1393,7 @@ export function GameView() {
             ) : menu === "root"
               ? (
                   [
-                    { label: "1 Játékos VS CPU", i: 0 },
+                    { label: "1 Játékos", i: 0 },
                     { label: "2 Játékos", i: 1 },
                     { label: "Online", i: 2 },
                     { label: "Gyakorló mód", i: 3 },
@@ -1282,8 +1406,10 @@ export function GameView() {
                     onClick={() => {
                       boot();
                       setTitleIdx(item.i);
-                      if (item.i === 0) setMenu("diff");
-                      else if (item.i === 1) {
+                      if (item.i === 0) {
+                        setTitleIdx(0);
+                        setMenu("onep");
+                      } else if (item.i === 1) {
                         resetSelect(false);
                         gameRef.current?.chooseMode(false, diff);
                       } else if (item.i === 2) {
@@ -1305,6 +1431,35 @@ export function GameView() {
                     {titleIdx === item.i ? `▸ ${item.label}` : item.label}
                   </button>
                 ))
+              : menu === "onep"
+                ? (
+                    [
+                      { label: "Történet", i: 0 },
+                      { label: "1 Játékos VS CPU", i: 1 },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.i}
+                      type="button"
+                      onClick={() => {
+                        setTitleIdx(item.i);
+                        if (item.i === 0) startStory();
+                        else {
+                          boot();
+                          setMenu("diff");
+                        }
+                      }}
+                      className={`font-display min-w-48 text-center tracking-wide transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] ${
+                        touchUi
+                          ? "min-h-0 px-3 py-0.5 text-[clamp(15px,4.2vh,20px)] leading-tight"
+                          : "min-h-11 min-w-64 px-6 text-2xl sm:text-3xl"
+                      } ${
+                        titleIdx === item.i ? "text-gold" : "text-white/90 hover:text-fg"
+                      }`}
+                    >
+                      {titleIdx === item.i ? `▸ ${item.label}` : item.label}
+                    </button>
+                  ))
               : DIFFICULTIES.map((d) => (
                   <button
                     key={d}
@@ -1329,6 +1484,25 @@ export function GameView() {
                     {difficultyLabel(d)}
                   </button>
                 ))}
+            {(menu === "onep" || menu === "diff") && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (menu === "diff") {
+                    setTitleIdx(1);
+                    setMenu("onep");
+                  } else {
+                    setTitleIdx(0);
+                    setMenu("root");
+                  }
+                }}
+                className={`font-display mt-2 min-w-48 text-center tracking-wide text-white/70 [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:text-fg ${
+                  touchUi ? "min-h-0 px-3 py-0.5 text-[clamp(14px,3.8vh,18px)]" : "min-h-11 px-6 text-xl"
+                }`}
+              >
+                Vissza
+              </button>
+            )}
           </div>
           {menu === "root" && (
             <>
@@ -1720,19 +1894,19 @@ export function GameView() {
       )}
 
       {hud.screen === "result" && (
-        <div className="absolute inset-0 z-10">
-          {hud.winner && victoryUrl(hud.winner) && (
+        <div className={`absolute inset-0 z-10 ${hud.story ? "bg-black" : ""}`}>
+          {hud.winner && !hud.story && victoryUrl(hud.winner) && (
             <img
               src={asset(victoryUrl(hud.winner))}
               alt=""
               className="pointer-events-none absolute bottom-0 left-0 h-[96%] max-h-full w-auto max-w-[58%] object-contain object-left-bottom"
             />
           )}
-          <div className="absolute inset-y-0 right-0 flex w-[48%] max-w-[28rem] flex-col items-center justify-center gap-3 bg-gradient-to-l from-black/80 via-black/55 to-transparent px-8 py-6 sm:w-[42%]">
+          <div className={`absolute inset-y-0 right-0 flex w-[48%] max-w-[28rem] flex-col items-center justify-center gap-3 bg-gradient-to-l from-black/80 via-black/55 to-transparent px-8 py-6 sm:w-[42%] ${hud.story ? "left-0 right-0 w-full max-w-none bg-black/70" : ""}`}>
             <h2 className="font-display text-center text-3xl sm:text-4xl">
-              {hud.winner ? winLine(hud.winner) : "DÖNTETLEN"}
+              {hud.story ? "ELSŐ FEJEZET" : hud.winner ? winLine(hud.winner) : "DÖNTETLEN"}
             </h2>
-            {hud.fatality && <p className="text-gold text-xl">{hud.fatality}</p>}
+            {!hud.story && hud.fatality && <p className="text-gold text-xl">{hud.fatality}</p>}
             {confirm ? (
               <ConfirmBox
                 q={confirm.q}
@@ -1740,6 +1914,21 @@ export function GameView() {
                 onYes={confirm.yes}
                 onNo={() => setConfirm(null)}
               />
+            ) : hud.story ? (
+              <>
+                <MenuBtn active={false} disabled>
+                  Folytatás
+                </MenuBtn>
+                <MenuBtn
+                  active={resultIdx === 1}
+                  onClick={() => {
+                    setResultIdx(1);
+                    ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                  }}
+                >
+                  Vissza a menübe
+                </MenuBtn>
+              </>
             ) : (
               (
                 [
@@ -2063,21 +2252,30 @@ function MenuBtn({
   onClick,
   active,
   dense,
+  disabled,
 }: {
   children: React.ReactNode;
-  onClick: () => void;
+  onClick?: () => void;
   active?: boolean;
   dense?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
       className={`rounded-md border font-semibold uppercase tracking-wide ${
         dense ? "min-h-7 px-4 py-0.5 text-sm" : "min-h-11 px-6 py-2"
-      } ${active ? "border-gold bg-gold text-bg" : "border-gold bg-surface text-fg hover:bg-gold hover:text-bg"}`}
+      } ${
+        disabled
+          ? "cursor-not-allowed border-white/20 bg-white/10 text-white/35"
+          : active
+            ? "border-gold bg-gold text-bg"
+            : "border-gold bg-surface text-fg hover:bg-gold hover:text-bg"
+      }`}
     >
-      {active ? `▸ ${children}` : children}
+      {!disabled && active ? `▸ ${children}` : children}
     </button>
   );
 }
