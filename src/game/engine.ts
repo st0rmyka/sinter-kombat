@@ -40,11 +40,11 @@ declare global {
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti";
-export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti"];
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti" | "alfonz";
+export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.5";
+export const GAME_VERSION = "v0.52";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -107,13 +107,14 @@ type Atk = {
   cancel: AtkId[];
   low?: boolean;
   unblockable?: boolean;
-  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot" | "meteor" | "stomp";
+  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot" | "meteor" | "stomp" | "warp";
   pounce?: boolean;
   heal?: number;
   shield?: boolean;
   armor?: boolean;
   rage?: boolean;
   pull?: boolean;
+  slow?: boolean;
 };
 
 const PUNCH_L: Atk = {
@@ -580,6 +581,42 @@ const SPECIAL_STOMP: Atk = {
   cancel: [],
   zone: "stomp",
 };
+const SPECIAL_HUFF: Atk = {
+  id: "special",
+  pose: "special",
+  startup: 0.5,
+  active: 0.08,
+  recover: 0.12,
+  dmg: 0,
+  hitstun: 0,
+  blockstun: 0,
+  knock: 0,
+  cost: 50,
+  hx: 0,
+  hy: 0,
+  hw: 1,
+  hh: 1,
+  cancel: [],
+  slow: true,
+};
+const SPECIAL_WARP: Atk = {
+  id: "special2",
+  pose: "special2",
+  startup: 0.5,
+  active: 1.15,
+  recover: 0.12,
+  dmg: 0,
+  hitstun: 0,
+  blockstun: 0,
+  knock: 0,
+  cost: 50,
+  hx: 0,
+  hy: 0,
+  hw: 1,
+  hh: 1,
+  cancel: [],
+  zone: "warp",
+};
 
 function special1For(id: CharId): Atk {
   if (id === "cica") return SPECIAL_TIGER;
@@ -590,6 +627,7 @@ function special1For(id: CharId): Atk {
   if (id === "farajo") return SPECIAL_TRUMPET;
   if (id === "gabi") return SPECIAL_BAT;
   if (id === "isti") return SPECIAL_METEOR;
+  if (id === "alfonz") return SPECIAL_HUFF;
   return SPECIAL;
 }
 function special2For(id: CharId): Atk {
@@ -602,6 +640,7 @@ function special2For(id: CharId): Atk {
   if (id === "farajo") return SPECIAL_GUITAR;
   if (id === "gabi") return SPECIAL_SHOT;
   if (id === "isti") return SPECIAL_STOMP;
+  if (id === "alfonz") return SPECIAL_WARP;
   return SPECIAL2_VAMP;
 }
 
@@ -722,6 +761,13 @@ export const CHARACTERS: Record<
     special2: "DOBBANTÁS",
     fatality: "",
   },
+  alfonz: {
+    name: "SZIPUS ALFONZ",
+    title: "A Nylonkirály",
+    special: "SZIPUÁ",
+    special2: "NAGYPATIKA",
+    fatality: "",
+  },
 };
 
 export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
@@ -765,6 +811,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Felugrás — kiugrik a képernyőről, majd az ellenfélre zuhan. Nem blokkolható.",
     s2: "R1 Dobbantás — földön lévő ellenfelet a levegőbe löki MC Isti felé.",
   },
+  alfonz: {
+    s1: "L1 Szipuá — 0,5 mp beleszív a zacskóba, majd 3 mp-ig az ellenfél 80%-kal lassul. Sárga filter. Blokkolható hitstunnal megszakítható.",
+    s2: "R1 Nagypatika — 0,5 mp szívás, aztán lelép a pálya szélén és a másik oldalon jön elő. A futás irányába néz.",
+  },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string; blur: string }> = {
@@ -790,7 +840,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi", isti: "MC Isti" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi", isti: "MC Isti", alfonz: "Szipus Alfonz" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -805,6 +855,7 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   farajo: "/ui/victory/Victory_Farajo.png",
   gabi: "/ui/victory/Victory_Gabi.png",
   isti: "/ui/victory/Victory_Isti.png",
+  alfonz: "/ui/victory/Victory_Alfonz.png",
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
@@ -818,17 +869,18 @@ export const VS_ART: Partial<Record<CharId, string>> = {
   farajo: "/ui/vs/farajo.jpg",
   gabi: "/ui/vs/gabi.jpg",
   isti: "/ui/vs/isti.jpg",
+  alfonz: "/ui/vs/alfonz.jpg",
 };
 
 export function vsJpgUrl(id: CharId) {
-  return `/ui/vs/${id}.jpg?v=37`;
+  return `/ui/vs/${id}.jpg?v=40`;
 }
 export function vsPngUrl(id: CharId) {
-  return `/ui/vs/${id}.png?v=37`;
+  return `/ui/vs/${id}.png?v=40`;
 }
 export function victoryUrl(id: CharId) {
   const base = VICTORY_ART[id]?.split("?")[0];
-  return base ? `${base}?v=270` : "";
+  return base ? `${base}?v=271` : "";
 }
 
 const W = 1280;
@@ -882,6 +934,7 @@ type ReplayF = {
   rageT: number;
   shieldT: number;
   pullT: number;
+  slowT: number;
   atk: Atk | null;
   atkT: number;
   dashDir: 1 | -1;
@@ -920,6 +973,7 @@ function snapFighter(f: Fighter): ReplayF {
     rageT: f.rageT,
     shieldT: f.shieldT,
     pullT: f.pullT,
+    slowT: f.slowT,
     atk: f.atk,
     atkT: f.atkT,
     dashDir: f.dashDir,
@@ -942,6 +996,7 @@ function applyFighter(f: Fighter, s: ReplayF) {
   f.rageT = s.rageT;
   f.shieldT = s.shieldT;
   f.pullT = s.pullT;
+  f.slowT = s.slowT;
   f.atk = s.atk;
   f.atkT = s.atkT;
   f.dashDir = s.dashDir;
@@ -995,6 +1050,8 @@ type Fighter = {
   rageT: number;
   rageAcc: number;
   pullT: number;
+  slowT: number;
+  warpT: number;
   lastHurtT: number;
   sameAtkId: AtkId | "";
   sameAtkN: number;
@@ -1011,6 +1068,7 @@ type ImgBag = {
   farajo: Record<Pose, HTMLImageElement>;
   gabi: Record<Pose, HTMLImageElement>;
   isti: Record<Pose, HTMLImageElement>;
+  alfonz: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
 };
@@ -1177,6 +1235,7 @@ export class KitchenKombat {
   vsLoadPct = 0;
   loadedChars = new Set<CharId>();
   loadedStages = new Set<StageId>();
+  huffFilterT = 0;
   fxLoaded = false;
   dummyKeys: string[] = [];
   zones: {
@@ -1360,6 +1419,8 @@ export class KitchenKombat {
       rageT: 0,
       rageAcc: 0,
       pullT: 0,
+      slowT: 0,
+      warpT: 0,
       lastHurtT: 9,
       sameAtkId: "",
       sameAtkN: 0,
@@ -1383,10 +1444,11 @@ export class KitchenKombat {
       farajo: {} as Record<Pose, HTMLImageElement>,
       gabi: {} as Record<Pose, HTMLImageElement>,
       isti: {} as Record<Pose, HTMLImageElement>,
+      alfonz: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {} };
     this.images = { ...bags, anims, stage: emptyImg() };
-    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {} };
+    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {} };
     this.menuReady = true;
     this.loadPct = 1;
     this.hudKey = "";
@@ -1473,7 +1535,7 @@ export class KitchenKombat {
       "punchL","punchR","kickL","kickR","block","dash","jumpPunchL","jumpPunchR",
       "jumpKickL","jumpKickR","lowPunchL","lowPunchR","lowKickL","lowKickR","special2","crouch",
     ];
-    const bust = "?v=86";
+    const bust = "?v=107";
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
@@ -1818,6 +1880,7 @@ export class KitchenKombat {
     this.cpuPlan = [];
     this.cpuAirOffense = false;
     sfxPlay.farajoReset();
+    this.huffFilterT = 0;
     this.cpuGuard = false;
     this.cpuDashCd = 0;
     this.cpuJumpCd = 0;
@@ -2044,11 +2107,16 @@ export class KitchenKombat {
       this.timer = Math.max(0, this.timer - dt);
       if (this.timer <= 0) this.timeOver();
     }
-    this.control(this.f1, a1, dt);
-    this.control(this.f2, a2, dt);
+    if (this.huffFilterT > 0) this.huffFilterT = Math.max(0, this.huffFilterT - dt);
+    if (this.f1.slowT > 0) this.f1.slowT = Math.max(0, this.f1.slowT - dt);
+    if (this.f2.slowT > 0) this.f2.slowT = Math.max(0, this.f2.slowT - dt);
+    const s1 = this.f1.slowT > 0 ? dt * 0.2 : dt;
+    const s2 = this.f2.slowT > 0 ? dt * 0.2 : dt;
+    this.control(this.f1, a1, s1);
+    this.control(this.f2, a2, s2);
     this.syncFarajoAudio();
-    this.tickBody(this.f1, dt);
-    this.tickBody(this.f2, dt);
+    this.tickBody(this.f1, s1);
+    this.tickBody(this.f2, s2);
     this.face();
     this.separate();
     this.maybeSpec2(this.f1);
@@ -2207,6 +2275,12 @@ export class KitchenKombat {
       this.cpuPlan = [];
       const stomp = dist < 150 && Math.random() < 0.42;
       this.cpuPress(a, stomp ? "special2" : "special");
+      return;
+    }
+    if (id === "alfonz" && meter >= 50 && Math.random() < Math.max(0.26, spec * 2.1)) {
+      this.cpuPlan = [];
+      const nearEdge = this.f2.x <= 180 || this.f2.x >= W - 180;
+      this.cpuPress(a, nearEdge && Math.random() < 0.55 ? "special2" : "special");
       return;
     }
     if (meter >= 50 && Math.random() < (jesus ? Math.max(0.42, spec * 3.2) : spec)) {
@@ -2653,6 +2727,19 @@ export class KitchenKombat {
         }
         return;
       }
+      if (f.atk.zone === "warp") {
+        this.tickWarp(f, dt);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          if (f.warpT > 0) f.x = f.dashDir < 0 ? W - 90 : 90;
+          f.warpT = 0;
+          f.state = "idle";
+          f.atk = null;
+          f.pose = "idle";
+          f.vx *= 0.2;
+        }
+        return;
+      }
       if (f.atk.zone === "note") {
         f.pose = "special";
         f.vx = 0;
@@ -2946,12 +3033,33 @@ export class KitchenKombat {
         if (f.state === "ko") f.pose = "hurt";
       }
     }
+    if (f.warpT > 0) {
+      if (f.dashDir < 0 && f.x < -70) {
+        f.x = W - 90;
+        f.warpT = 0;
+        f.vx *= 0.15;
+        f.invuln = Math.max(f.invuln, 0.12);
+        f.state = "idle";
+        f.atk = null;
+        f.pose = "idle";
+      } else if (f.dashDir > 0 && f.x > W + 70) {
+        f.x = 90;
+        f.warpT = 0;
+        f.vx *= 0.15;
+        f.invuln = Math.max(f.invuln, 0.12);
+        f.state = "idle";
+        f.atk = null;
+        f.pose = "idle";
+      }
+      return;
+    }
     f.x = Math.max(80, Math.min(W - 80, f.x));
   }
 
   separate() {
     if (this.f1.shieldT > 0 || this.f2.shieldT > 0) return;
     if (this.f1.superDash || this.f2.superDash) return;
+    if (this.f1.warpT > 0 || this.f2.warpT > 0) return;
     const hb1 = this.hurtbox(this.f1);
     const hb2 = this.hurtbox(this.f2);
     const vOverlap = hb1.y < hb2.y + hb2.h && hb2.y < hb1.y + hb1.h;
@@ -3521,6 +3629,29 @@ export class KitchenKombat {
     if (def.hp <= 0) this.onKo(f, def);
   }
 
+  tickWarp(f: Fighter, _dt: number) {
+    if (!f.atk || f.atk.zone !== "warp") return;
+    if (f.atkT < f.atk.startup) {
+      f.pose = "special2";
+      f.vx = 0;
+      f.warpT = 0;
+      return;
+    }
+    if (f.warpT <= 0) {
+      const def = f === this.f1 ? this.f2 : this.f1;
+      const dir: 1 | -1 = f.x <= def.x ? -1 : 1;
+      f.dashDir = dir;
+      f.facing = dir;
+      f.warpT = 1.2;
+      f.invuln = Math.max(f.invuln, 1.1);
+      this.specialCallout(CHARACTERS[f.id].special2, 0.9);
+    }
+    f.pose = "dash";
+    f.facing = f.dashDir;
+    f.vx = f.dashDir * 1680;
+    f.invuln = Math.max(f.invuln, 0.06);
+  }
+
   tickStomp(f: Fighter, dt: number) {
     if (!f.atk || f.atk.zone !== "stomp") return;
     void dt;
@@ -3595,6 +3726,17 @@ export class KitchenKombat {
       this.trauma = Math.min(1, this.trauma + 0.22);
       rumble(f === this.f1 ? 0 : 1, 160, 0.55);
       this.spawnGuardSmoke(f.x + f.facing * 24, GROUND - f.y - 210, f.facing);
+      return;
+    }
+    if (f.atk.slow) {
+      f.spec2Spawned = true;
+      const def = f === this.f1 ? this.f2 : this.f1;
+      if (def.state !== "ko") def.slowT = Math.max(def.slowT, 3);
+      this.huffFilterT = Math.max(this.huffFilterT, 3);
+      this.specialCallout(CHARACTERS[f.id].special, 1.1);
+      this.trauma = Math.min(1, this.trauma + 0.14);
+      rumble(0, 120, 0.35);
+      rumble(1, 120, 0.35);
       return;
     }
     if (f.atk.pull) {
@@ -4325,16 +4467,21 @@ export class KitchenKombat {
     if (f.id === "cica" && (f.pose === "special" || (f.state === "attack" && f.atk?.pounce))) scale *= 0.68;
     if (f.id === "agi" && (f.pose.startsWith("low") || f.pose === "crouch")) scale *= 1.12;
     if (f.id === "hoffer" && (f.pose === "crouch" || f.pose.startsWith("low"))) scale *= 0.72;
+    if (f.id === "alfonz" && f.pose.startsWith("low")) scale *= 0.86;
+    if (f.id === "alfonz" && f.pose.startsWith("jumpPunch")) scale *= 0.84;
+    if (f.id === "alfonz" && f.pose.startsWith("jumpKick")) scale *= 0.78;
     const crouchY = (() => {
       if (f.id === "agi" && (f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "hoffer" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "isti" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
+      if (f.id === "alfonz" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.state === "crouch" || (f.state === "block" && f.crouchGuard)) return 0.8;
       return 1;
     })();
     const flip = f.state === "dash" ? f.dashDir : f.facing;
+    const drawFlip = f.id === "alfonz" && (f.state === "dash" || f.pose === "jumpPunchL") ? -flip : flip;
     let lunge = 0;
     let tilt = 0;
     if ((f.state === "attack" || f.state === "win") && f.atk) {
@@ -4367,7 +4514,7 @@ export class KitchenKombat {
         ctx.save();
         ctx.globalAlpha = (f.superDash ? 0.28 : 0.16) * i;
         ctx.translate(f.x - f.dashDir * i * 38 + flip * lunge, GROUND - f.y);
-        ctx.scale(flip, crouchY);
+        ctx.scale(drawFlip, crouchY);
         const ghost = f.superDash ? this.tintSprite(img, 232, 176, 24, 0.7) : img;
         ctx.drawImage(ghost, (-img.width * scale) / 2, -idle.foot * scale, img.width * scale, img.height * scale);
         ctx.restore();
@@ -4375,7 +4522,7 @@ export class KitchenKombat {
     }
     ctx.save();
     ctx.translate(f.x + flip * lunge, GROUND - f.y - bob);
-    ctx.scale(flip, crouchY);
+    ctx.scale(drawFlip, crouchY);
     ctx.rotate(tilt);
     if (f.pullT > 0) {
       ctx.filter = "brightness(0.92) saturate(0.65) sepia(0.15)";
@@ -4965,6 +5112,13 @@ export class KitchenKombat {
       }
     }
     ctx.restore();
+    const tint = Math.max(this.huffFilterT, this.f1?.slowT ?? 0, this.f2?.slowT ?? 0);
+    if (tint > 0 && (this.screen === "fight" || this.screen === "pause")) {
+      ctx.save();
+      ctx.fillStyle = `rgba(210, 175, 28, ${0.16 * Math.min(1, tint / 0.35)})`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
     if (this.screen === "fight" || this.screen === "pause") this.drawHudBars();
   }
 

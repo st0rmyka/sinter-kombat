@@ -27,6 +27,19 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.52",
+    items: [
+      "Szipus Alfonz: walk, guggolás, ugrás és jump-attack sprite-ok jobbra néznek",
+      "Zacskó csak a specialon (Szipuá / Nagypatika), a többi póz üres kézzel",
+    ],
+  },
+  {
+    v: "v0.51",
+    items: [
+      "Új karakter: Szipus Alfonz — Szipuá (ellenfél 80%-kal lassul 3 mp-ig, sárga filter) + Nagypatika (lelép a pálya szélén, a másik oldalon jön elő)",
+    ],
+  },
+  {
     v: "v0.5",
     items: [
       "1 Játékos menü: Történet + 1 Játékos VS CPU",

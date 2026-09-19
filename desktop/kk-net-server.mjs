@@ -102,7 +102,7 @@ export function createKitchenNet() {
   const clients = new Map();
   const rooms = new Map();
   let nextId = 1;
-  const ROSTER = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo"];
+  const ROSTER = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz"];
 
   function validChar(id) {
     return ROSTER.includes(id) ? id : "renike";
