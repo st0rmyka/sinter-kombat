@@ -27,6 +27,21 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.55",
+    items: [
+      "Új főmenü háttér (teljes roster csoportkép)",
+      "Új pálya: Budapest - Árpád Híd (zene ideiglenesen Duranda)",
+      "Leonidasz announcer: név + győzelem",
+    ],
+  },
+  {
+    v: "v0.54",
+    items: [
+      "Új karakter: Leonidasz — Hektor (átbiciklizős, blokkolható/átugorható) + Pitbull Terrier (hátba rúgás Leonidasz felé, füst, blokkolható)",
+      "Leonidasz X/Kör: felütő horog, kicsit a levegőbe löki az ellenfelet",
+    ],
+  },
+  {
     v: "v0.53",
     items: [
       "Alfonz Nagypatika: első sprite 0.3 mp, addig immunis, sárga superdash-filter a képesség alatt",
@@ -1397,7 +1412,7 @@ export function GameView() {
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
-            src={asset("/ui/mainmenu-v35.jpg")}
+            src={asset("/ui/mainmenu-v54.jpg?v=55")}
             alt=""
             className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
             style={{ objectPosition: "center 18%" }}
@@ -2187,7 +2202,9 @@ function SelectPanel({
               <img
                 src={asset(vsPngUrl(id))}
                 alt=""
-                className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${side === "right" ? "-scale-x-100" : ""}`}
+                className={`min-h-0 w-auto max-h-[calc(100%-2.8rem)] max-w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.7)] ${
+                  side === "right" ? "-scale-x-100" : ""
+                }`}
               />
             )}
             <div

@@ -33,6 +33,7 @@ const MUSIC_FILES: Record<string, string> = {
   kispest: "/music/kispest.mp3?v=45l",
   hosutca: "/music/hosutca.mp3?v=45l",
   pokol: "/music/pokol.mp3?v=45l",
+  arpadhid: "/music/sintertanya.mp3",
 };
 const MUSIC_VOL = 0.48;
 
@@ -200,6 +201,7 @@ const CHAR_NAME: Record<string, string> = {
   gabi: "/sfx/name_gabi.mp3",
   isti: "/sfx/name_isti.mp3",
   alfonz: "/sfx/name_alfonz.mp3",
+  leo: "/sfx/name_leo.mp3",
 };
 const CHAR_WIN: Record<string, string> = {
   ricsi: "/sfx/ricsiwins.mp3",
@@ -213,6 +215,7 @@ const CHAR_WIN: Record<string, string> = {
   gabi: "/sfx/gabiwins.mp3",
   isti: "/sfx/istiwins.mp3",
   alfonz: "/sfx/alfonzwins.mp3",
+  leo: "/sfx/leowins.mp3",
 };
 const STAGE_NAME: Record<string, string> = {
   sintertanya: "/sfx/mapname_duranda.mp3",
@@ -227,6 +230,7 @@ const STAGE_NAME: Record<string, string> = {
   kispest: "/sfx/mapname_kispest.mp3",
   hosutca: "/sfx/mapname_hosutca.mp3",
   pokol: "/sfx/mapname_pokol.mp3",
+  arpadhid: "/sfx/mapname_arpadhid.mp3",
 };
 const CHAR_TAUNT: Record<string, string> = {
   ricsi: "/sfx/ricsi_taunt.mp3",
