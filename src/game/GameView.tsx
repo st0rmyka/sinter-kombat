@@ -715,7 +715,7 @@ export function GameView() {
       game.loadPct = 1;
       game.hudKey = "";
       game.pushHud();
-    }, 700);
+    }, 5000);
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape") game.pauseToggle();
     };
@@ -2605,6 +2605,9 @@ function Updates({
       <div className="border-border bg-surface max-h-[90dvh] w-full max-w-lg overflow-auto rounded-lg border p-5">
         <h3 className="font-display text-2xl">Frissítések</h3>
         <p className="text-muted mt-1 text-sm">Aktuális verzió: {GAME_VERSION}</p>
+        <div className="mt-3">
+          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
+        </div>
         <div className="mt-4 space-y-4">
           {PATCH_NOTES.map((p, i) => (
             <button
@@ -2623,9 +2626,6 @@ function Updates({
               </ul>
             </button>
           ))}
-        </div>
-        <div className="mt-4">
-          <MenuBtn onClick={onClose}>Vissza</MenuBtn>
         </div>
       </div>
     </div>

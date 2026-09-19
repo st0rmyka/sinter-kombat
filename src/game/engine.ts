@@ -1506,8 +1506,8 @@ export class KitchenKombat {
     const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {} };
     this.images = { ...bags, anims, stage: emptyImg() };
     this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {} };
-    this.menuReady = true;
-    this.loadPct = 1;
+    this.menuReady = false;
+    this.loadPct = 0.12;
     this.hudKey = "";
     this.pushHud();
     const eat = (src: string, im: HTMLImageElement) => {
@@ -1526,8 +1526,8 @@ export class KitchenKombat {
         /* ignore */
       }
     };
+    const MENU_SRC = "/ui/mainmenu-v54.jpg?v=55";
     const later = [
-      "/ui/mainmenu-v54.jpg?v=55",
       "/ui/ko.png?v=1",
       "/ui/selection.jpg",
       ...CHAR_IDS.map((id) => `/portraits/${id}-icon.png?v=10`),
@@ -1535,10 +1535,38 @@ export class KitchenKombat {
       ...CHAR_IDS.map((id) => vsJpgUrl(id)),
       ...CHAR_IDS.map((id) => vsPngUrl(id)),
     ];
-    window.setTimeout(() => {
-      later.forEach(fire);
-      void preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
-    }, 40);
+    later.forEach(fire);
+    void preloadSfx(() => undefined, sfxMenuList(), musicMenuList()).catch(() => undefined);
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        this.menuReady = true;
+        this.loadPct = 1;
+        this.hudKey = "";
+        this.pushHud();
+        resolve();
+      };
+      const t = window.setTimeout(finish, 4000);
+      try {
+        const im = new Image();
+        im.decoding = "async";
+        im.onload = () => {
+          window.clearTimeout(t);
+          eat(MENU_SRC, im);
+          finish();
+        };
+        im.onerror = () => {
+          window.clearTimeout(t);
+          finish();
+        };
+        im.src = asset(MENU_SRC);
+      } catch {
+        window.clearTimeout(t);
+        finish();
+      }
+    });
   }
 
   async ensureFight(p1: CharId = this.p1id, p2: CharId = this.p2id, stageId: StageId = this.stageId) {
