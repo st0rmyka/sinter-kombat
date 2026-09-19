@@ -27,6 +27,13 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.53",
+    items: [
+      "Alfonz Nagypatika: első sprite 0.3 mp, addig immunis, sárga superdash-filter a képesség alatt",
+      "Nagypatika elég energyvel bármikor (hitstunból is) aktiválható — kombómegszakító",
+    ],
+  },
+  {
     v: "v0.52",
     items: [
       "Szipus Alfonz: walk, guggolás, ugrás és jump-attack sprite-ok jobbra néznek",

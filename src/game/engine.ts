@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol"];
-export const GAME_VERSION = "v0.52";
+export const GAME_VERSION = "v0.53";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -602,7 +602,7 @@ const SPECIAL_HUFF: Atk = {
 const SPECIAL_WARP: Atk = {
   id: "special2",
   pose: "special2",
-  startup: 0.5,
+  startup: 0.3,
   active: 1.15,
   recover: 0.12,
   dmg: 0,
@@ -2610,6 +2610,7 @@ export class KitchenKombat {
         this.startAttack(f, SPECIAL2_VAMP, false, false, false);
         return;
       }
+      if (this.tryAlfonzWarpBurst(f)) return;
       f.atk = null;
       f.spec2Spawned = false;
       f.stun -= dt;
@@ -2874,6 +2875,22 @@ export class KitchenKombat {
     f.lastHurtT = 0;
   }
 
+  tryAlfonzWarpBurst(f: Fighter) {
+    if (f.id !== "alfonz") return false;
+    if (this.phase !== "fight") return false;
+    if (f.hp <= 0) return false;
+    if (f.bufSpecial2 <= 0) return false;
+    if (f.atk?.zone === "warp") return false;
+    const w = SPECIAL_WARP;
+    if (f.meter < w.cost) return false;
+    f.stun = 0;
+    f.y = 0;
+    f.vy = 0;
+    f.airAtk = false;
+    this.startAttack(f, w, false, false, false);
+    return true;
+  }
+
   startDash(f: Fighter, dir: 1 | -1, superD = false) {
     f.state = "dash";
     f.dashDir = dir;
@@ -2929,7 +2946,14 @@ export class KitchenKombat {
     }
     const air = f.y > 4;
     if (air) {
-      if (nxt.id === "special" || nxt.id === "special2") return false;
+      if (nxt.id === "special") return false;
+      if (nxt.id === "special2" && f.id !== "alfonz") return false;
+      if (nxt.id === "special2" && f.id === "alfonz") {
+        f.y = 0;
+        f.vy = 0;
+        this.startAttack(f, nxt, false, false, false);
+        return true;
+      }
       if (f.airAtk) return false;
       if (!JUMP_POSE[nxt.id]) return false;
     }
@@ -2991,6 +3015,7 @@ export class KitchenKombat {
     f.hasHit = false;
     f.pose = pose;
     if (atk.id === "special" || atk.id === "special2") f.meter = Math.max(0, f.meter - atk.cost);
+    if (atk.zone === "warp") f.invuln = Math.max(f.invuln, atk.startup + 0.04);
     f.bufPunchL = f.bufPunchR = f.bufKickL = f.bufKickR = f.bufSpecial = f.bufSpecial2 = 0;
     f.spec2Spawned = false;
     f.spinAcc = 0;
@@ -3639,6 +3664,7 @@ export class KitchenKombat {
       f.pose = "special2";
       f.vx = 0;
       f.warpT = 0;
+      f.invuln = Math.max(f.invuln, 0.06);
       return;
     }
     if (f.warpT <= 0) {
@@ -4541,6 +4567,9 @@ export class KitchenKombat {
     const dw = img.width * scale;
     const dh = img.height * scale;
     if (f.superDash && f.state === "dash") {
+      const pulse = 0.62 + 0.2 * Math.abs(Math.sin(this.time * 16));
+      ctx.drawImage(this.tintSprite(img, 232, 176, 24, pulse), dx, dy, dw, dh);
+    } else if (f.id === "alfonz" && f.state === "attack" && f.atk?.zone === "warp") {
       const pulse = 0.62 + 0.2 * Math.abs(Math.sin(this.time * 16));
       ctx.drawImage(this.tintSprite(img, 232, 176, 24, pulse), dx, dy, dw, dh);
     } else if (f.rageT > 0) {
