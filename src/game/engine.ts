@@ -2860,6 +2860,10 @@ export class KitchenKombat {
 
   addMeter(f: Fighter, n: number) {
     if (n <= 0 || f.rageT > 0) return;
+    if (f.id === "alfonz") {
+      const other = f === this.f1 ? this.f2 : this.f1;
+      if (f.atk?.slow || other.slowT > 0) return;
+    }
     if (f.id === "jezus" && this.zones.some((z) => z.kind === "pillar" && z.owner === f && z.life > 0)) n *= 0.5;
     f.meter = Math.min(100, f.meter + n);
   }
@@ -4481,7 +4485,7 @@ export class KitchenKombat {
       return 1;
     })();
     const flip = f.state === "dash" ? f.dashDir : f.facing;
-    const drawFlip = f.id === "alfonz" && (f.state === "dash" || f.pose === "jumpPunchL") ? -flip : flip;
+    const drawFlip = f.id === "alfonz" && (f.state === "dash" || f.pose === "dash" || f.pose === "jumpPunchL") ? -flip : flip;
     let lunge = 0;
     let tilt = 0;
     if ((f.state === "attack" || f.state === "win") && f.atk) {
