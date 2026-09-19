@@ -27,6 +27,13 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.56",
+    items: [
+      "Szipus Alfonz VO: Szipuá, Nagypatika, defeat, taunt",
+      "Leonidasz VO: attack/damage/defeat, Hektor 1+2 (0,8 mp eltérés), Pitbull, taunt",
+    ],
+  },
+  {
     v: "v0.55",
     items: [
       "Új főmenü háttér (teljes roster csoportkép)",
