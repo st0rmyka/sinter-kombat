@@ -1161,6 +1161,8 @@ export type Hud = {
   p1Hist: TrainPress[];
   p2Hist: TrainPress[];
   story: boolean;
+  storyBeat: number;
+  storyCut: string | null;
 };
 
 function overlap(a: Box, b: Box) {
@@ -1223,6 +1225,8 @@ export class KitchenKombat {
   phase: "intro" | "fight" | "ko" | "replay" | "finish" | "fatality" | "end" = "intro";
   versusCpu = true;
   storyMode = false;
+  storyBeat = 0;
+  storyCut: string | null = null;
   training = false;
   dummy: DummyMode = "idle";
   trainMeter = false;
@@ -1786,6 +1790,8 @@ export class KitchenKombat {
     this.difficulty = diff;
     this.training = training;
     this.storyMode = false;
+    this.storyBeat = 0;
+    this.storyCut = null;
     this.dummy = training ? "idle" : "cpu";
     this.trainMeter = training ? this.trainMeter : false;
     this.screen = "select";
@@ -1812,16 +1818,24 @@ export class KitchenKombat {
     this.pushHud();
   }
 
-  startStoryFight() {
+  startStoryFight(beat = 1) {
     this.storyMode = true;
     this.versusCpu = true;
     this.training = false;
     this.dummy = "cpu";
     this.trainMeter = false;
+    this.storyBeat = beat;
+    this.storyCut = null;
     this.p1id = "hoffer";
-    this.p2id = "agi";
-    this.stageId = "sintertanya";
-    this.confirmStage("sintertanya");
+    const fights: { p2: CharId; stage: StageId }[] = [
+      { p2: "agi", stage: "sintertanya" },
+      { p2: "cricsi", stage: "sintertanya" },
+      { p2: "gabi", stage: "nagybatony" },
+    ];
+    const next = fights[Math.max(0, Math.min(fights.length, beat) - 1)]!;
+    this.p2id = next.p2;
+    this.stageId = next.stage;
+    this.confirmStage(next.stage);
   }
 
   confirmStage(id: StageId = this.stageId) {
@@ -3400,6 +3414,20 @@ export class KitchenKombat {
   }
 
   goResult() {
+    if (this.storyMode && this.winner === this.p1id) {
+      if (this.storyBeat === 1) {
+        this.storyCut = "ch1f2";
+        this.phase = "end";
+        this.pushHud();
+        return;
+      }
+      if (this.storyBeat === 2) {
+        this.storyCut = "ch1f3";
+        this.phase = "end";
+        this.pushHud();
+        return;
+      }
+    }
     this.screen = "result";
     this.phase = "end";
     if (this.winner && !this.storyMode) sfxPlay.charTaunt(this.winner);
@@ -5416,8 +5444,10 @@ export class KitchenKombat {
       p1Hist: this.p1Hist.slice(),
       p2Hist: this.p2Hist.slice(),
       story: this.storyMode,
+      storyBeat: this.storyBeat,
+      storyCut: this.storyCut,
     };
-    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 1000)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}|${h.story}`;
+    const key = `${h.screen}|${h.hp1}|${h.hp2}|${h.timer}|${h.callout}|${h.combo}|${h.wins1}|${h.wins2}|${h.selectSlot}|${h.winner}|${h.loading}|${Math.floor(h.loadPct * 1000)}|${h.vsLoading}|${Math.floor(this.vsLoadPct * 50)}|${h.pads}|${h.p1}|${h.p2}|${h.netWait}|${h.training}|${h.dummy}|${h.trainMeter}|${h.p1Hist.map((x) => x.id).join(",")}|${h.p2Hist.map((x) => x.id).join(",")}|${h.difficulty}|${h.story}|${h.storyBeat}|${h.storyCut}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.onHud(h);

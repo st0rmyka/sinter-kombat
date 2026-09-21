@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, victoryUrl, vsJpgUrl, vsPngUrl, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
-import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
+import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, stopMusic, setMenuMusicAllowed, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, type KeyAction, PAD_BTNS, KEY_ACTIONS, DEFAULT_KEYS, codeLabel, patchPadBtn, resetPadLayout, patchKey, resetKeys } from "./settings";
 import { NetPlay } from "./net";
 import { asset } from "./asset";
@@ -367,6 +367,14 @@ function nudgeSetting(i: number, dir: number) {
   applyMix();
 }
 
+type StoryClip = "prologue" | "ch1f2" | "ch1f3";
+const STORY_VID: Record<StoryClip, string> = {
+  prologue: "/story/Chapter1_Prologue.mp4",
+  ch1f2: "/story/CH1_F2.mp4",
+  ch1f3: "/story/CH1_F3.mp4",
+};
+const storyBeatAfter = (clip: StoryClip) => (clip === "ch1f3" ? 3 : clip === "ch1f2" ? 2 : 1);
+
 const emptyHud = (): Hud => ({
   screen: "title",
   p1: "renike",
@@ -402,6 +410,8 @@ const emptyHud = (): Hud => ({
   p1Hist: [],
   p2Hist: [],
   story: false,
+  storyBeat: 0,
+  storyCut: null,
 });
 
 export function GameView() {
@@ -446,6 +456,8 @@ export function GameView() {
   const [audioReady, setAudioReady] = useState(false);
   const [bootFloor, setBootFloor] = useState(0.16);
   const [storyPlay, setStoryPlay] = useState(false);
+  const [storyClip, setStoryClip] = useState<StoryClip>("prologue");
+  const [storyCatch, setStoryCatch] = useState(false);
   const netRef = useRef(new NetPlay());
   const hudRef = useRef(hud);
   hudRef.current = hud;
@@ -484,8 +496,11 @@ export function GameView() {
   const storySkipAt = useRef(0);
   const storyDone = useRef(false);
   const storyVidRef = useRef<HTMLVideoElement | null>(null);
+  const storyClipRef = useRef<StoryClip>("prologue");
+  storyClipRef.current = storyClip;
   const tapStorySkipRef = useRef<() => void>(() => undefined);
   const startStoryRef = useRef<() => void>(() => undefined);
+  const startStoryCutRef = useRef<(clip: StoryClip) => void>(() => undefined);
   const confirmRef = useRef(confirm);
   confirmRef.current = confirm;
   const confirmChoiceRef = useRef(confirmChoice);
@@ -525,12 +540,16 @@ export function GameView() {
   const goTitle = () => {
     const g = gameRef.current;
     if (!g) return;
+    setStoryPlay(false);
+    setStoryCatch(false);
+    setMenuMusicAllowed(true);
     startMenuMusic();
     sfxPlay.title();
     setMenu("root");
     setConfirm(null);
-    setStoryPlay(false);
     g.storyMode = false;
+    g.storyBeat = 0;
+    g.storyCut = null;
     g.screen = "title";
     g.paused = false;
     g.training = false;
@@ -549,9 +568,10 @@ export function GameView() {
     }
     setStoryPlay(false);
     storyPlayRef.current = false;
+    setStoryCatch(true);
     const g = gameRef.current;
     if (!g) return;
-    g.startStoryFight();
+    g.startStoryFight(storyBeatAfter(storyClipRef.current));
   };
 
   const tapStorySkip = () => {
@@ -568,19 +588,44 @@ export function GameView() {
   const startStory = () => {
     const g = gameRef.current;
     if (!g) return;
+    storyPlayRef.current = true;
+    setMenuMusicAllowed(false);
     boot();
     primeAudio();
     setAudioReady(true);
-    stopStageMusic();
+    stopMusic();
     storyDone.current = false;
     storySkipAt.current = 0;
+    setStoryClip("prologue");
+    storyClipRef.current = "prologue";
     setStoryPlay(true);
-    storyPlayRef.current = true;
     g.storyMode = true;
     void g.ensureFight("hoffer", "agi", "sintertanya");
   };
+
+  const startStoryCut = (clip: StoryClip) => {
+    const g = gameRef.current;
+    if (!g) return;
+    storyPlayRef.current = true;
+    setMenuMusicAllowed(false);
+    boot();
+    primeAudio();
+    setAudioReady(true);
+    stopMusic();
+    storyDone.current = false;
+    storySkipAt.current = 0;
+    setStoryClip(clip);
+    storyClipRef.current = clip;
+    setStoryPlay(true);
+    g.storyMode = true;
+    g.storyCut = null;
+    if (clip === "ch1f3") void g.ensureFight("hoffer", "gabi", "nagybatony");
+    else if (clip === "ch1f2") void g.ensureFight("hoffer", "cricsi", "sintertanya");
+    else void g.ensureFight("hoffer", "agi", "sintertanya");
+  };
   tapStorySkipRef.current = tapStorySkip;
   startStoryRef.current = startStory;
+  startStoryCutRef.current = startStoryCut;
 
   const goNewFight = () => {
     const g = gameRef.current;
@@ -649,6 +694,7 @@ export function GameView() {
     primeAudio();
     setAudioReady(true);
     goLandscape();
+    if (storyPlayRef.current || gameRef.current?.storyMode) return;
     const s = hudRef.current.screen;
     if (s === "title" || s === "select" || s === "stage" || s === "online" || s === "lobby") startMenuMusic();
   };
@@ -787,6 +833,14 @@ export function GameView() {
   }, [hud.screen]);
 
   useEffect(() => {
+    if (hud.storyCut === "ch1f2" || hud.storyCut === "ch1f3") startStoryCutRef.current(hud.storyCut);
+  }, [hud.storyCut]);
+
+  useEffect(() => {
+    if (hud.screen === "vs" || hud.screen === "fight") setStoryCatch(false);
+  }, [hud.screen]);
+
+  useEffect(() => {
     let raf = 0;
     const tick = () => {
       const h = hudRef.current;
@@ -902,6 +956,10 @@ export function GameView() {
         return;
       }
       if (h.screen === "title") {
+        if (g.storyMode) {
+          raf = requestAnimationFrame(tick);
+          return;
+        }
         const m = sampleMenu();
         const c = confirmRef.current;
         if (c) {
@@ -1390,29 +1448,35 @@ export function GameView() {
         </div>
       )}
 
-      {storyPlay && (
+      {(storyPlay || storyCatch) && (
         <div
           className="fixed inset-0 z-[80] bg-black"
-          onPointerDown={() => tapStorySkip()}
+          onPointerDown={() => {
+            if (storyPlay) tapStorySkip();
+          }}
         >
-          <video
-            ref={storyVidRef}
-            src={asset("/story/Chapter1_Prologue.mp4")}
-            className="h-full w-full bg-black object-contain"
-            playsInline
-            autoPlay
-            onEnded={() => finishStory()}
-            onError={() => finishStory()}
-            onLoadedData={(e) => {
-              const el = e.currentTarget;
-              const s = getSettings();
-              el.volume = !s.soundOn || isMuted() ? 0 : s.music;
-              void el.play().catch(() => undefined);
-            }}
-          />
-          <p className="pointer-events-none absolute bottom-5 left-0 right-0 text-center font-display text-sm tracking-wide text-white/70 [text-shadow:0_1px_3px_#000]">
-            Kattints / koppints kétszer a kihagyáshoz
-          </p>
+          {storyPlay && (
+            <video
+              ref={storyVidRef}
+              src={asset(STORY_VID[storyClip])}
+              className="h-full w-full bg-black object-contain"
+              playsInline
+              autoPlay
+              onEnded={() => finishStory()}
+              onError={() => finishStory()}
+              onLoadedData={(e) => {
+                const el = e.currentTarget;
+                const s = getSettings();
+                el.volume = !s.soundOn || isMuted() ? 0 : s.music;
+                void el.play().catch(() => undefined);
+              }}
+            />
+          )}
+          {storyPlay && (
+            <p className="pointer-events-none absolute bottom-5 left-0 right-0 text-center font-display text-sm tracking-wide text-white/70 [text-shadow:0_1px_3px_#000]">
+              Kattints / koppints kétszer a kihagyáshoz
+            </p>
+          )}
         </div>
       )}
 

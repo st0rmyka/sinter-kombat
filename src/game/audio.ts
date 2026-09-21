@@ -16,6 +16,7 @@ let musicNode: MediaElementAudioSourceNode | null = null;
 let musicKind: "menu" | "stage" | null = null;
 let musicSrc: string | null = null;
 let musicFile: string | null = null;
+let menuMusicAllowed = true;
 const MUSIC_BLOBS: Record<string, string> = {};
 
 const MENU_FILE = "/music/menu.mp3?v=19";
@@ -363,7 +364,7 @@ export function primeAudio() {
         /* blocked */
       });
     }
-  } else {
+  } else if (musicKind === "menu") {
     startMenuMusic();
   }
 }
@@ -1057,7 +1058,12 @@ function hookMusicGraph(el: HTMLAudioElement) {
   el.volume = 1;
 }
 
+export function setMenuMusicAllowed(on: boolean) {
+  menuMusicAllowed = on;
+}
+
 export function startMenuMusic() {
+  if (!menuMusicAllowed) return;
   const c = ac();
   if (c.state === "suspended") void c.resume();
   if (musicKind === "menu" && musicEl && !musicEl.paused && c.state === "running") return;
@@ -1136,4 +1142,9 @@ export function stopStageMusic() {
   } catch {
     /* ignore */
   }
+}
+
+export function stopMusic() {
+  stopStageMusic();
+  musicKind = null;
 }
