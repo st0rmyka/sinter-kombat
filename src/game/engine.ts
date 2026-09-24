@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol" | "arpadhid";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol", "arpadhid"];
-export const GAME_VERSION = "v0.56";
+export const GAME_VERSION = "v0.57";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -2451,14 +2451,32 @@ export class KitchenKombat {
     this.cpuHpMark = me.hp;
     if (dmg > 0) this.cpuPressure = Math.min(1.25, this.cpuPressure + dmg / (MAX_HP * 0.1));
     else this.cpuPressure = Math.max(0, this.cpuPressure - dt * 0.3);
-    if (this.phase !== "fight" || me.state === "hurt" || me.state === "ko") {
+    if (this.phase !== "fight" || me.state === "ko") {
       this.cpuGuard = false;
       return a;
     }
-
     const easy = this.difficulty === "easy";
     const hell = this.difficulty === "szopni";
     const hard = this.difficulty === "hard";
+    if (me.state === "hurt" && me.hp > 0 && me.meter >= SUPER_DASH_COST && this.cpuEscapeCd <= 0) {
+      const cornered = me.x <= 140 || me.x >= W - 140;
+      const pressured = this.cpuPressure > 0.35;
+      const p = easy ? 0.03 : hell ? 0.5 : hard ? 0.24 : 0.08;
+      if ((cornered || pressured) && Math.random() < p) {
+        a.superDash = true;
+        a.superDashP = true;
+        const escapeDir: 1 | -1 = me.x <= W * 0.5 ? 1 : -1;
+        if (escapeDir > 0) a.right = true;
+        else a.left = true;
+        this.cpuEscapeCd = hell ? 1.4 : hard ? 2.1 : 3.2;
+        this.cpuPressure *= 0.2;
+      }
+      return a;
+    }
+    if (me.state === "hurt") {
+      this.cpuGuard = false;
+      return a;
+    }
     const spec = easy
       ? { block: 0.077, atk: 0.136, dash: 0.11, jumpIn: 0.051, combo: 0.034, special: 0.051, antiAir: 0.025, jumpDef: 0.017, punish: 0.051 }
       : hell
@@ -2705,6 +2723,7 @@ export class KitchenKombat {
     }
 
     if (f.state === "hurt") {
+      if (f.hp > 0 && a.superDashP && this.trySuperDash(f, a, true)) return;
       if (
         f.id === "agi" &&
         f.hp > 0 &&
@@ -3015,14 +3034,37 @@ export class KitchenKombat {
     else sfxPlay.dash();
   }
 
-  trySuperDash(f: Fighter, a: Actions) {
-    if (f.y > 0) return false;
-    if (f.state === "attack" || f.state === "dash" || f.state === "hurt" || f.state === "ko" || f.state === "win") return false;
+  trySuperDash(f: Fighter, a: Actions, burst = false) {
+    if (f.hp <= 0 || f.state === "ko" || f.state === "win") return false;
+    if (burst) {
+      if (f.state !== "hurt") return false;
+    } else {
+      if (f.y > 0) return false;
+      if (f.state === "attack" || f.state === "dash" || f.state === "hurt") return false;
+    }
     if (f.meter < SUPER_DASH_COST) return false;
+    if (burst) {
+      f.stun = 0;
+      f.vy = 0;
+      f.y = 0;
+      f.pullT = 0;
+      f.atk = null;
+      const mine: 1 | 2 = f === this.f1 ? 1 : 2;
+      if (this.comboSide !== 0 && this.comboSide !== mine) {
+        this.combo = 0;
+        this.comboSide = 0;
+        this.comboName = null;
+        this.comboT = 0;
+        const other = f === this.f1 ? this.f2 : this.f1;
+        other.chain = [];
+        other.comboTag = "";
+      }
+    }
     let dir: 1 | -1 = f.facing;
     if (a.left && !a.right) dir = -1;
     else if (a.right && !a.left) dir = 1;
     this.startDash(f, dir, true);
+    if (burst) f.invuln = Math.max(f.invuln, SUPER_DASH_DUR + 0.14);
     return true;
   }
 

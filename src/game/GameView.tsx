@@ -27,6 +27,13 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.57",
+    items: [
+      "2 Játékos: két azonos kontroller külön P1 / P2",
+      "Super Dash kombóból és juggle-ből is kivesz (40 energia)",
+    ],
+  },
+  {
     v: "v0.56",
     items: [
       "Szipus Alfonz VO: Szipuá, Nagypatika, defeat, taunt",
@@ -2450,7 +2457,7 @@ function Help({ p1, p2, onClose }: { p1: CharId; p2: CharId; onClose: () => void
           <li>Y / △ — bal ütés · X / □ — jobb ütés</li>
           <li>A / ✕ — bal rúgás · B / ○ — jobb rúgás</li>
           <li>RT / R2 — védekezés. Guggolva + blokk = low védés</li>
-          <li>LT / L2 — Super Dash (40 energia)</li>
+          <li>LT / L2 — Super Dash (40 energia, kombóból is kivesz)</li>
           <li>LB / L1 special 1 · RB / R1 special 2</li>
           <li>Start / Options — szünet</li>
         </ul>
