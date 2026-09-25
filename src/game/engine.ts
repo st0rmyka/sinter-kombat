@@ -44,7 +44,39 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol" | "arpadhid";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol", "arpadhid"];
-export const GAME_VERSION = "v0.58";
+export const GAME_VERSION = "v0.6";
+
+const STORY_SAVE_KEY = "sk-story-v1";
+export type StorySave = { kind: "cut"; clip: string } | { kind: "fight"; beat: number };
+
+export function readStorySave(): StorySave | null {
+  try {
+    const raw = localStorage.getItem(STORY_SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as StorySave;
+    if (s?.kind === "cut" && typeof s.clip === "string") return s;
+    if (s?.kind === "fight" && typeof s.beat === "number" && s.beat >= 1 && s.beat <= 5) return s;
+  } catch {
+    /* private mode / bad json */
+  }
+  return null;
+}
+
+export function writeStorySave(save: StorySave) {
+  try {
+    localStorage.setItem(STORY_SAVE_KEY, JSON.stringify(save));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearStorySave() {
+  try {
+    localStorage.removeItem(STORY_SAVE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -1530,7 +1562,7 @@ export class KitchenKombat {
         /* ignore */
       }
     };
-    const MENU_SRC = "/ui/mainmenu-v54.jpg?v=55";
+    const MENU_SRC = "/ui/mainmenu-v58.jpg?v=58";
     const later = [
       "/ui/ko.png?v=1",
       "/ui/selection.jpg",
@@ -1826,6 +1858,7 @@ export class KitchenKombat {
     this.trainMeter = false;
     this.storyBeat = beat;
     this.storyCut = null;
+    writeStorySave({ kind: "fight", beat });
     this.difficulty = beat === 5 ? "szopni" : "easy";
     this.p1id = "hoffer";
     const fights: { p2: CharId; stage: StageId }[] = [
@@ -3469,24 +3502,28 @@ export class KitchenKombat {
     if (this.storyMode && this.winner === this.p1id) {
       if (this.storyBeat === 1) {
         this.storyCut = "ch1f2";
+        writeStorySave({ kind: "cut", clip: "ch1f2" });
         this.phase = "end";
         this.pushHud();
         return;
       }
       if (this.storyBeat === 2) {
         this.storyCut = "ch1f3";
+        writeStorySave({ kind: "cut", clip: "ch1f3" });
         this.phase = "end";
         this.pushHud();
         return;
       }
       if (this.storyBeat === 3) {
         this.storyCut = "ch1f4";
+        writeStorySave({ kind: "cut", clip: "ch1f4" });
         this.phase = "end";
         this.pushHud();
         return;
       }
       if (this.storyBeat === 4) {
         this.storyCut = "ch1f5";
+        writeStorySave({ kind: "cut", clip: "ch1f5" });
         this.phase = "end";
         this.pushHud();
         return;
@@ -3494,7 +3531,8 @@ export class KitchenKombat {
     }
     if (this.storyMode && this.storyBeat === 5) {
       this.winner = this.p2id;
-      this.screen = "result";
+      this.storyCut = "ch1f6";
+      writeStorySave({ kind: "cut", clip: "ch1f6" });
       this.phase = "end";
       this.pushHud();
       return;

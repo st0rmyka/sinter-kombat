@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, victoryUrl, vsJpgUrl, vsPngUrl, winLine, KitchenKombat, type CharId, type Difficulty, type Hud, type StageId, type TrainPress } from "./engine";
+import { CHARACTERS, CHAR_IDS, CHAR_SKILLS, DIFFICULTIES, difficultyLabel, GAME_VERSION, STAGE_IDS, STAGES, victoryUrl, vsJpgUrl, vsPngUrl, winLine, KitchenKombat, clearStorySave, readStorySave, writeStorySave, type CharId, type Difficulty, type Hud, type StageId, type StorySave, type TrainPress } from "./engine";
 import { installInput, pressVirtual, releaseVirtual, sampleMenu, sampleP1, sampleP2, getPadCount } from "./input";
 import { isMuted, setMuted, sfxPlay, startMenuMusic, startKitchenDrone, stopKitchenDrone, stopStageMusic, stopMusic, setMenuMusicAllowed, unlockAudio, applyMix, primeAudio, isAudioPrimed } from "./audio";
 import { getSettings, patchSettings, subscribeSettings, type GameSettings, type PadBtnId, type KeyAction, PAD_BTNS, KEY_ACTIONS, DEFAULT_KEYS, codeLabel, patchPadBtn, resetPadLayout, patchKey, resetKeys } from "./settings";
@@ -26,6 +26,14 @@ function asStage(id: StageSlot): StageId {
 }
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
+  {
+    v: "v0.6",
+    items: [
+      "Új főmenü háttér",
+      "Történet: a Jézus-harc után CH1_F6, majd a köszönő képernyő",
+      "Story mentés: Folytatás az 1 Játékos menüben, ha megszakadt a fejezet",
+    ],
+  },
   {
     v: "v0.58",
     items: [
@@ -382,13 +390,14 @@ function nudgeSetting(i: number, dir: number) {
   applyMix();
 }
 
-type StoryClip = "prologue" | "ch1f2" | "ch1f3" | "ch1f4" | "ch1f5";
+type StoryClip = "prologue" | "ch1f2" | "ch1f3" | "ch1f4" | "ch1f5" | "ch1f6";
 const STORY_VID: Record<StoryClip, string> = {
   prologue: "/story/Chapter1_Prologue.mp4",
   ch1f2: "/story/CH1_F2.mp4",
   ch1f3: "/story/CH1_F3.mp4",
   ch1f4: "/story/CH1_F4.mp4",
   ch1f5: "/story/CH1_F5.mp4",
+  ch1f6: "/story/CH1_F6.mp4",
 };
 const storyBeatAfter = (clip: StoryClip) =>
   clip === "ch1f5" ? 5 : clip === "ch1f4" ? 4 : clip === "ch1f3" ? 3 : clip === "ch1f2" ? 2 : 1;
@@ -516,6 +525,13 @@ export function GameView() {
   const storyVidRef = useRef<HTMLVideoElement | null>(null);
   const storyClipRef = useRef<StoryClip>("prologue");
   storyClipRef.current = storyClip;
+  const [storyThanks, setStoryThanks] = useState(false);
+  const storyThanksRef = useRef(false);
+  storyThanksRef.current = storyThanks;
+  const [storySave, setStorySave] = useState<StorySave | null>(() => readStorySave());
+  const storySaveRef = useRef<StorySave | null>(storySave);
+  storySaveRef.current = storySave;
+  const continueStoryRef = useRef<() => void>(() => undefined);
   const tapStorySkipRef = useRef<() => void>(() => undefined);
   const startStoryRef = useRef<() => void>(() => undefined);
   const startStoryCutRef = useRef<(clip: StoryClip) => void>(() => undefined);
@@ -560,6 +576,11 @@ export function GameView() {
     if (!g) return;
     setStoryPlay(false);
     setStoryCatch(false);
+    setStoryThanks(false);
+    storyThanksRef.current = false;
+    const saved = readStorySave();
+    storySaveRef.current = saved;
+    setStorySave(saved);
     setMenuMusicAllowed(true);
     startMenuMusic();
     sfxPlay.title();
@@ -586,6 +607,15 @@ export function GameView() {
     }
     setStoryPlay(false);
     storyPlayRef.current = false;
+    if (storyClipRef.current === "ch1f6") {
+      clearStorySave();
+      storySaveRef.current = null;
+      setStorySave(null);
+      setStoryCatch(false);
+      setStoryThanks(true);
+      storyThanksRef.current = true;
+      return;
+    }
     setStoryCatch(true);
     const g = gameRef.current;
     if (!g) return;
@@ -617,6 +647,9 @@ export function GameView() {
     setStoryClip("prologue");
     storyClipRef.current = "prologue";
     setStoryPlay(true);
+    writeStorySave({ kind: "cut", clip: "prologue" });
+    storySaveRef.current = { kind: "cut", clip: "prologue" };
+    setStorySave({ kind: "cut", clip: "prologue" });
     g.storyMode = true;
     void g.ensureFight("hoffer", "agi", "sintertanya");
   };
@@ -635,17 +668,40 @@ export function GameView() {
     setStoryClip(clip);
     storyClipRef.current = clip;
     setStoryPlay(true);
+    writeStorySave({ kind: "cut", clip });
+    storySaveRef.current = { kind: "cut", clip };
+    setStorySave({ kind: "cut", clip });
     g.storyMode = true;
     g.storyCut = null;
+    if (clip === "ch1f6") return;
     if (clip === "ch1f5") void g.ensureFight("hoffer", "jezus", "golgota");
     else if (clip === "ch1f4") void g.ensureFight("hoffer", "farajo", "miskolc");
     else if (clip === "ch1f3") void g.ensureFight("hoffer", "gabi", "nagybatony");
     else if (clip === "ch1f2") void g.ensureFight("hoffer", "cricsi", "sintertanya");
     else void g.ensureFight("hoffer", "agi", "sintertanya");
   };
+  const continueStory = () => {
+    const s = readStorySave();
+    if (!s) return;
+    if (s.kind === "cut") {
+      if (s.clip === "prologue") startStory();
+      else if (s.clip === "ch1f2" || s.clip === "ch1f3" || s.clip === "ch1f4" || s.clip === "ch1f5" || s.clip === "ch1f6") startStoryCut(s.clip);
+      return;
+    }
+    const g = gameRef.current;
+    if (!g) return;
+    g.storyMode = true;
+    setMenuMusicAllowed(false);
+    boot();
+    primeAudio();
+    setAudioReady(true);
+    stopMusic();
+    g.startStoryFight(s.beat);
+  };
   tapStorySkipRef.current = tapStorySkip;
   startStoryRef.current = startStory;
   startStoryCutRef.current = startStoryCut;
+  continueStoryRef.current = continueStory;
 
   const goNewFight = () => {
     const g = gameRef.current;
@@ -861,7 +917,7 @@ export function GameView() {
   }, [hud.screen]);
 
   useEffect(() => {
-    if (hud.storyCut === "ch1f2" || hud.storyCut === "ch1f3" || hud.storyCut === "ch1f4" || hud.storyCut === "ch1f5") startStoryCutRef.current(hud.storyCut);
+    if (hud.storyCut === "ch1f2" || hud.storyCut === "ch1f3" || hud.storyCut === "ch1f4" || hud.storyCut === "ch1f5" || hud.storyCut === "ch1f6") startStoryCutRef.current(hud.storyCut);
   }, [hud.storyCut]);
 
   useEffect(() => {
@@ -983,6 +1039,29 @@ export function GameView() {
         raf = requestAnimationFrame(tick);
         return;
       }
+      if (storyThanksRef.current) {
+        const m = sampleMenu();
+        const c = confirmRef.current;
+        if (c) {
+          const ok = !gated() && (m.kickLP || m.punchLP || m.punchRP || m.startP);
+          const back = !gated() && m.kickRP;
+          if (m.leftP) setConfirmChoice(0);
+          if (m.rightP) setConfirmChoice(1);
+          if (ok) {
+            armGate();
+            if (confirmChoiceRef.current === 0) c.yes();
+            else setConfirm(null);
+          } else if (back) {
+            armGate();
+            setConfirm(null);
+          }
+        } else if (!gated() && (m.kickLP || m.punchLP || m.startP)) {
+          armGate();
+          ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+        }
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       if (h.screen === "title") {
         if (g.storyMode) {
           raf = requestAnimationFrame(tick);
@@ -1041,7 +1120,9 @@ export function GameView() {
             }
           }
         } else if (menuRef.current === "onep") {
-          if (m.upP || m.downP) setTitleIdx((i) => (i === 0 ? 1 : 0));
+          const n = storySaveRef.current ? 3 : 2;
+          if (m.upP) setTitleIdx((i) => (i + n - 1) % n);
+          if (m.downP) setTitleIdx((i) => (i + 1) % n);
           if (!gated() && m.kickRP) {
             armGate();
             setTitleIdx(0);
@@ -1049,7 +1130,12 @@ export function GameView() {
           }
           if (ok) {
             armGate();
-            if (titleIdxRef.current === 0) startStoryRef.current();
+            const i = titleIdxRef.current;
+            const has = !!storySaveRef.current;
+            if (i === 0) {
+              if (has) ask("Új történetet kezdesz? A mentés felülíródik.", () => startStoryRef.current());
+              else startStoryRef.current();
+            } else if (has && i === 1) continueStoryRef.current();
             else {
               boot();
               setMenu("diff");
@@ -1060,7 +1146,7 @@ export function GameView() {
           if (m.downP || m.rightP) setDiff((d) => diffs[(diffs.indexOf(d) + 1) % diffs.length]);
           if (!gated() && m.kickRP) {
             armGate();
-            setTitleIdx(1);
+            setTitleIdx(storySaveRef.current ? 2 : 1);
             setMenu("onep");
           }
           if (ok) {
@@ -1517,10 +1603,31 @@ export function GameView() {
         </div>
       )}
 
+      {storyThanks && (
+        <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-black px-6 text-center">
+          <p className="font-display max-w-3xl text-2xl leading-snug text-white sm:text-4xl [text-shadow:0_2px_8px_#000]">
+            Köszönöm, hogy kipróbáltad a Sinter Kombatot! Hamarosan folytatjuk!
+          </p>
+          {confirm ? (
+            <div className="mt-8">
+              <ConfirmBox q={confirm.q} choice={confirmChoice} onYes={confirm.yes} onNo={() => setConfirm(null)} />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => ask("Biztos vissza akarsz lépni a főmenübe?", goTitle)}
+              className="font-display mt-10 min-h-11 px-6 text-2xl text-gold sm:text-3xl"
+            >
+              ▸ Vissza a menübe
+            </button>
+          )}
+        </div>
+      )}
+
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
-            src={asset("/ui/mainmenu-v54.jpg?v=55")}
+            src={asset("/ui/mainmenu-v58.jpg?v=58")}
             alt=""
             className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
             style={{ objectPosition: "center 18%" }}
@@ -1577,16 +1684,20 @@ export function GameView() {
               : menu === "onep"
                 ? (
                     [
-                      { label: "Történet", i: 0 },
-                      { label: "1 Játékos VS CPU", i: 1 },
+                      { label: "Történet", id: "story" },
+                      ...(storySave ? [{ label: "Folytatás", id: "continue" }] : []),
+                      { label: "1 Játékos VS CPU", id: "cpu" },
                     ] as const
-                  ).map((item) => (
+                  ).map((item, i) => (
                     <button
-                      key={item.i}
+                      key={item.id}
                       type="button"
                       onClick={() => {
-                        setTitleIdx(item.i);
-                        if (item.i === 0) startStory();
+                        setTitleIdx(i);
+                        if (item.id === "story") {
+                          if (storySave) ask("Új történetet kezdesz? A mentés felülíródik.", startStory);
+                          else startStory();
+                        } else if (item.id === "continue") continueStory();
                         else {
                           boot();
                           setMenu("diff");
@@ -1597,10 +1708,10 @@ export function GameView() {
                           ? "min-h-0 px-3 py-0.5 text-[clamp(15px,4.2vh,20px)] leading-tight"
                           : "min-h-11 min-w-64 px-6 text-2xl sm:text-3xl"
                       } ${
-                        titleIdx === item.i ? "text-gold" : "text-white/90 hover:text-fg"
+                        titleIdx === i ? "text-gold" : "text-white/90 hover:text-fg"
                       }`}
                     >
-                      {titleIdx === item.i ? `▸ ${item.label}` : item.label}
+                      {titleIdx === i ? `▸ ${item.label}` : item.label}
                     </button>
                   ))
               : DIFFICULTIES.map((d) => (
@@ -1632,7 +1743,7 @@ export function GameView() {
                 type="button"
                 onClick={() => {
                   if (menu === "diff") {
-                    setTitleIdx(1);
+                    setTitleIdx(storySave ? 2 : 1);
                     setMenu("onep");
                   } else {
                     setTitleIdx(0);
