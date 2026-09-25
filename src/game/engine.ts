@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol" | "arpadhid";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol", "arpadhid"];
-export const GAME_VERSION = "v0.57";
+export const GAME_VERSION = "v0.58";
 /** Special splash texts (Büdi, Dühroham, stb.) — keep strings, hide in-game. */
 export const SHOW_SPECIAL_CALLOUTS = false;
 export type Difficulty = "easy" | "normal" | "hard" | "szopni";
@@ -1826,11 +1826,14 @@ export class KitchenKombat {
     this.trainMeter = false;
     this.storyBeat = beat;
     this.storyCut = null;
+    this.difficulty = beat === 5 ? "szopni" : "easy";
     this.p1id = "hoffer";
     const fights: { p2: CharId; stage: StageId }[] = [
       { p2: "agi", stage: "sintertanya" },
       { p2: "cricsi", stage: "sintertanya" },
       { p2: "gabi", stage: "nagybatony" },
+      { p2: "farajo", stage: "miskolc" },
+      { p2: "jezus", stage: "golgota" },
     ];
     const next = fights[Math.max(0, Math.min(fights.length, beat) - 1)]!;
     this.p2id = next.p2;
@@ -2997,6 +3000,7 @@ export class KitchenKombat {
 
   hurtHp(f: Fighter, n: number) {
     if (n <= 0) return;
+    if (this.storyMode && this.storyBeat === 5 && f === this.f2) return;
     f.hp = Math.max(0, f.hp - n);
     f.lastHurtT = 0;
   }
@@ -3442,6 +3446,12 @@ export class KitchenKombat {
 
   timeOver() {
     if (this.phase !== "fight") return;
+    if (this.storyMode && this.storyBeat === 5) {
+      sfxPlay.ko();
+      sfxPlay.charDefeat(this.f1.id);
+      this.roundWin(this.f2);
+      return;
+    }
     if (this.f1.hp === this.f2.hp) {
       this.callout = "DÖNTETLEN";
       this.calloutT = 2;
@@ -3469,6 +3479,25 @@ export class KitchenKombat {
         this.pushHud();
         return;
       }
+      if (this.storyBeat === 3) {
+        this.storyCut = "ch1f4";
+        this.phase = "end";
+        this.pushHud();
+        return;
+      }
+      if (this.storyBeat === 4) {
+        this.storyCut = "ch1f5";
+        this.phase = "end";
+        this.pushHud();
+        return;
+      }
+    }
+    if (this.storyMode && this.storyBeat === 5) {
+      this.winner = this.p2id;
+      this.screen = "result";
+      this.phase = "end";
+      this.pushHud();
+      return;
     }
     this.screen = "result";
     this.phase = "end";

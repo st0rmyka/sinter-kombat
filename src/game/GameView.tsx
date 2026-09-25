@@ -27,6 +27,14 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.58",
+    items: [
+      "Történet: CH1_F4 után Hoffer vs Fárajó, Miskolc - Avas",
+      "CH1_F5 után Hoffer vs Jézus, Golgota: Jézus sérthetetlen, Szopni fogsz, a vereség visz a fejezet végére",
+      "Story harcok könnyű nehézségen, sima vereségnél Újra / Főmenü",
+    ],
+  },
+  {
     v: "v0.57",
     items: [
       "2 Játékos: két azonos kontroller külön P1 / P2",
@@ -374,13 +382,16 @@ function nudgeSetting(i: number, dir: number) {
   applyMix();
 }
 
-type StoryClip = "prologue" | "ch1f2" | "ch1f3";
+type StoryClip = "prologue" | "ch1f2" | "ch1f3" | "ch1f4" | "ch1f5";
 const STORY_VID: Record<StoryClip, string> = {
   prologue: "/story/Chapter1_Prologue.mp4",
   ch1f2: "/story/CH1_F2.mp4",
   ch1f3: "/story/CH1_F3.mp4",
+  ch1f4: "/story/CH1_F4.mp4",
+  ch1f5: "/story/CH1_F5.mp4",
 };
-const storyBeatAfter = (clip: StoryClip) => (clip === "ch1f3" ? 3 : clip === "ch1f2" ? 2 : 1);
+const storyBeatAfter = (clip: StoryClip) =>
+  clip === "ch1f5" ? 5 : clip === "ch1f4" ? 4 : clip === "ch1f3" ? 3 : clip === "ch1f2" ? 2 : 1;
 
 const emptyHud = (): Hud => ({
   screen: "title",
@@ -626,7 +637,9 @@ export function GameView() {
     setStoryPlay(true);
     g.storyMode = true;
     g.storyCut = null;
-    if (clip === "ch1f3") void g.ensureFight("hoffer", "gabi", "nagybatony");
+    if (clip === "ch1f5") void g.ensureFight("hoffer", "jezus", "golgota");
+    else if (clip === "ch1f4") void g.ensureFight("hoffer", "farajo", "miskolc");
+    else if (clip === "ch1f3") void g.ensureFight("hoffer", "gabi", "nagybatony");
     else if (clip === "ch1f2") void g.ensureFight("hoffer", "cricsi", "sintertanya");
     else void g.ensureFight("hoffer", "agi", "sintertanya");
   };
@@ -656,6 +669,14 @@ export function GameView() {
     setConfirm(null);
     setHelp(false);
     g.beginMatch();
+  };
+
+  const goStoryRetry = () => {
+    const g = gameRef.current;
+    if (!g) return;
+    setConfirm(null);
+    setMenuMusicAllowed(false);
+    g.startStoryFight(g.storyBeat || 1);
   };
 
   const goTrainChars = () => {
@@ -840,7 +861,7 @@ export function GameView() {
   }, [hud.screen]);
 
   useEffect(() => {
-    if (hud.storyCut === "ch1f2" || hud.storyCut === "ch1f3") startStoryCutRef.current(hud.storyCut);
+    if (hud.storyCut === "ch1f2" || hud.storyCut === "ch1f3" || hud.storyCut === "ch1f4" || hud.storyCut === "ch1f5") startStoryCutRef.current(hud.storyCut);
   }, [hud.storyCut]);
 
   useEffect(() => {
@@ -1319,7 +1340,16 @@ export function GameView() {
             else ask("Biztos ki akarsz lépni a játékból?", goExit);
           }
         } else if (h.screen === "result") {
-          if (h.story) {
+          const storyScripted = h.story && h.storyBeat === 5;
+          const lost = h.story && !!h.winner && h.winner !== h.p1 && !storyScripted;
+          if (lost) {
+            if (m.upP) setResultIdx((i) => (i === 0 ? 1 : 0));
+            if (m.downP) setResultIdx((i) => (i === 0 ? 1 : 0));
+            if (ok) {
+              if (resultIdxRef.current === 0) ask("Újrapróbálod ezt a harcot?", goStoryRetry);
+              else ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+            }
+          } else if (h.story) {
             if (m.upP || m.downP) setResultIdx(1);
             if (ok && resultIdxRef.current === 1) ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
           } else {
@@ -2017,7 +2047,13 @@ export function GameView() {
           )}
           <div className={`absolute inset-y-0 right-0 flex w-[48%] max-w-[28rem] flex-col items-center justify-center gap-3 bg-gradient-to-l from-black/80 via-black/55 to-transparent px-8 py-6 sm:w-[42%] ${hud.story ? "left-0 right-0 w-full max-w-none bg-black/70" : ""}`}>
             <h2 className="font-display text-center text-3xl sm:text-4xl">
-              {hud.story ? "ELSŐ FEJEZET" : hud.winner ? winLine(hud.winner) : "DÖNTETLEN"}
+              {hud.story && hud.winner && hud.winner !== hud.p1 && hud.storyBeat !== 5
+                ? "VERESÉG"
+                : hud.story
+                  ? "ELSŐ FEJEZET"
+                  : hud.winner
+                    ? winLine(hud.winner)
+                    : "DÖNTETLEN"}
             </h2>
             {!hud.story && hud.fatality && <p className="text-gold text-xl">{hud.fatality}</p>}
             {confirm ? (
@@ -2027,6 +2063,27 @@ export function GameView() {
                 onYes={confirm.yes}
                 onNo={() => setConfirm(null)}
               />
+            ) : hud.story && hud.winner && hud.winner !== hud.p1 && hud.storyBeat !== 5 ? (
+              <>
+                <MenuBtn
+                  active={resultIdx === 0}
+                  onClick={() => {
+                    setResultIdx(0);
+                    ask("Újrapróbálod ezt a harcot?", goStoryRetry);
+                  }}
+                >
+                  Újra
+                </MenuBtn>
+                <MenuBtn
+                  active={resultIdx === 1}
+                  onClick={() => {
+                    setResultIdx(1);
+                    ask("Biztos vissza akarsz lépni a főmenübe?", goTitle);
+                  }}
+                >
+                  Főmenü
+                </MenuBtn>
+              </>
             ) : hud.story ? (
               <>
                 <MenuBtn active={false} disabled>
