@@ -44,7 +44,7 @@ export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | 
 export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo", "brendon"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol" | "arpadhid";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol", "arpadhid"];
-export const GAME_VERSION = "v0.61";
+export const GAME_VERSION = "v0.62";
 
 const STORY_SAVE_KEY = "sk-story-v1";
 export type StorySave = { kind: "cut"; clip: string } | { kind: "fight"; beat: number };

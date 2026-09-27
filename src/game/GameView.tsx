@@ -27,6 +27,10 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.62",
+    items: ["Bal alsó sarok: Támogatás doboz QR-kóddal a verziószám felett"],
+  },
+  {
     v: "v0.61",
     items: [
       "Új főmenü háttér",
@@ -2340,11 +2344,26 @@ export function GameView() {
 
       {touchUi && !landscape && <RotateHint />}
 
-      <div
-        className="pointer-events-none absolute bottom-2 left-3 z-30 font-display text-[11px] tracking-[0.18em] text-white/75"
-        style={{ textShadow: "0 1px 2px #000" }}
-      >
-        {GAME_VERSION}
+      <div className="pointer-events-none absolute bottom-2 left-3 z-30 flex flex-col items-start gap-1.5">
+        <div className="flex flex-col items-center gap-1 rounded-md border border-[#e2c15a]/80 bg-black/80 px-2 py-1.5">
+          <span
+            className="font-display text-[11px] tracking-[0.16em] text-[#e2c15a]"
+            style={{ textShadow: "0 1px 2px #000" }}
+          >
+            Támogatás
+          </span>
+          <img
+            src={asset("/ui/tamogatas-qr.png")}
+            alt="Támogatás"
+            className="h-20 w-20 bg-white p-0.5"
+          />
+        </div>
+        <div
+          className="font-display text-[11px] tracking-[0.18em] text-white/75"
+          style={{ textShadow: "0 1px 2px #000" }}
+        >
+          {GAME_VERSION}
+        </div>
       </div>
 
       <button
