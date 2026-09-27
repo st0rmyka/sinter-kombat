@@ -40,11 +40,11 @@ declare global {
   }
 }
 
-export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti" | "alfonz" | "leo";
-export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo"];
+export type CharId = "renike" | "ricsi" | "cica" | "agi" | "cricsi" | "jezus" | "hoffer" | "farajo" | "gabi" | "isti" | "alfonz" | "leo" | "brendon";
+export const CHAR_IDS: CharId[] = ["renike", "ricsi", "cica", "agi", "cricsi", "jezus", "hoffer", "farajo", "gabi", "isti", "alfonz", "leo", "brendon"];
 export type StageId = "kitchen" | "sintertanya" | "kisterenye" | "golgota" | "nepszinhaz" | "salgotarjan" | "nagybatony" | "maconka" | "miskolc" | "ozd" | "kispest" | "hosutca" | "pokol" | "arpadhid";
 export const STAGE_IDS: StageId[] = ["sintertanya", "kisterenye", "golgota", "nepszinhaz", "salgotarjan", "nagybatony", "maconka", "miskolc", "ozd", "kispest", "hosutca", "pokol", "arpadhid"];
-export const GAME_VERSION = "v0.6";
+export const GAME_VERSION = "v0.61";
 
 const STORY_SAVE_KEY = "sk-story-v1";
 export type StorySave = { kind: "cut"; clip: string } | { kind: "fight"; beat: number };
@@ -139,7 +139,7 @@ type Atk = {
   cancel: AtkId[];
   low?: boolean;
   unblockable?: boolean;
-  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot" | "meteor" | "stomp" | "warp" | "bike" | "assist";
+  zone?: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "spin" | "brush" | "note" | "solo" | "bat" | "shot" | "meteor" | "stomp" | "warp" | "bike" | "assist" | "knife" | "stab";
   pounce?: boolean;
   heal?: number;
   shield?: boolean;
@@ -685,6 +685,42 @@ const SPECIAL_PITBULL: Atk = {
   cancel: [],
   zone: "assist",
 };
+const SPECIAL_KNIVES: Atk = {
+  id: "special",
+  pose: "special",
+  startup: 0.22,
+  active: 0.7,
+  recover: 0.34,
+  dmg: 9.9,
+  hitstun: 0.24,
+  blockstun: 0.14,
+  knock: 140,
+  cost: 50,
+  hx: 0,
+  hy: 0,
+  hw: 1,
+  hh: 1,
+  cancel: [],
+  zone: "knife",
+};
+const SPECIAL_STAB: Atk = {
+  id: "special2",
+  pose: "special2",
+  startup: 0.1,
+  active: 0.62,
+  recover: 0.28,
+  dmg: 8.855,
+  hitstun: 0.16,
+  blockstun: 0.1,
+  knock: 70,
+  cost: 50,
+  hx: 24,
+  hy: 168,
+  hw: 148,
+  hh: 110,
+  cancel: [],
+  zone: "stab",
+};
 
 function special1For(id: CharId): Atk {
   if (id === "cica") return SPECIAL_TIGER;
@@ -697,6 +733,7 @@ function special1For(id: CharId): Atk {
   if (id === "isti") return SPECIAL_METEOR;
   if (id === "alfonz") return SPECIAL_HUFF;
   if (id === "leo") return SPECIAL_HEKTOR;
+  if (id === "brendon") return SPECIAL_KNIVES;
   return SPECIAL;
 }
 function special2For(id: CharId): Atk {
@@ -711,6 +748,7 @@ function special2For(id: CharId): Atk {
   if (id === "isti") return SPECIAL_STOMP;
   if (id === "alfonz") return SPECIAL_WARP;
   if (id === "leo") return SPECIAL_PITBULL;
+  if (id === "brendon") return SPECIAL_STAB;
   return SPECIAL2_VAMP;
 }
 
@@ -845,6 +883,13 @@ export const CHARACTERS: Record<
     special2: "PITBULL TERRIER",
     fatality: "",
   },
+  brendon: {
+    name: "LAKATOS BRENDON",
+    title: "A Késes",
+    special: "KÉSDOBÁS",
+    special2: "SZURKÁLÁS",
+    fatality: "",
+  },
 };
 
 export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
@@ -896,6 +941,10 @@ export const CHAR_SKILLS: Record<CharId, { s1: string; s2: string }> = {
     s1: "L1 Hektor — rámutat, Hektor átbiciklizik a pályán. Blokkolható és átugorható.",
     s2: "R1 Pitbull Terrier — füstben megjelenik, hátba rúgja az ellenfelet Leonidasz felé, majd eltűnik. Blokkolható.",
   },
+  brendon: {
+    s1: "L1 Késdobás — három kés egymás után. Az első kettő mellmagasságban, a harmadik spárgából alul. A magas kés guggolással kerülhető, az alsót csak guggoló blokk fogja.",
+    s2: "R1 Szurkálás — előretolja magát, és késsel gyorsan megszúrja az ellenfelet. Blokkolható.",
+  },
 };
 
 export const STAGES: Record<StageId, { id: StageId; name: string; nameHu: string; art: string; blur: string }> = {
@@ -922,7 +971,7 @@ export const ROUND_CALL: Record<number, string> = {
 };
 
 export function winLine(id: CharId) {
-  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi", isti: "MC Isti", alfonz: "Szipus Alfonz", leo: "Leonidasz" }[id];
+  const n = { renike: "Renike", ricsi: "Ricsi", cica: "Cica", agi: "Ági", cricsi: "Cigányricsi", jezus: "Jézus", hoffer: "Hoffer Józsi", farajo: "Fárajó", gabi: "Gabi", isti: "MC Isti", alfonz: "Szipus Alfonz", leo: "Leonidasz", brendon: "Lakatos Brendon" }[id];
   return `${n} a Győztes!`;
 }
 
@@ -939,6 +988,7 @@ export const VICTORY_ART: Partial<Record<CharId, string>> = {
   isti: "/ui/victory/Victory_Isti.png",
   alfonz: "/ui/victory/Victory_Alfonz.png",
   leo: "/ui/victory/Victory_Leonidasz.png",
+  brendon: "/ui/victory/Victory_LakatosBrendon.png",
 };
 
 export const VS_ART: Partial<Record<CharId, string>> = {
@@ -954,17 +1004,18 @@ export const VS_ART: Partial<Record<CharId, string>> = {
   isti: "/ui/vs/isti.jpg",
   alfonz: "/ui/vs/alfonz.jpg",
   leo: "/ui/vs/leo.jpg",
+  brendon: "/ui/vs/brendon.jpg",
 };
 
 export function vsJpgUrl(id: CharId) {
-  return `/ui/vs/${id}.jpg?v=44`;
+  return `/ui/vs/${id}.jpg?v=45`;
 }
 export function vsPngUrl(id: CharId) {
-  return `/ui/vs/${id}.png?v=44`;
+  return `/ui/vs/${id}.png?v=45`;
 }
 export function victoryUrl(id: CharId) {
   const base = VICTORY_ART[id]?.split("?")[0];
-  return base ? `${base}?v=272` : "";
+  return base ? `${base}?v=273` : "";
 }
 
 const W = 1280;
@@ -1154,6 +1205,7 @@ type ImgBag = {
   isti: Record<Pose, HTMLImageElement>;
   alfonz: Record<Pose, HTMLImageElement>;
   leo: Record<Pose, HTMLImageElement>;
+  brendon: Record<Pose, HTMLImageElement>;
   anims: Record<CharId, Partial<Record<AtkId, HTMLImageElement[]>>>;
   stage: HTMLImageElement;
 };
@@ -1251,6 +1303,7 @@ export class KitchenKombat {
   hektorImg: HTMLImageElement | null = null;
   pitbullImg: HTMLImageElement | null = null;
   smokeImg: HTMLImageElement | null = null;
+  knifeImg: HTMLImageElement | null = null;
   bulletImg: HTMLImageElement | null = null;
   rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
@@ -1291,6 +1344,7 @@ export class KitchenKombat {
   finishT = 0;
   winAnnounceId: CharId | null = null;
   winAnnounceT = 0;
+  winAnnounced = false;
   callout: string | null = null;
   calloutT = 0;
   combo = 0;
@@ -1332,7 +1386,7 @@ export class KitchenKombat {
   dummyKeys: string[] = [];
   zones: {
     owner: Fighter;
-    kind: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "brush" | "note" | "solo" | "shot" | "bike" | "assist";
+    kind: "cloud" | "beam" | "quake" | "spit" | "ki" | "pillar" | "brush" | "note" | "solo" | "shot" | "bike" | "assist" | "knife";
     x: number;
     y: number;
     w: number;
@@ -1538,10 +1592,11 @@ export class KitchenKombat {
       isti: {} as Record<Pose, HTMLImageElement>,
       alfonz: {} as Record<Pose, HTMLImageElement>,
       leo: {} as Record<Pose, HTMLImageElement>,
+      brendon: {} as Record<Pose, HTMLImageElement>,
     };
-    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {} };
+    const anims: ImgBag["anims"] = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {}, brendon: {} };
     this.images = { ...bags, anims, stage: emptyImg() };
-    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {} };
+    this.boxes = { renike: {}, ricsi: {}, cica: {}, agi: {}, cricsi: {}, jezus: {}, hoffer: {}, farajo: {}, gabi: {}, isti: {}, alfonz: {}, leo: {}, brendon: {} };
     this.menuReady = false;
     this.loadPct = 0.12;
     this.hudKey = "";
@@ -1562,7 +1617,7 @@ export class KitchenKombat {
         /* ignore */
       }
     };
-    const MENU_SRC = "/ui/mainmenu-v58.jpg?v=58";
+    const MENU_SRC = "/ui/mainmenu-v60.jpg?v=60";
     const later = [
       "/ui/ko.png?v=1",
       "/ui/selection.jpg",
@@ -1656,7 +1711,7 @@ export class KitchenKombat {
       "punchL","punchR","kickL","kickR","block","dash","jumpPunchL","jumpPunchR",
       "jumpKickL","jumpKickR","lowPunchL","lowPunchR","lowKickL","lowKickR","special2","crouch",
     ];
-    const bust = "?v=110";
+    const bust = "?v=126";
     const poseFile = (p: Pose) => (p === "special2" ? "spec2" : p);
     const ids: CharId[] = p1 === p2 ? [p1] : [p1, p2];
     const jobs: Array<() => Promise<void>> = [];
@@ -1709,6 +1764,7 @@ export class KitchenKombat {
       jobs.push(async () => { this.hektorImg = await loadTick(`/fx/hektor.png${bust}`); });
       jobs.push(async () => { this.pitbullImg = await loadTick(`/fx/pitbull.png${bust}`); });
       jobs.push(async () => { this.smokeImg = await loadTick(`/fx/smoke.png${bust}`); });
+      jobs.push(async () => { this.knifeImg = await loadTick(`/fx/knife.png${bust}`); });
     }
     const audioN = sfxFightList(ids).length + musicFightList(stageId).length;
     const total = Math.max(1, jobs.length + audioN);
@@ -2015,6 +2071,7 @@ export class KitchenKombat {
     this.comboName = null;
     this.winAnnounceId = null;
     this.winAnnounceT = 0;
+    this.winAnnounced = false;
     this.cpuPlan = [];
     this.cpuAirOffense = false;
     sfxPlay.farajoReset();
@@ -2155,6 +2212,7 @@ export class KitchenKombat {
         this.winAnnounceT -= dt;
         if (this.winAnnounceT <= 0 && this.winAnnounceId) {
           sfxPlay.charWin(this.winAnnounceId);
+          this.winAnnounced = true;
           this.callout = winLine(this.winAnnounceId);
           this.calloutT = 5.2;
           this.winAnnounceId = null;
@@ -2166,8 +2224,14 @@ export class KitchenKombat {
           this.pushHud();
           return;
         }
-        if (this.phase === "fatality" || this.f1.wins >= 2 || this.f2.wins >= 2) this.goResult();
-        else {
+        const matchOver = this.phase === "fatality" || this.f1.wins >= 2 || this.f2.wins >= 2;
+        if (matchOver) {
+          if (this.winner && !this.winAnnounced) {
+            sfxPlay.charWin(this.winner);
+            this.winAnnounced = true;
+          }
+          this.goResult();
+        } else {
           this.round += 1;
           this.beginRound();
         }
@@ -2560,8 +2624,7 @@ export class KitchenKombat {
       me.meter >= SUPER_DASH_COST &&
       me.y <= 0 &&
       this.cpuEscapeCd <= 0 &&
-      me.state !== "dash" &&
-      me.state !== "attack"
+      me.state !== "dash"
     ) {
       const pressured = this.cpuPressure > 0.4 || me.hp < MAX_HP * 0.42;
       if (pressured && Math.random() < escapeP) {
@@ -2657,6 +2720,19 @@ export class KitchenKombat {
       if (Math.random() < pMeteor) {
         this.cpuPress(a, "special");
         this.cpuAtkCd = hell ? 0.4 : hard ? 0.7 : 1.05;
+        return a;
+      }
+    }
+
+    if (me.id === "brendon" && me.y <= 0 && me.meter >= 50 && this.cpuAtkCd <= 0) {
+      if (dist > 240 && Math.random() < (hell ? 0.22 : hard ? 0.12 : easy ? 0.05 : 0.08)) {
+        this.cpuPress(a, "special");
+        this.cpuAtkCd = hell ? 0.45 : 0.85;
+        return a;
+      }
+      if (dist < 360 && Math.random() < (hell ? 0.16 : hard ? 0.09 : easy ? 0.04 : 0.06)) {
+        this.cpuPress(a, "special2");
+        this.cpuAtkCd = hell ? 0.4 : 0.75;
         return a;
       }
     }
@@ -2912,6 +2988,31 @@ export class KitchenKombat {
           f.state = "idle";
           f.atk = null;
           f.pose = "idle";
+        }
+        return;
+      }
+      if (f.atk.zone === "knife") {
+        f.pose = "special";
+        f.vx = 0;
+        f.vy = 0;
+        this.tickKnives(f);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          f.state = "idle";
+          f.atk = null;
+          f.pose = "idle";
+        }
+        return;
+      }
+      if (f.atk.zone === "stab") {
+        f.pose = "special2";
+        this.tickStab(f);
+        const total = f.atk.startup + f.atk.active + f.atk.recover;
+        if (f.atkT >= total) {
+          f.state = "idle";
+          f.atk = null;
+          f.pose = "idle";
+          f.vx *= 0.3;
         }
         return;
       }
@@ -3307,7 +3408,7 @@ export class KitchenKombat {
 
   combat(att: Fighter, def: Fighter) {
     if (!att.atk || att.hasHit || att.state !== "attack") return;
-    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.zone === "bat" || att.atk.zone === "shot" || att.atk.zone === "meteor" || att.atk.zone === "stomp" || att.atk.zone === "warp" || att.atk.zone === "bike" || att.atk.zone === "assist" || att.atk.shield || att.atk.rage || att.atk.pull || att.atk.slow) return;
+    if (att.atk.zone === "cloud" || att.atk.zone === "quake" || att.atk.zone === "spit" || att.atk.zone === "ki" || att.atk.zone === "pillar" || att.atk.zone === "spin" || att.atk.zone === "brush" || att.atk.zone === "note" || att.atk.zone === "solo" || att.atk.zone === "bat" || att.atk.zone === "shot" || att.atk.zone === "meteor" || att.atk.zone === "stomp" || att.atk.zone === "warp" || att.atk.zone === "bike" || att.atk.zone === "assist" || att.atk.zone === "knife" || att.atk.zone === "stab" || att.atk.shield || att.atk.rage || att.atk.pull || att.atk.slow) return;
     if (att.atkT < att.atk.startup || att.atkT > att.atk.startup + att.atk.active) return;
     if (def.invuln > 0 || def.state === "ko") return;
     const hb = this.hitbox(att, att.atk);
@@ -3537,6 +3638,9 @@ export class KitchenKombat {
       this.pushHud();
       return;
     }
+    this.callout = null;
+    this.calloutT = 0;
+    this.draw();
     this.screen = "result";
     this.phase = "end";
     if (this.winner && !this.storyMode) sfxPlay.charTaunt(this.winner);
@@ -3772,6 +3876,58 @@ export class KitchenKombat {
     }
   }
 
+  tickKnives(f: Fighter) {
+    if (!f.atk) return;
+    const marks = [0.16, 0.4, 0.64];
+    const low = [false, false, true];
+    while (f.spinAcc < 3 && f.atkT >= marks[f.spinAcc]!) {
+      if (f.spinAcc === 0) this.specialCallout(CHARACTERS[f.id].special, 0.85);
+      this.spawnKnife(f, low[f.spinAcc]!);
+      f.spinAcc += 1;
+    }
+  }
+
+  spawnKnife(f: Fighter, low: boolean) {
+    const dir = f.facing;
+    const w = 42;
+    const h = 14;
+    const x = dir === 1 ? f.x + 40 : f.x - 40 - w;
+    const y = low ? GROUND - f.y - 70 : GROUND - f.y - 198;
+    this.zones.push({
+      owner: f,
+      kind: "knife",
+      x,
+      y,
+      w,
+      h,
+      life: 0.95,
+      dmg: low ? 11 : 8.8,
+      dir,
+      hit: false,
+      arm: 0,
+      jumped: false,
+      noteI: low ? 2 : 0,
+    });
+  }
+
+  tickStab(f: Fighter) {
+    if (!f.atk) return;
+    const st = f.atk.startup;
+    const ac = f.atk.active;
+    if (f.atkT < st) f.vx = f.facing * 240;
+    else if (f.atkT < st + ac) f.vx = f.facing * 640;
+    else f.vx *= 0.82;
+    f.vy = 0;
+    if (f.y < 10) f.y = 0;
+    if (f.atkT < st) return;
+    const i = Math.min(5, Math.floor((f.atkT - st) / 0.1) + 1);
+    if (f.spinAcc === 0) this.specialCallout(CHARACTERS[f.id].special2, 0.85);
+    if (i > f.spinAcc) {
+      f.spinAcc = i;
+      this.spinPulse(f);
+    }
+  }
+
   tickSpin(f: Fighter, dt: number) {
     if (!f.atk || f.atk.zone !== "spin") return;
     if (f.atkT < f.atk.startup) return;
@@ -3937,7 +4093,7 @@ export class KitchenKombat {
     this.specialCallout(CHARACTERS[f.id].special2, 0.7);
     this.trauma = Math.min(1, this.trauma + 0.16);
     this.spawnRockBurst(f.x, GROUND - 8, f.facing);
-    this.spawnRockBurst(f.x, GROUND - 4, -f.facing);
+    this.spawnRockBurst(f.x, GROUND - 4, f.facing === 1 ? -1 : 1);
     rumble(f === this.f1 ? 0 : 1, 200, 0.7);
     if (def.state === "ko" || def.invuln > 0) return;
     if (def.y > 8) return;
@@ -4495,6 +4651,9 @@ export class KitchenKombat {
         z.x += z.dir * 760 * dt;
         z.y += Math.sin(z.life * 18) * 20 * dt;
       }
+      if (z.kind === "knife") {
+        z.x += z.dir * 1120 * dt;
+      }
       if (z.kind === "bike") {
         z.x += z.dir * 1480 * dt;
       }
@@ -4520,7 +4679,7 @@ export class KitchenKombat {
       const def = z.owner === this.f1 ? this.f2 : this.f1;
       const att = z.owner;
       if (def.state === "ko" || def.invuln > 0) continue;
-      if (z.kind !== "spit" && z.kind !== "ki" && z.kind !== "brush" && z.kind !== "note" && z.kind !== "solo" && z.kind !== "shot") {
+      if (z.kind !== "spit" && z.kind !== "ki" && z.kind !== "brush" && z.kind !== "note" && z.kind !== "solo" && z.kind !== "shot" && z.kind !== "knife") {
         if (def.y > 36) z.jumped = true;
         if (z.jumped) continue;
       }
@@ -4536,13 +4695,18 @@ export class KitchenKombat {
         if (ducked) continue;
       }
       const facingOk = def.facing === (def.x <= att.x ? 1 : -1);
-      if ((z.kind === "spit" || z.kind === "brush" || z.kind === "note" || z.kind === "solo" || z.kind === "bike" || z.kind === "assist") && def.state === "block" && facingOk) {
+      if ((z.kind === "spit" || z.kind === "brush" || z.kind === "note" || z.kind === "solo" || z.kind === "bike" || z.kind === "assist" || z.kind === "knife") && def.state === "block" && facingOk) {
+        const lowKnife = z.kind === "knife" && (z.noteI ?? 0) >= 2;
+        if (lowKnife && !def.crouchGuard) {
+          /* standing block does not stop the low knife */
+        } else {
         z.hit = true;
         def.vx = z.dir * 70;
         this.addMeter(def, METER_BLOCK_DEF);
         this.spawnGuardSmoke(def.x, GROUND - 180, z.dir);
         sfxPlay.block();
         continue;
+        }
       }
       if (def.shieldT > 0) {
         z.hit = true;
@@ -4555,10 +4719,10 @@ export class KitchenKombat {
       const dir = z.dir;
       if (z.kind === "assist") this.spawnAssistSmoke(def.x, GROUND - 80);
       this.hurtHp(def, z.dmg);
-      def.vx = z.kind === "assist" ? z.dir * 520 : dir * (z.kind === "ki" ? 420 : z.kind === "note" ? 80 : z.kind === "bike" ? 380 : 240);
-      def.vy = z.kind === "ki" ? 620 : z.kind === "note" ? 160 : z.kind === "assist" ? 180 : z.kind === "bike" ? 220 : 420;
+      def.vx = z.kind === "assist" ? z.dir * 520 : dir * (z.kind === "ki" ? 420 : z.kind === "note" ? 80 : z.kind === "knife" ? ((z.noteI ?? 0) >= 2 ? 260 : 140) : z.kind === "bike" ? 380 : 240);
+      def.vy = z.kind === "ki" ? 620 : z.kind === "note" ? 160 : z.kind === "knife" ? ((z.noteI ?? 0) >= 2 ? 90 : 36) : z.kind === "assist" ? 180 : z.kind === "bike" ? 220 : 420;
       def.y += 2;
-      def.stun = z.kind === "note" ? 0.16 : 0.48;
+      def.stun = z.kind === "note" ? 0.16 : z.kind === "knife" ? 0.26 : 0.48;
       def.state = "hurt";
       def.pose = "hurt";
       def.atk = null;
@@ -4568,7 +4732,7 @@ export class KitchenKombat {
       this.hitstop = 0.09;
       this.trauma = Math.min(1, this.trauma + 0.4);
       this.specialCallout(
-        z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "shot" ? CHARACTERS[att.id].special2 : z.kind === "brush" ? "Kefe dobás!" : z.kind === "note" ? CHARACTERS[att.id].special : z.kind === "bike" ? CHARACTERS[att.id].special : z.kind === "assist" ? CHARACTERS[att.id].special2 : CHARACTERS[att.id].special2,
+        z.kind === "spit" ? "Köpköd a Vámpír!" : z.kind === "shot" ? CHARACTERS[att.id].special2 : z.kind === "brush" ? "Kefe dobás!" : z.kind === "knife" ? CHARACTERS[att.id].special : z.kind === "note" ? CHARACTERS[att.id].special : z.kind === "bike" ? CHARACTERS[att.id].special : z.kind === "assist" ? CHARACTERS[att.id].special2 : CHARACTERS[att.id].special2,
         0.8,
       );
       const cx = z.x + z.w / 2;
@@ -4737,6 +4901,12 @@ export class KitchenKombat {
       const local = (t - st) % cycle;
       return pick(Math.floor((local / cycle) * frames.length));
     }
+    if (f.atk.zone === "knife") {
+      if (t < st) return pick(0);
+      if (t < st + 0.24) return pick(1);
+      if (t < st + ac) return pick(2);
+      return pick(3);
+    }
     if ((f.atk.zone === "note" || f.atk.zone === "solo") && frames.length >= 2) {
       if (t < st) return pick(0);
       const n = Math.min(4, frames.length);
@@ -4781,6 +4951,7 @@ export class KitchenKombat {
       }
       if (f.id === "ricsi") scale *= 1.16;
       if (f.id === "farajo") scale *= 0.76;
+      if (f.id === "brendon") scale *= 0.92;
     }
     if (f.id === "isti") {
       const zone = f.atk?.zone;
@@ -5232,6 +5403,33 @@ export class KitchenKombat {
         ctx.globalAlpha = Math.min(1, z.life / 0.2);
         const s = (z.h / pit.height) * 1.02;
         ctx.drawImage(pit, (-pit.width * s) / 2, -pit.height * s, pit.width * s, pit.height * s);
+      }
+      ctx.restore();
+    }
+    for (const z of this.zones) {
+      if (z.kind !== "knife" || z.hit) continue;
+      const cx = z.x + z.w / 2;
+      const cy = z.y + z.h / 2;
+      const img = this.knifeImg;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(z.dir, 1);
+      ctx.rotate(((z.noteI ?? 0) >= 2 ? 0.35 : -0.2) + Math.sin(this.time * 22 + z.x * 0.01) * 0.12);
+      ctx.globalAlpha = Math.max(0.55, Math.min(1, z.life / 0.3));
+      if (img && img.naturalWidth) {
+        const dw = 30;
+        const dh = 30;
+        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      } else {
+        ctx.fillStyle = "#e4e7ec";
+        ctx.beginPath();
+        ctx.moveTo(34, 0);
+        ctx.lineTo(-8, -5);
+        ctx.lineTo(-8, 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#3a2a1c";
+        ctx.fillRect(-22, -4, 16, 8);
       }
       ctx.restore();
     }

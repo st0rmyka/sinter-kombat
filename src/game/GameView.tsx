@@ -27,6 +27,13 @@ function asStage(id: StageSlot): StageId {
 
 const PATCH_NOTES: { v: string; items: string[] }[] = [
   {
+    v: "v0.61",
+    items: [
+      "Új főmenü háttér",
+      "Lakatos Brendon: az alaptámadások sebzése visszaállt, a specialek maradtak erősebbek",
+    ],
+  },
+  {
     v: "v0.6",
     items: [
       "Új főmenü háttér",
@@ -481,6 +488,7 @@ export function GameView() {
   const [netErr, setNetErr] = useState<string | null>(null);
   const [lobbyTick, setLobbyTick] = useState(0);
   const [audioReady, setAudioReady] = useState(false);
+  const audioReadyRef = useRef(false);
   const [bootFloor, setBootFloor] = useState(0.16);
   const [storyPlay, setStoryPlay] = useState(false);
   const [storyClip, setStoryClip] = useState<StoryClip>("prologue");
@@ -559,6 +567,16 @@ export function GameView() {
     gateUntil.current = performance.now() + 280;
   };
   const gated = () => performance.now() < gateUntil.current;
+  const dismissSplashRef = useRef<() => void>(() => {});
+  dismissSplashRef.current = () => {
+    primeAudio();
+    if (audioReadyRef.current) return;
+    audioReadyRef.current = true;
+    setAudioReady(true);
+    sfxPlay.title();
+    startMenuMusic();
+    armGate();
+  };
 
   useEffect(() => {
     if (!hud.loading) {
@@ -776,6 +794,7 @@ export function GameView() {
 
   const boot = () => {
     primeAudio();
+    audioReadyRef.current = true;
     setAudioReady(true);
     goLandscape();
     if (storyPlayRef.current || gameRef.current?.storyMode) return;
@@ -858,8 +877,7 @@ export function GameView() {
     };
     window.addEventListener("keydown", onKey);
     const onGesture = () => {
-      primeAudio();
-      setAudioReady(true);
+      dismissSplashRef.current();
     };
     window.addEventListener("pointerdown", onGesture, { capture: true });
     window.addEventListener("keydown", onGesture, { capture: true });
@@ -926,6 +944,7 @@ export function GameView() {
 
   useEffect(() => {
     let raf = 0;
+    let splashBlock = false;
     const tick = () => {
       const h = hudRef.current;
       const g = gameRef.current;
@@ -934,6 +953,17 @@ export function GameView() {
         return;
       }
       if (h.loading) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (!audioReadyRef.current) {
+        const m = sampleMenu();
+        const tap =
+          m.punchLP || m.punchRP || m.kickLP || m.kickRP ||
+          m.specialP || m.special2P || m.startP || m.superDashP ||
+          (m.block && !splashBlock);
+        splashBlock = m.block;
+        if (tap) dismissSplashRef.current();
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -1560,10 +1590,7 @@ export function GameView() {
         <div
           className="absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-black/80"
           onPointerDown={() => {
-            primeAudio();
-            setAudioReady(true);
-            sfxPlay.title();
-            startMenuMusic();
+            dismissSplashRef.current();
           }}
         >
           <h2 className="font-display text-gold text-4xl tracking-[0.2em] sm:text-5xl">SINTER KOMBAT</h2>
@@ -1627,7 +1654,7 @@ export function GameView() {
       {hud.screen === "title" && !hud.loading && (
         <div className="fixed inset-0 z-10 flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black">
           <img
-            src={asset("/ui/mainmenu-v58.jpg?v=58")}
+            src={asset("/ui/mainmenu-v60.jpg?v=60")}
             alt=""
             className="pointer-events-none absolute inset-0 h-full w-full max-h-none max-w-none object-cover"
             style={{ objectPosition: "center 18%" }}
@@ -1924,7 +1951,7 @@ export function GameView() {
           </div>
           <div className="relative z-10 w-full border-t border-white/20 bg-zinc-500/45 px-2 py-2.5 shadow-[0_-8px_28px_rgba(0,0,0,0.28)] backdrop-blur-[6px] sm:px-4 sm:py-3">
             <div
-              className={`flex w-full justify-center gap-1.5 ${touchUi ? "flex-wrap" : "flex-nowrap"}`}
+              className="flex w-full flex-wrap justify-center gap-1.5"
             >
             {hud.screen === "stage"
               ? [...STAGE_IDS, "random" as const].map((id) => {
