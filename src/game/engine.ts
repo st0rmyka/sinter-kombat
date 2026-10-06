@@ -1077,6 +1077,7 @@ type ReplayF = {
   crouchGuard: boolean;
   hp: number;
   meter: number;
+  vampLatch: boolean;
 };
 type ReplaySfx = { i: number; k: string; id?: string };
 type ReplaySnap = {
@@ -1116,6 +1117,7 @@ function snapFighter(f: Fighter): ReplayF {
     crouchGuard: f.crouchGuard,
     hp: f.hp,
     meter: f.meter,
+    vampLatch: f.vampLatch,
   };
 }
 function applyFighter(f: Fighter, s: ReplayF) {
@@ -1139,6 +1141,7 @@ function applyFighter(f: Fighter, s: ReplayF) {
   f.crouchGuard = s.crouchGuard;
   f.hp = s.hp;
   f.meter = s.meter;
+  f.vampLatch = s.vampLatch;
 }
 
 type Box = { x: number; y: number; w: number; h: number; foot: number };
@@ -1190,6 +1193,8 @@ type Fighter = {
   lastHurtT: number;
   sameAtkId: AtkId | "";
   sameAtkN: number;
+  vampLatch: boolean;
+  vampStuck: boolean;
 };
 
 type ImgBag = {
@@ -1305,6 +1310,15 @@ export class KitchenKombat {
   smokeImg: HTMLImageElement | null = null;
   knifeImg: HTMLImageElement | null = null;
   bulletImg: HTMLImageElement | null = null;
+  ricsiCrouchBlock: HTMLImageElement | null = null;
+  ricsiLow: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  ricsiAir: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  renikeCrouchBlock: HTMLImageElement | null = null;
+  renikeLow: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  renikeAir: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  cricsiCrouchBlock: HTMLImageElement | null = null;
+  cricsiLow: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  cricsiAir: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
   rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
   phase: "intro" | "fight" | "ko" | "replay" | "finish" | "fatality" | "end" = "intro";
@@ -1570,6 +1584,8 @@ export class KitchenKombat {
       lastHurtT: 9,
       sameAtkId: "",
       sameAtkN: 0,
+      vampLatch: false,
+      vampStuck: false,
     };
   }
 
@@ -1680,6 +1696,7 @@ export class KitchenKombat {
       this.vsLoadPct = 1;
       this.hudKey = "";
       this.pushHud();
+      void this.patchMoveFrames(p1 === p2 ? [p1] : [p1, p2]);
       return;
     }
     this.fightReady = false;
@@ -1797,6 +1814,7 @@ export class KitchenKombat {
     };
     try {
       await runPool(jobs, 8);
+      await this.patchMoveFrames(ids);
       await Promise.race([
         preloadSfx(tick, sfxFightList(ids), musicFightList(stageId)).catch(() => undefined),
         new Promise<void>((r) => window.setTimeout(r, 4000)),
@@ -1817,6 +1835,208 @@ export class KitchenKombat {
     this.vsLoadPct = 1;
     this.hudKey = "";
     this.pushHud();
+  }
+
+  releaseVamp(f: Fighter) {
+    const other = f === this.f1 ? this.f2 : this.f1;
+    if (f.vampLatch) {
+      f.vampLatch = false;
+      other.vampStuck = false;
+      other.stun = Math.min(other.stun, 0.12);
+    }
+    if (f.vampStuck) {
+      f.vampStuck = false;
+      f.stun = Math.min(f.stun, 0.12);
+      if (other.vampLatch) {
+        other.vampLatch = false;
+        if (other.id === "agi" && other.state === "attack" && other.atk?.id === "special2") {
+          other.atkT = Math.max(other.atkT, other.atk.startup + other.atk.active);
+        }
+      }
+    }
+  }
+
+  stickVamp() {
+    const pin = (att: Fighter, def: Fighter) => {
+      if (!att.vampLatch && !def.vampStuck) return;
+      if (!att.vampLatch || !def.vampStuck || att.state !== "attack" || def.hp <= 0 || def.state === "ko" || def.superDash) {
+        this.releaseVamp(att.vampLatch ? att : def);
+        return;
+      }
+      att.vx = 0;
+      att.vy = 0;
+      att.y = 0;
+      def.x = Math.max(80, Math.min(W - 80, att.x + att.facing * 86));
+      def.y = 0;
+      def.vx = 0;
+      def.vy = 0;
+      def.facing = att.facing === 1 ? -1 : 1;
+    };
+    pin(this.f1, this.f2);
+    pin(this.f2, this.f1);
+  }
+
+  async patchMoveFrames(ids: CharId[]) {
+    if (!this.images) return;
+    const load = (src: string) =>
+      new Promise<HTMLImageElement>((res) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => res(im);
+        im.src = asset(src);
+      });
+    const ok = (im: HTMLImageElement) => (im.naturalWidth || im.width) > 8;
+    const bust = "?v=127";
+    if (ids.includes("agi")) {
+      const frames = await Promise.all([
+        load(`/sprites/agi/spec2.png${bust}`),
+        load(`/sprites/agi/spec2a.png${bust}`),
+        load(`/sprites/agi/spec2b.png${bust}`),
+        load(`/sprites/agi/spec2c.png${bust}`),
+        load(`/sprites/agi/idle.png${bust}`),
+      ]);
+      if (frames.every(ok)) this.images.anims.agi.special2 = frames;
+    }
+    if (ids.includes("ricsi")) {
+      const bustR = "?v=128";
+      const grab = (name: string) => load(`/sprites/ricsi/${name}.png${bustR}`);
+      const [idle, kickRwind, kickR, kickLwind, kickLhit, punchL, punchRhit, crouch, crouchBlock, lowPL, lowPR, lowKL, lowKR] = await Promise.all([
+        grab("idle"),
+        grab("kickRwind"),
+        grab("kickR"),
+        grab("kickLwind"),
+        grab("kickLhit"),
+        grab("punchL"),
+        grab("punchRhit"),
+        grab("crouchReal"),
+        grab("crouchBlock"),
+        grab("lowPunchLhit"),
+        grab("lowPunchRhit"),
+        grab("lowKickLhit"),
+        grab("lowKickRhit"),
+      ]);
+      if ([idle, kickRwind, kickR].every(ok)) this.images.anims.ricsi.kickR = [idle, kickRwind, kickR, idle];
+      if ([idle, kickLwind, kickLhit].every(ok)) this.images.anims.ricsi.kickL = [idle, kickLwind, kickLhit, idle];
+      if ([idle, punchL].every(ok)) this.images.anims.ricsi.punchL = [idle, punchL, idle];
+      if ([idle, punchRhit].every(ok)) this.images.anims.ricsi.punchR = [idle, punchRhit, idle];
+      if (ok(crouch)) this.images.ricsi.crouch = crouch;
+      if (ok(crouchBlock)) this.ricsiCrouchBlock = crouchBlock;
+      if ([crouch, lowPL, lowPR, lowKL, lowKR].every(ok)) {
+        this.ricsiLow = {
+          punchL: [crouch, lowPL, crouch],
+          punchR: [crouch, lowPR, crouch],
+          kickL: [crouch, lowKL, crouch],
+          kickR: [crouch, lowKR, crouch],
+        };
+      }
+      const [jump, jumpPL, jumpPR, jumpKL, jumpKR] = await Promise.all([
+        grab("jump"),
+        grab("jumpPunchL"),
+        grab("jumpPunchRhit"),
+        grab("jumpKickLhit"),
+        grab("jumpKickR"),
+      ]);
+      if ([jump, idle, jumpPL, jumpPR, jumpKL, jumpKR].every(ok)) {
+        this.ricsiAir = {
+          punchL: [jump, jumpPL, jump, idle],
+          punchR: [jump, jumpPR, jump, idle],
+          kickL: [jump, jumpKL, jump, idle],
+          kickR: [jump, jumpKR, jump, idle],
+        };
+      }
+    }
+    if (ids.includes("renike")) {
+      const bustN = "?v=129";
+      const grab = (name: string) => load(`/sprites/renike/${name}.png${bustN}`);
+      const [idle, kickRwind, kickR, kickLwind, kickLhit, punchL, punchR, crouch, crouchBlock, lowPL, lowPR, lowKL, lowKR, jump, jumpPL, jumpPR, jumpKL, jumpKR] = await Promise.all([
+        grab("idle"),
+        grab("kickRwind"),
+        grab("kickR"),
+        grab("kickLwind"),
+        grab("kickLhit"),
+        grab("punchL"),
+        grab("punchR"),
+        grab("crouchReal"),
+        grab("crouchBlock"),
+        grab("lowPunchLhit"),
+        grab("lowPunchR"),
+        grab("lowKickLhit"),
+        grab("lowKickRhit"),
+        grab("jump"),
+        grab("jumpPunchLhit"),
+        grab("jumpPunchRhit"),
+        grab("jumpKickLhit"),
+        grab("jumpKickRhit"),
+      ]);
+      if ([idle, kickRwind, kickR].every(ok)) this.images.anims.renike.kickR = [idle, kickRwind, kickR, idle];
+      if ([idle, kickLwind, kickLhit].every(ok)) this.images.anims.renike.kickL = [idle, kickLwind, kickLhit, idle];
+      if ([idle, punchL].every(ok)) this.images.anims.renike.punchL = [idle, punchL, idle];
+      if ([idle, punchR].every(ok)) this.images.anims.renike.punchR = [idle, punchR, idle];
+      if (ok(crouch)) this.images.renike.crouch = crouch;
+      if (ok(crouchBlock)) this.renikeCrouchBlock = crouchBlock;
+      if ([crouch, lowPL, lowPR, lowKL, lowKR].every(ok)) {
+        this.renikeLow = {
+          punchL: [crouch, lowPL, crouch],
+          punchR: [crouch, lowPR, crouch],
+          kickL: [crouch, lowKL, crouch],
+          kickR: [crouch, lowKR, crouch],
+        };
+      }
+      if ([jump, idle, jumpPL, jumpPR, jumpKL, jumpKR].every(ok)) {
+        this.renikeAir = {
+          punchL: [jump, jumpPL, jump, idle],
+          punchR: [jump, jumpPR, jump, idle],
+          kickL: [jump, jumpKL, jump, idle],
+          kickR: [jump, jumpKR, jump, idle],
+        };
+      }
+    }
+    if (ids.includes("cricsi")) {
+      const bustC = "?v=130";
+      const grab = (name: string) => load(`/sprites/cricsi/${name}.png${bustC}`);
+      const [idle, kickLwind, kickLhit, kickRwind, kickRhit, punchL, punchR, crouch, crouchBlock, lowPL, lowPR, lowKL, lowKR, jump, jumpPL, jumpPR, jumpKL, jumpKR] = await Promise.all([
+        grab("idle"),
+        grab("kickLwind"),
+        grab("kickLhit"),
+        grab("kickRwind"),
+        grab("kickRhit"),
+        grab("punchLhit"),
+        grab("punchRhit"),
+        grab("crouchReal"),
+        grab("crouchBlock"),
+        grab("lowPunchLhit"),
+        grab("lowPunchRhit"),
+        grab("lowKickLhit"),
+        grab("lowKickRhit"),
+        grab("jump"),
+        grab("jumpPunchLhit"),
+        grab("jumpPunchRhit"),
+        grab("jumpKickLhit"),
+        grab("jumpKickRhit"),
+      ]);
+      if ([idle, kickLwind, kickLhit].every(ok)) this.images.anims.cricsi.kickL = [idle, kickLwind, kickLhit, idle];
+      if ([idle, kickRwind, kickRhit].every(ok)) this.images.anims.cricsi.kickR = [idle, kickRwind, kickRhit, idle];
+      if ([idle, punchL].every(ok)) this.images.anims.cricsi.punchL = [idle, punchL, idle];
+      if ([idle, punchR].every(ok)) this.images.anims.cricsi.punchR = [idle, punchR, idle];
+      if (ok(crouch)) this.images.cricsi.crouch = crouch;
+      if (ok(crouchBlock)) this.cricsiCrouchBlock = crouchBlock;
+      if ([crouch, lowPL, lowPR, lowKL, lowKR].every(ok)) {
+        this.cricsiLow = {
+          punchL: [crouch, lowPL, crouch],
+          punchR: [crouch, lowPR, crouch],
+          kickL: [crouch, lowKL, crouch],
+          kickR: [crouch, lowKR, crouch],
+        };
+      }
+      if ([jump, idle, jumpPL, jumpPR, jumpKL, jumpKR].every(ok)) {
+        this.cricsiAir = {
+          punchL: [jump, jumpPL, jump, idle],
+          punchR: [jump, jumpPR, jump, idle],
+          kickL: [jump, jumpKL, jump, idle],
+          kickR: [jump, jumpKR, jump, idle],
+        };
+      }
+    }
   }
 
   start() {
@@ -2321,6 +2541,7 @@ export class KitchenKombat {
     this.tickBody(this.f2, s2);
     this.face();
     this.separate();
+    this.stickVamp();
     this.maybeSpec2(this.f1);
     this.maybeSpec2(this.f2);
     this.tickBeamDrip(this.f1);
@@ -2835,7 +3056,18 @@ export class KitchenKombat {
     }
 
     if (f.state === "hurt") {
-      if (f.hp > 0 && a.superDashP && this.trySuperDash(f, a, true)) return;
+      if (f.hp > 0 && a.superDashP && this.trySuperDash(f, a, true)) {
+        this.releaseVamp(f);
+        return;
+      }
+      if (f.vampStuck) {
+        f.stun = 0.3;
+        f.pose = "hurt";
+        f.vx = 0;
+        f.vy = 0;
+        f.y = 0;
+        return;
+      }
       if (
         f.id === "agi" &&
         f.hp > 0 &&
@@ -2916,6 +3148,34 @@ export class KitchenKombat {
 
     if (f.state === "attack" && f.atk) {
       f.atkT += dt * (f.rageT > 0 ? 1.3 : 1);
+      if (f.id === "agi" && f.atk.id === "special2") {
+        const other = f === this.f1 ? this.f2 : this.f1;
+        const st = f.atk.startup;
+        const ac = f.atk.active;
+        if (f.vampLatch && other.vampStuck && other.hp > 0 && other.state !== "ko") {
+          const cpu = f === this.f2 && (this.versusCpu || (this.training && this.dummy === "cpu"));
+          const holding = (a.special2 || cpu) && f.meter > 0.35;
+          if (holding) {
+            f.atkT = st + 0.04;
+            f.vx = 0;
+            f.vy = 0;
+            f.y = 0;
+            const spend = Math.min(f.meter, 24 * dt);
+            f.meter -= spend;
+            f.hp = Math.min(MAX_HP, f.hp + spend);
+            other.stun = 0.3;
+            other.state = "hurt";
+            other.pose = "hurt";
+            other.vx = 0;
+            other.vy = 0;
+            return;
+          }
+          this.releaseVamp(f);
+          f.atkT = Math.max(f.atkT, st + ac);
+        } else if (!f.vampLatch && f.atkT >= st + 0.22) {
+          f.atkT = Math.max(f.atkT, st + ac);
+        }
+      }
       if (f.atk.zone === "spin") {
         f.pose = "special";
         const axis = (a.right ? 1 : 0) + (a.left ? -1 : 0);
@@ -3049,9 +3309,11 @@ export class KitchenKombat {
       }
       if (f.atkT >= total) {
         const air = f.y > 4;
-        f.state = air ? "jump" : "idle";
+        const low = !air && !!f.atk.low && a.down;
+        f.state = air ? "jump" : low ? "crouch" : "idle";
         f.atk = null;
-        f.pose = air ? "jump" : "idle";
+        f.pose = air ? "jump" : low ? "crouch" : "idle";
+        if (low) f.crouchGuard = false;
       }
       return;
     }
@@ -3286,6 +3548,26 @@ export class KitchenKombat {
       f.vx *= 0.2;
     } else {
       f.atk = atk;
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && atk.id === "kickR") {
+        const startup = 0.22;
+        const oldTotal = atk.startup + atk.active + atk.recover;
+        const nextTotal = startup + atk.active + atk.recover;
+        f.atk = { ...atk, startup, dmg: Math.round(atk.dmg * nextTotal / oldTotal) };
+      }
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && atk.id === "kickL") {
+        const startup = atk.startup + 0.09;
+        const oldTotal = atk.startup + atk.active + atk.recover;
+        const nextTotal = startup + atk.active + atk.recover;
+        f.atk = { ...atk, startup, dmg: Math.round(atk.dmg * nextTotal / oldTotal) };
+      }
+      if (f.id === "agi" && atk.id === "special2") {
+        const startup = 0.28;
+        const active = 0.62;
+        const recover = 0.22;
+        const oldTotal = atk.startup + atk.active + atk.recover;
+        const whiff = startup + 0.22 + recover;
+        f.atk = { ...atk, startup, active, recover, dmg: Math.round(atk.dmg * whiff / oldTotal) };
+      }
       f.vx *= 0.3;
       if (atk.pounce) {
         if (f.id === "cricsi") {
@@ -3300,6 +3582,7 @@ export class KitchenKombat {
     }
     f.atkT = chained ? atk.startup * 0.55 : 0;
     f.hasHit = false;
+    if (f.vampLatch || f.vampStuck) this.releaseVamp(f);
     f.pose = pose;
     if (atk.id === "special" || atk.id === "special2") f.meter = Math.max(0, f.meter - atk.cost);
     if (atk.zone === "warp") f.invuln = Math.max(f.invuln, atk.startup + 0.04);
@@ -3374,6 +3657,7 @@ export class KitchenKombat {
 
   separate() {
     if (this.f1.shieldT > 0 || this.f2.shieldT > 0) return;
+    if (this.f1.vampLatch || this.f2.vampLatch || this.f1.vampStuck || this.f2.vampStuck) return;
     if (this.f1.superDash || this.f2.superDash) return;
     if (this.f1.warpT > 0 || this.f2.warpT > 0) return;
     const hb1 = this.hurtbox(this.f1);
@@ -3470,11 +3754,21 @@ export class KitchenKombat {
     }
     this.hurtHp(def, dmg);
     if (att.atk.heal) att.hp = Math.min(MAX_HP, att.hp + att.atk.heal);
-    def.vx = dir * att.atk.knock;
-    def.vy = att.atk.id === "kickR" || att.atk.id.startsWith("special") ? 700 : att.atk.id === "kickL" ? 470 : 270;
-    if (att.id === "leo" && (att.atk.id === "kickL" || att.atk.id === "kickR")) def.vy = Math.max(def.vy, 920);
-    def.y += 2;
-    def.stun = att.atk.hitstun;
+    const vamp = att.id === "agi" && att.atk.id === "special2" && def.hp > 0;
+    if (vamp) {
+      att.vampLatch = true;
+      def.vampStuck = true;
+      def.vx = 0;
+      def.vy = 0;
+      def.y = 0;
+      def.stun = 0.4;
+    } else {
+      def.vx = dir * att.atk.knock;
+      def.vy = att.atk.id === "kickR" || att.atk.id.startsWith("special") ? 700 : att.atk.id === "kickL" ? 470 : 270;
+      if (att.id === "leo" && (att.atk.id === "kickL" || att.atk.id === "kickR")) def.vy = Math.max(def.vy, 920);
+      def.y += 2;
+      def.stun = att.atk.hitstun;
+    }
     def.state = "hurt";
     def.pose = "hurt";
     def.atk = null;
@@ -4881,7 +5175,36 @@ export class KitchenKombat {
     if (!this.images || !f.atk) return null;
     const ok = (im: HTMLImageElement | null | undefined) =>
       im && (im.naturalWidth || im.width) > 8 ? im : null;
-    if (f.atk.pose.startsWith("jump") || f.atk.pose.startsWith("low")) {
+    const airSet = f.id === "ricsi" ? this.ricsiAir : f.id === "renike" ? this.renikeAir : f.id === "cricsi" ? this.cricsiAir : null;
+    if (airSet && (f.airAtk || f.atk.pose.startsWith("jump"))) {
+      const air = airSet[f.atk.id];
+      if (air && air.length >= 4) {
+        const t = f.atkT;
+        const st = f.atk.startup;
+        const ac = f.atk.active;
+        const pickAir = (i: number) => ok(air[i]);
+        if (t < st) return pickAir(0);
+        if (t < st + ac) return pickAir(1);
+        return f.y > 4 ? pickAir(2) : pickAir(3);
+      }
+    }
+    if (f.atk.pose.startsWith("jump")) {
+      return ok(this.images[f.id][f.atk.pose]) ?? null;
+    }
+    const lowSet = f.id === "ricsi" ? this.ricsiLow : f.id === "renike" ? this.renikeLow : f.id === "cricsi" ? this.cricsiLow : null;
+    if (f.atk.low && lowSet) {
+      const low = lowSet[f.atk.id];
+      if (low && low.length >= 3) {
+        const t = f.atkT;
+        const st = f.atk.startup;
+        const ac = f.atk.active;
+        const pickLow = (i: number) => ok(low[Math.max(0, Math.min(low.length - 1, i))]);
+        if (t < st) return pickLow(0);
+        if (t < st + ac) return pickLow(1);
+        return pickLow(2);
+      }
+    }
+    if (f.atk.pose.startsWith("low")) {
       return ok(this.images[f.id][f.atk.pose]) ?? null;
     }
     const frames = this.images.anims[f.id][f.atk.id];
@@ -4907,6 +5230,24 @@ export class KitchenKombat {
       if (t < st + ac) return pick(2);
       return pick(3);
     }
+    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.atk.id === "kickL" || f.atk.id === "kickR") && frames.length >= 4) {
+      if (t < st * 0.4) return pick(0);
+      if (t < st) return pick(1);
+      if (t < st + ac) return pick(2);
+      return pick(3);
+    }
+    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.atk.id === "punchL" || f.atk.id === "punchR") && frames.length === 3) {
+      if (t < st) return pick(0);
+      if (t < st + ac) return pick(1);
+      return pick(2);
+    }
+    if (f.id === "agi" && f.atk.id === "special2" && frames.length >= 5) {
+      if (f.vampLatch && t >= st && t < st + ac) return pick(3);
+      if (t < st * 0.42) return pick(0);
+      if (t < st * 0.75) return pick(1);
+      if (t < st + ac) return pick(2);
+      return pick(4);
+    }
     if ((f.atk.zone === "note" || f.atk.zone === "solo") && frames.length >= 2) {
       if (t < st) return pick(0);
       const n = Math.min(4, frames.length);
@@ -4931,7 +5272,10 @@ export class KitchenKombat {
       im && (im.naturalWidth || 0) > 8 ? im : null;
     const hold = this.replayHold[slot];
     const holdOk = hold && hold.id === f.id ? hold.img : null;
-    const img = pick(anim) ?? pick(bag?.[f.pose]) ?? pick(bag?.idle) ?? pick(holdOk);
+    const crouchBlock = f.state === "block" && f.crouchGuard
+      ? f.id === "ricsi" ? this.ricsiCrouchBlock : f.id === "renike" ? this.renikeCrouchBlock : f.id === "cricsi" ? this.cricsiCrouchBlock : null
+      : null;
+    const img = pick(crouchBlock) ?? pick(anim) ?? pick(bag?.[f.pose]) ?? pick(bag?.idle) ?? pick(holdOk);
     if (!img || (img.naturalWidth || 0) < 32) return;
     this.replayHold[slot] = { id: f.id, img };
     let idle = this.boxes[f.id]?.idle;
@@ -4943,7 +5287,7 @@ export class KitchenKombat {
     const bob = f.state === "walk" ? Math.sin(this.time * 12) * 2 : 0;
     const body = 318 * Math.max(0.72, Math.min(1.22, f.squash || 1));
     let scale = body / Math.max(8, idle.h);
-    if (f.pose === "jump") {
+    if (f.pose === "jump" || ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.pose.startsWith("jump") || f.airAtk))) {
       const jumpBox = this.boxes[f.id].jump;
       if (f.id !== "isti" && jumpBox && jumpBox.h < idle.h * 0.82) {
         const closeUp = Math.min(1, idle.w / Math.max(1, jumpBox.w));
@@ -4991,6 +5335,7 @@ export class KitchenKombat {
       if (f.pose === "special" || f.pose === "special2") scale *= 1.08;
     }
     const crouchY = (() => {
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || !!f.atk?.low)) return 1;
       if (f.id === "agi" && (f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
