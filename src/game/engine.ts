@@ -1319,6 +1319,8 @@ export class KitchenKombat {
   cricsiCrouchBlock: HTMLImageElement | null = null;
   cricsiLow: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
   cricsiAir: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  cicaLow: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
+  cicaAir: Partial<Record<"punchL" | "punchR" | "kickL" | "kickR", HTMLImageElement[]>> = {};
   rageBuf: HTMLCanvasElement | null = null;
   screen: Screen = "title";
   phase: "intro" | "fight" | "ko" | "replay" | "finish" | "fatality" | "end" = "intro";
@@ -2037,6 +2039,62 @@ export class KitchenKombat {
         };
       }
     }
+    if (ids.includes("cica")) {
+      const bustCica = "?v=131";
+      const grab = (name: string) => load(`/sprites/cica/${name}.png${bustCica}`);
+      const [idle, kickLwind, kickLhit, kickRwind, kickRhit, punchL, punchR, crouch, lowPL, lowPR, lowKL, lowKR, jump, jumpPL, jumpPR, jumpKL, jumpKR, tiger1, tiger2, tiger3, tiger4] = await Promise.all([
+        grab("idle"),
+        grab("kickLwind"),
+        grab("kickLhit"),
+        grab("kickRwind"),
+        grab("kickRhit"),
+        grab("punchLhit"),
+        grab("punchRhit"),
+        grab("crouchReal"),
+        grab("lowPunchLhit"),
+        grab("lowPunchRhit"),
+        grab("lowKickLhit"),
+        grab("lowKickRhit"),
+        grab("jump"),
+        grab("jumpPunchLhit"),
+        grab("jumpPunchRhit"),
+        grab("jumpKickLhit"),
+        grab("jumpKickRhit"),
+        grab("tiger1"),
+        grab("tiger2"),
+        grab("tiger3"),
+        grab("tiger4"),
+      ]);
+      if ([idle, kickLwind, kickLhit].every(ok)) this.images.anims.cica.kickL = [idle, kickLwind, kickLhit, idle];
+      if ([idle, kickRwind, kickRhit].every(ok)) this.images.anims.cica.kickR = [idle, kickRwind, kickRhit, idle];
+      if ([idle, punchL].every(ok)) this.images.anims.cica.punchL = [idle, punchL, idle];
+      if ([idle, punchR].every(ok)) this.images.anims.cica.punchR = [idle, punchR, idle];
+      if (ok(crouch)) this.images.cica.crouch = crouch;
+      if ([crouch, lowPL, lowPR, lowKL, lowKR].every(ok)) {
+        this.cicaLow = {
+          punchL: [crouch, lowPL, crouch],
+          punchR: [crouch, lowPR, crouch],
+          kickL: [crouch, lowKL, crouch],
+          kickR: [crouch, lowKR, crouch],
+        };
+      }
+      if ([jump, idle, jumpPL, jumpPR, jumpKL, jumpKR].every(ok)) {
+        this.cicaAir = {
+          punchL: [jump, jumpPL, jump, idle],
+          punchR: [jump, jumpPR, jump, idle],
+          kickL: [jump, jumpKL, jump, idle],
+          kickR: [jump, jumpKR, jump, idle],
+        };
+      }
+      if ([idle, tiger1, tiger2, tiger3, tiger4].every(ok)) {
+        this.images.anims.cica.special = [idle, tiger1, tiger2, tiger3, tiger4, idle];
+      }
+      const bustQ = "?v=132";
+      const [q1, q2, q3, q4] = await Promise.all([1, 2, 3, 4].map((i) => load(`/sprites/cica/quake${i}.png${bustQ}`)));
+      if ([idle, q1, q2, q3, q4].every(ok)) {
+        this.images.anims.cica.special2 = [idle, q1, q2, q3, q4, idle];
+      }
+    }
   }
 
   start() {
@@ -2425,8 +2483,9 @@ export class KitchenKombat {
         this.maybeRecordReplay();
       }
       if (this.phase === "finish") {
+        const champ = this.f1.wins > this.f2.wins ? this.f1 : this.f2.wins > this.f1.wins ? this.f2 : null;
         const wa = sampleP1();
-        if (wa.specialP || wa.punchLP || wa.punchRP || wa.kickLP || wa.kickRP) this.doFatality(this.f1.hp > 0 ? this.f1 : this.f2);
+        if (champ === this.f1 && (wa.specialP || wa.punchLP || wa.punchRP || wa.kickLP || wa.kickRP)) this.doFatality(this.f1);
       }
       if (this.winAnnounceT > 0) {
         this.winAnnounceT -= dt;
@@ -3548,13 +3607,13 @@ export class KitchenKombat {
       f.vx *= 0.2;
     } else {
       f.atk = atk;
-      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && atk.id === "kickR") {
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && atk.id === "kickR") {
         const startup = 0.22;
         const oldTotal = atk.startup + atk.active + atk.recover;
         const nextTotal = startup + atk.active + atk.recover;
         f.atk = { ...atk, startup, dmg: Math.round(atk.dmg * nextTotal / oldTotal) };
       }
-      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && atk.id === "kickL") {
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && atk.id === "kickL") {
         const startup = atk.startup + 0.09;
         const oldTotal = atk.startup + atk.active + atk.recover;
         const nextTotal = startup + atk.active + atk.recover;
@@ -3567,6 +3626,12 @@ export class KitchenKombat {
         const oldTotal = atk.startup + atk.active + atk.recover;
         const whiff = startup + 0.22 + recover;
         f.atk = { ...atk, startup, active, recover, dmg: Math.round(atk.dmg * whiff / oldTotal) };
+      }
+      if (f.id === "cica" && atk.id === "special") {
+        const startup = 0.32;
+        const oldTotal = atk.startup + atk.active + atk.recover;
+        const nextTotal = startup + atk.active + atk.recover;
+        f.atk = { ...atk, startup, dmg: Math.round(atk.dmg * nextTotal / oldTotal) };
       }
       f.vx *= 0.3;
       if (atk.pounce) {
@@ -3888,8 +3953,12 @@ export class KitchenKombat {
       return;
     }
     const winner = this.f1.hp > this.f2.hp ? this.f1 : this.f2;
+    const loser = winner === this.f1 ? this.f2 : this.f1;
+    loser.hp = 0;
+    loser.state = "ko";
+    loser.pose = "hurt";
     sfxPlay.ko();
-    sfxPlay.charDefeat(winner === this.f1 ? this.f2.id : this.f1.id);
+    sfxPlay.charDefeat(loser.id);
     this.roundWin(winner);
   }
 
@@ -5175,7 +5244,7 @@ export class KitchenKombat {
     if (!this.images || !f.atk) return null;
     const ok = (im: HTMLImageElement | null | undefined) =>
       im && (im.naturalWidth || im.width) > 8 ? im : null;
-    const airSet = f.id === "ricsi" ? this.ricsiAir : f.id === "renike" ? this.renikeAir : f.id === "cricsi" ? this.cricsiAir : null;
+    const airSet = f.id === "ricsi" ? this.ricsiAir : f.id === "renike" ? this.renikeAir : f.id === "cricsi" ? this.cricsiAir : f.id === "cica" ? this.cicaAir : null;
     if (airSet && (f.airAtk || f.atk.pose.startsWith("jump"))) {
       const air = airSet[f.atk.id];
       if (air && air.length >= 4) {
@@ -5191,7 +5260,7 @@ export class KitchenKombat {
     if (f.atk.pose.startsWith("jump")) {
       return ok(this.images[f.id][f.atk.pose]) ?? null;
     }
-    const lowSet = f.id === "ricsi" ? this.ricsiLow : f.id === "renike" ? this.renikeLow : f.id === "cricsi" ? this.cricsiLow : null;
+    const lowSet = f.id === "ricsi" ? this.ricsiLow : f.id === "renike" ? this.renikeLow : f.id === "cricsi" ? this.cricsiLow : f.id === "cica" ? this.cicaLow : null;
     if (f.atk.low && lowSet) {
       const low = lowSet[f.atk.id];
       if (low && low.length >= 3) {
@@ -5230,16 +5299,32 @@ export class KitchenKombat {
       if (t < st + ac) return pick(2);
       return pick(3);
     }
-    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.atk.id === "kickL" || f.atk.id === "kickR") && frames.length >= 4) {
+    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && (f.atk.id === "kickL" || f.atk.id === "kickR") && frames.length >= 4) {
       if (t < st * 0.4) return pick(0);
       if (t < st) return pick(1);
       if (t < st + ac) return pick(2);
       return pick(3);
     }
-    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.atk.id === "punchL" || f.atk.id === "punchR") && frames.length === 3) {
+    if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && (f.atk.id === "punchL" || f.atk.id === "punchR") && frames.length === 3) {
       if (t < st) return pick(0);
       if (t < st + ac) return pick(1);
       return pick(2);
+    }
+    if (f.id === "cica" && f.atk.id === "special" && frames.length >= 6) {
+      if (t < st * 0.4) return pick(0);
+      if (t < st) return pick(1);
+      if (t < st + ac * 0.5) return pick(2);
+      if (t < st + ac) return pick(3);
+      if (t < st + ac + rec * 0.72) return pick(4);
+      return pick(5);
+    }
+    if (f.id === "cica" && f.atk.id === "special2" && frames.length >= 6) {
+      if (t < st * 0.4) return pick(0);
+      if (t < st) return pick(1);
+      if (t < st + 0.1) return pick(2);
+      if (t < st + 0.28) return pick(3);
+      if (t < st + 0.44) return pick(4);
+      return pick(5);
     }
     if (f.id === "agi" && f.atk.id === "special2" && frames.length >= 5) {
       if (f.vampLatch && t >= st && t < st + ac) return pick(3);
@@ -5273,7 +5358,7 @@ export class KitchenKombat {
     const hold = this.replayHold[slot];
     const holdOk = hold && hold.id === f.id ? hold.img : null;
     const crouchBlock = f.state === "block" && f.crouchGuard
-      ? f.id === "ricsi" ? this.ricsiCrouchBlock : f.id === "renike" ? this.renikeCrouchBlock : f.id === "cricsi" ? this.cricsiCrouchBlock : null
+      ? f.id === "ricsi" ? this.ricsiCrouchBlock : f.id === "renike" ? this.renikeCrouchBlock : f.id === "cricsi" ? this.cricsiCrouchBlock : f.id === "cica" ? bag?.crouch : null
       : null;
     const img = pick(crouchBlock) ?? pick(anim) ?? pick(bag?.[f.pose]) ?? pick(bag?.idle) ?? pick(holdOk);
     if (!img || (img.naturalWidth || 0) < 32) return;
@@ -5287,7 +5372,7 @@ export class KitchenKombat {
     const bob = f.state === "walk" ? Math.sin(this.time * 12) * 2 : 0;
     const body = 318 * Math.max(0.72, Math.min(1.22, f.squash || 1));
     let scale = body / Math.max(8, idle.h);
-    if (f.pose === "jump" || ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.pose.startsWith("jump") || f.airAtk))) {
+    if (f.pose === "jump" || ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && (f.pose.startsWith("jump") || f.airAtk))) {
       const jumpBox = this.boxes[f.id].jump;
       if (f.id !== "isti" && jumpBox && jumpBox.h < idle.h * 0.82) {
         const closeUp = Math.min(1, idle.w / Math.max(1, jumpBox.w));
@@ -5323,8 +5408,6 @@ export class KitchenKombat {
     if (f.id === "farajo" && (f.pose.startsWith("jumpPunch") || f.pose === "punch" || f.pose.startsWith("punchL") || f.pose.startsWith("punchR"))) {
       scale *= 0.86;
     }
-    if (f.id === "cica" && f.pose.startsWith("low")) scale *= 0.6;
-    if (f.id === "cica" && (f.pose === "special" || (f.state === "attack" && f.atk?.pounce))) scale *= 0.68;
     if (f.id === "agi" && (f.pose.startsWith("low") || f.pose === "crouch")) scale *= 1.12;
     if (f.id === "hoffer" && (f.pose === "crouch" || f.pose.startsWith("low"))) scale *= 0.72;
     if (f.id === "alfonz" && f.pose.startsWith("low")) scale *= 0.86;
@@ -5335,7 +5418,7 @@ export class KitchenKombat {
       if (f.pose === "special" || f.pose === "special2") scale *= 1.08;
     }
     const crouchY = (() => {
-      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi") && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || !!f.atk?.low)) return 1;
+      if ((f.id === "ricsi" || f.id === "renike" || f.id === "cricsi" || f.id === "cica") && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || !!f.atk?.low)) return 1;
       if (f.id === "agi" && (f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "cricsi" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
       if (f.id === "jezus" && (f.state === "crouch" || (f.state === "block" && f.crouchGuard) || f.pose === "crouch" || f.pose.startsWith("low"))) return 1;
