@@ -43,7 +43,7 @@ async function pruneEmpty(dir) {
 }
 
 const KEEP = (rel) => rel === "index.html" || rel === "favicon.svg" || /^assets\d*\.zip$/.test(rel) || rel.startsWith("assets/") || rel.startsWith("__grok/");
-const PACK_LIMIT = 185 * 1024 * 1024;
+const PACK_LIMIT = 60 * 1024 * 1024;
 
 await run("npx", ["vite", "build", "--config", "desktop/vite.itch.mjs"]);
 
@@ -78,7 +78,7 @@ await rm(path.join(outDir, "__grok"), { recursive: true, force: true });
 await pruneEmpty(outDir);
 
 const outer = await walkRel(outDir);
-if (outer.length > 20) {
+if (outer.length > 40) {
   console.error(outer);
   throw new Error(`itch folder has ${outer.length} files, expected a handful`);
 }

@@ -16,7 +16,10 @@ export async function readStoredZip(blob: Blob): Promise<PackedFile[]> {
   const tail = new Uint8Array(await blob.slice(tailStart).arrayBuffer());
   let eocd = -1;
   for (let i = tail.length - 22; i >= 0; i--) {
-    if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) eocd = i;
+    if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) {
+      eocd = i;
+      break;
+    }
   }
   if (eocd < 0) throw new Error("assets.zip: nincs tartalomjegyzék");
   const eocdView = new DataView(tail.buffer, tail.byteOffset + eocd, 22);
@@ -65,25 +68,48 @@ function mimeFor(name: string): string {
 }
 
 /** Load assets.zip, then assets2.zip, assets3.zip, … next to index.html. Returns 0 when the first pack is absent (web / Electron). */
-export async function tryInstallAssetPack(): Promise<number> {
+export async function tryInstallAssetPack(onProgress?: (bytes: number) => void): Promise<number> {
   let total = 0;
-  for (let i = 1; i <= 8; i++) {
+  let got = 0;
+  for (let i = 1; i <= 24; i++) {
     const name = i === 1 ? "assets.zip" : `assets${i}.zip`;
-    const n = await loadStoredPack(name);
+    const n = await loadStoredPack(name, (nBytes) => onProgress?.(got + nBytes));
     if (n < 0) break;
-    total += n;
+    got += n.bytes;
+    total += n.count;
+    onProgress?.(got);
   }
   return total;
 }
 
-async function loadStoredPack(name: string): Promise<number> {
-  const res = await fetch(new URL(name, document.baseURI).href);
+async function loadStoredPack(name: string, onProgress: (bytes: number) => void): Promise<{ count: number; bytes: number } | -1> {
+  const res = await fetch(new URL(name, document.location.href).href);
   if (!res.ok) return -1;
-  const blob = await res.blob();
+  const blob = await readBody(res, onProgress);
   if (blob.size < 22) return -1;
   const magic = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
-  if (magic[0] !== 0x50 || magic[1] !== 0x4b) return name === "assets.zip" ? 0 : -1;
+  if (magic[0] !== 0x50 || magic[1] !== 0x4b) return name === "assets.zip" ? { count: 0, bytes: blob.size } : -1;
   const files = await readStoredZip(blob);
   for (const file of files) registerPackedAsset(file.name, URL.createObjectURL(file.blob));
-  return files.length;
+  return { count: files.length, bytes: blob.size };
+}
+
+async function readBody(res: Response, onProgress: (bytes: number) => void): Promise<Blob> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const blob = await res.blob();
+    onProgress(blob.size);
+    return blob;
+  }
+  const parts: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    parts.push(value);
+    got += value.byteLength;
+    onProgress(got);
+  }
+  return new Blob(parts);
 }
