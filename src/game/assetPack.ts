@@ -64,14 +64,25 @@ function mimeFor(name: string): string {
   return "application/octet-stream";
 }
 
-/** Load `assets.zip` next to index.html. Returns 0 when the pack is absent (web / Electron). */
+/** Load assets.zip, then assets2.zip, assets3.zip, … next to index.html. Returns 0 when the first pack is absent (web / Electron). */
 export async function tryInstallAssetPack(): Promise<number> {
-  const res = await fetch(new URL("assets.zip", document.baseURI).href);
-  if (!res.ok) return 0;
+  let total = 0;
+  for (let i = 1; i <= 8; i++) {
+    const name = i === 1 ? "assets.zip" : `assets${i}.zip`;
+    const n = await loadStoredPack(name);
+    if (n < 0) break;
+    total += n;
+  }
+  return total;
+}
+
+async function loadStoredPack(name: string): Promise<number> {
+  const res = await fetch(new URL(name, document.baseURI).href);
+  if (!res.ok) return -1;
   const blob = await res.blob();
-  if (blob.size < 22) return 0;
+  if (blob.size < 22) return -1;
   const magic = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
-  if (magic[0] !== 0x50 || magic[1] !== 0x4b) return 0;
+  if (magic[0] !== 0x50 || magic[1] !== 0x4b) return name === "assets.zip" ? 0 : -1;
   const files = await readStoredZip(blob);
   for (const file of files) registerPackedAsset(file.name, URL.createObjectURL(file.blob));
   return files.length;

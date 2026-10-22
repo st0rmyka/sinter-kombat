@@ -1,8 +1,8 @@
 /**
- * Itch upload stays under the 1000-file limit.
+ * Itch counts one file per zip entry and also rejects any single file over 200 MB.
  * Vite emits loose files, then everything except index.html, favicon.svg and
- * the hashed assets/ folder is stored uncompressed in assets.zip and removed.
- * The game reads that pack at startup. New characters only grow the inner zip.
+ * the hashed assets/ folder is stored uncompressed in assets.zip, assets2.zip, …
+ * each kept under 185 MB. The game reads those packs at startup.
  *
  *   node scripts/build-itch.mjs
  */
@@ -42,13 +42,36 @@ async function pruneEmpty(dir) {
   if (dir !== outDir && (await readdir(dir)).length === 0) await rm(dir, { recursive: true });
 }
 
-const KEEP = (rel) => rel === "index.html" || rel === "favicon.svg" || rel === "assets.zip" || rel.startsWith("assets/") || rel.startsWith("__grok/");
+const KEEP = (rel) => rel === "index.html" || rel === "favicon.svg" || /^assets\d*\.zip$/.test(rel) || rel.startsWith("assets/") || rel.startsWith("__grok/");
+const PACK_LIMIT = 185 * 1024 * 1024;
 
 await run("npx", ["vite", "build", "--config", "desktop/vite.itch.mjs"]);
 
 const packList = (await walkRel(outDir)).filter((rel) => !KEEP(rel));
-await writeFile(listFile, packList.join("\n") + "\n");
-await run("python3", ["scripts/store-zip.py", path.join(outDir, "assets.zip"), outDir, listFile]);
+const packs = [];
+let cur = [];
+let curSize = 0;
+for (const rel of packList) {
+  const bytes = (await stat(path.join(outDir, rel))).size;
+  if (bytes > PACK_LIMIT) throw new Error(`${rel} is ${bytes} bytes, over the itch per-file limit`);
+  const need = bytes + 120 + rel.length * 2;
+  if (cur.length && curSize + need > PACK_LIMIT) {
+    packs.push(cur);
+    cur = [];
+    curSize = 0;
+  }
+  cur.push(rel);
+  curSize += need;
+}
+if (cur.length) packs.push(cur);
+
+for (let i = 0; i < packs.length; i++) {
+  const zipName = i === 0 ? "assets.zip" : `assets${i + 1}.zip`;
+  const partList = path.join(root, "release", `itch-pack-${i}.txt`);
+  await writeFile(partList, packs[i].join("\n") + "\n");
+  await run("python3", ["scripts/store-zip.py", path.join(outDir, zipName), outDir, partList]);
+  await rm(partList, { force: true });
+}
 
 for (const rel of packList) await rm(path.join(outDir, rel), { force: true });
 await rm(path.join(outDir, "__grok"), { recursive: true, force: true });
